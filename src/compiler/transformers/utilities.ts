@@ -12,6 +12,9 @@ import {
     ClassExpression,
     ClassLikeDeclaration,
     ClassStaticBlockDeclaration,
+    combinePaths,
+    CompilerHost,
+    CompilerOptions,
     CompoundAssignmentOperator,
     CoreTransformationContext,
     createExternalHelpersImportDeclarationIfNeeded,
@@ -32,6 +35,7 @@ import {
     getNamespaceDeclarationNode,
     getNodeForGeneratedName,
     getNodeId,
+    getNormalizedAbsolutePath,
     getOriginalNode,
     hasDecorators,
     hasStaticModifier,
@@ -90,6 +94,7 @@ import {
     SyntaxKind,
     TransformationContext,
     unorderedRemoveItem,
+    TypeCheckerHost,
     VariableDeclaration,
     VariableStatement,
 } from "../_namespaces/ts.js";
@@ -110,6 +115,67 @@ export interface ExternalModuleInfo {
     exportedFunctions: Set<FunctionDeclaration>; // all of the top-level exported function declarations
     exportEquals: ExportAssignment | undefined; // an export= declaration if one was present
     hasExportStarsToExportValues: boolean; // whether this module contains export*
+    generatedExportSpecifiers?: Map<Identifier, ExportSpecifier[]>;
+}
+
+export function getImportLocation(fileMap: [string, RegExp][], source: string) {
+    for (const [path, reg] of fileMap) {
+        if (source.match(reg)) {
+            return source.replace(reg, path)
+        }
+    }
+    throw new Error(`cannot get import path for file: ${source} (Make sure to add it in your tsplus.config.json)`)
+}
+
+export function getTraceLocation(traceMap: [string, RegExp][], source: string) {
+    for (const [path, reg] of traceMap) {
+        if (source.match(reg)) {
+            return source.replace(reg, path)
+        }
+    }
+    return source
+}
+
+export function getFileMap(options: CompilerOptions, host: CompilerHost | TypeCheckerHost) {
+    const fileMap: [string, RegExp][] = []
+    if (options.configFilePath && options.tsPlusConfig) {
+        const content = host.readFile?.(getNormalizedAbsolutePath(combinePaths(options.configFilePath, "..", options.tsPlusConfig), void 0))
+        if (content) {
+            try {
+                const parsed = JSON.parse(content)
+                if ("importMap" in parsed && typeof parsed["importMap"] === "object") {
+                    for (const key of Object.keys(parsed["importMap"])) {
+                        if (typeof parsed["importMap"][key] === "string") {
+                            fileMap.push([parsed["importMap"][key], new RegExp(key, "g")]);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+    return fileMap
+}
+
+export function getTraceMap(options: CompilerOptions, host: CompilerHost) {
+    const traceMap: [string, RegExp][] = []
+    if (options.configFilePath && options.tsPlusConfig) {
+        const content = host.readFile(getNormalizedAbsolutePath(combinePaths(options.configFilePath, "..", options.tsPlusConfig), void 0))
+        if (content) {
+            try {
+                const parsed = JSON.parse(content)
+                if ("traceMap" in parsed && typeof parsed["traceMap"] === "object") {
+                    for (const key of Object.keys(parsed["traceMap"])) {
+                        if (typeof parsed["traceMap"][key] === "string") {
+                            traceMap.push([parsed["traceMap"][key], new RegExp(key, "g")]);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+    return traceMap
 }
 
 function containsDefaultReference(node: NamedImportBindings | NamedExportBindings | undefined) {
@@ -172,6 +238,9 @@ export function collectExternalModuleInfo(context: TransformationContext, source
     const compilerOptions = context.getCompilerOptions();
     const externalImports: (ImportDeclaration | ImportEqualsDeclaration | ExportDeclaration)[] = [];
     const exportSpecifiers = new IdentifierNameMultiMap<ExportSpecifier>();
+    // TSPLUS EXTENSION START
+    const generatedExportSpecifiers = new Map<Identifier, ExportSpecifier[]>();
+    // TSPLUS EXTENSION END
     const exportedBindings: Identifier[][] = [];
     const uniqueExports = new Map<string, boolean>();
     const exportedFunctions = new Set<FunctionDeclaration>();
@@ -289,7 +358,7 @@ export function collectExternalModuleInfo(context: TransformationContext, source
         externalImports.unshift(externalHelpersImportDeclaration);
     }
 
-    return { externalImports, exportSpecifiers, exportEquals, hasExportStarsToExportValues, exportedBindings, exportedNames, exportedFunctions, externalHelpersImportDeclaration };
+    return { externalImports, exportSpecifiers, exportEquals, hasExportStarsToExportValues, exportedBindings, exportedNames, exportedFunctions, externalHelpersImportDeclaration, generatedExportSpecifiers };
 
     function addExportedNamesForExportDeclaration(node: ExportDeclaration) {
         for (const specifier of cast(node.exportClause, isNamedExports).elements) {
@@ -298,7 +367,17 @@ export function collectExternalModuleInfo(context: TransformationContext, source
                 const name = specifier.propertyName || specifier.name;
                 if (name.kind !== SyntaxKind.StringLiteral) {
                     if (!node.moduleSpecifier) {
-                        exportSpecifiers.add(name, specifier);
+                        // TSPLUS EXTENSION START
+                        if (isGeneratedIdentifier(name)) {
+                            if (!generatedExportSpecifiers.has(name)) {
+                                generatedExportSpecifiers.set(name, []);
+                            }
+                            generatedExportSpecifiers.get(name)!.push(specifier)
+                        }
+                        else {
+                        // TSPLUS EXTENSION END
+                            exportSpecifiers.add(name, specifier);
+                        }
                     }
 
                     const decl = resolver.getReferencedImportDeclaration(name)

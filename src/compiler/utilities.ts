@@ -286,6 +286,7 @@ import {
     isIdentifier,
     isIdentifierStart,
     isIdentifierText,
+    isImportSpecifier,
     isImportTypeNode,
     isInterfaceDeclaration,
     isJSDoc,
@@ -434,6 +435,7 @@ import {
     Node,
     NodeArray,
     NodeFlags,
+    NodeLinks,
     nodeModulesPathPart,
     NonNullExpression,
     noop,
@@ -526,6 +528,7 @@ import {
     SwitchStatement,
     Symbol,
     SymbolFlags,
+    SymbolLinks,
     SymbolTable,
     SyntaxKind,
     TaggedTemplateExpression,
@@ -551,6 +554,7 @@ import {
     tryRemovePrefix,
     TryStatement,
     TsConfigSourceFile,
+    TsPlusGlobalImport,
     TupleTypeNode,
     Type,
     TypeAliasDeclaration,
@@ -592,7 +596,7 @@ export const resolvingEmptyArray: never[] = [];
 export const externalHelpersModuleNameText = "tslib";
 
 /** @internal */
-export const defaultMaximumTruncationLength = 160;
+export const defaultMaximumTruncationLength = 1_000;
 /** @internal */
 export const noTruncationMaximumTruncationLength = 1_000_000;
 
@@ -2151,6 +2155,9 @@ export function forEachEnclosingBlockScopeContainer(node: Node, cb: (container: 
 // text of the expression in the computed property.
 /** @internal */
 export function declarationNameToString(name: DeclarationName | QualifiedName | undefined) {
+    if (name?.tsPlusName) {
+        return name.tsPlusName;
+    }
     return !name || getFullWidth(name) === 0 ? "(Missing)" : getTextOfNode(name);
 }
 
@@ -11081,6 +11088,12 @@ export function createNameResolver({
     onPropertyWithInvalidInitializer = returnFalse,
     onFailedToResolveSymbol = returnUndefined,
     onSuccessfullyResolvedSymbol = returnUndefined,
+    tsPlusGlobalImportCache,
+    companionSymbolCache,
+    getSymbolLinks,
+    getNodeLinks,
+    getTargetOfImportSpecifier,
+    getGlobalSymbol
 }: {
     compilerOptions: CompilerOptions;
     getSymbolOfDeclaration: (node: Declaration) => Symbol;
@@ -11106,6 +11119,18 @@ export function createNameResolver({
         associatedDeclarationForContainingInitializerOrBindingName: ParameterDeclaration | BindingElement | undefined,
         withinDeferredContext: boolean,
     ) => void;
+    //
+    // TSPLUS START
+    //
+    tsPlusGlobalImportCache: Map<string, TsPlusGlobalImport>
+    companionSymbolCache: Map<Symbol, string[]>
+    getSymbolLinks: (symbol: Symbol) => SymbolLinks
+    getNodeLinks: (node: Node) => NodeLinks,
+    getTargetOfImportSpecifier: (node: ImportSpecifier | BindingElement, dontResolveAlias: boolean) => Symbol | undefined,
+    getGlobalSymbol: (name: __String, meaning: SymbolFlags, diagnostic: DiagnosticMessage | undefined) => Symbol | undefined
+    //
+    // TSPLUS END
+    //
 }) {
     /* eslint-disable no-var */
     var isolatedModulesLikeFlagName = compilerOptions.verbatimModuleSyntax ? "verbatimModuleSyntax" : "isolatedModules";
@@ -11120,6 +11145,7 @@ export function createNameResolver({
         nameNotFoundMessage: DiagnosticMessage | undefined,
         isUse: boolean,
         excludeGlobals?: boolean,
+        checkTsPlusGlobals = true
     ): Symbol | undefined {
         const originalLocation = location; // needed for did-you-mean error reporting, which gathers candidates starting from the original location
         let result: Symbol | undefined;
@@ -11198,6 +11224,38 @@ export function createNameResolver({
                         result = undefined;
                     }
                 }
+                //
+                // TSPLUS START
+                //
+                else {
+                    if (originalLocation && originalLocation.parent && (isPropertyAccessExpression(originalLocation.parent) || isCallExpression(originalLocation.parent))) {
+                        const symbol = location.locals.get(name)
+                        if (symbol) {
+                            if (companionSymbolCache.has(symbol)) {
+                                result = symbol;
+                                getSymbolLinks(symbol).isPossibleCompanionReference = true;
+                                break loop;
+                            }
+                            if (symbol.exportSymbol && companionSymbolCache.has(symbol.exportSymbol)) {
+                                result = symbol.exportSymbol;
+                                getSymbolLinks(symbol.exportSymbol).isPossibleCompanionReference = true;
+                                break loop;
+                            }
+                            if (symbol.declarations && symbol.declarations[0] && isImportSpecifier(symbol.declarations[0])) {
+                                const originalSymbol = getTargetOfImportSpecifier(symbol.declarations[0], false);
+                                if (originalSymbol && companionSymbolCache.has(originalSymbol)) {
+                                    result = originalSymbol;
+                                    getSymbolLinks(originalSymbol).isPossibleCompanionReference = true;
+                                    symbol.isReferenced = SymbolFlags.Value;
+                                    break loop;
+                                }
+                            }
+                        }
+                    }
+                }
+                //
+                // TSPLUS END
+                //
             }
             withinDeferredContext = withinDeferredContext || getIsDeferredContext(location, lastLocation);
             switch (location.kind) {
@@ -11466,6 +11524,47 @@ export function createNameResolver({
                 location.parent;
         }
 
+        //
+        // TSPLUS START
+        //
+        if (!result && originalLocation && checkTsPlusGlobals) {
+            const globalImport = tsPlusGlobalImportCache.get(name as string);
+            if (globalImport) {
+                const targetSymbol = getTargetOfImportSpecifier(globalImport.importSpecifier, false);
+                if (targetSymbol &&
+                    ((targetSymbol.flags & meaning) ||
+                    companionSymbolCache.has(targetSymbol) && (isPropertyAccessExpression(originalLocation.parent) || isCallExpression(originalLocation.parent)))
+                ) {
+                    const withoutGlobals = resolveNameHelper(
+                        originalLocation,
+                        nameArg,
+                        SymbolFlags.All,
+                        void 0,
+                        isUse,
+                        excludeGlobals,
+                        false
+                    );
+                    if (!withoutGlobals) {
+                        getNodeLinks(originalLocation).isTsPlusGlobalIdentifier = true;
+                        if (companionSymbolCache.has(targetSymbol)) {
+                            getSymbolLinks(targetSymbol).isPossibleCompanionReference = true;
+                        }
+                        result = targetSymbol;
+                    }
+                }
+            }
+        }
+        if (!result && originalLocation) {
+            const globalSymbol = getGlobalSymbol(name, SymbolFlags.Type, undefined);
+            if (globalSymbol && companionSymbolCache.has(globalSymbol)) {
+                result = globalSymbol;
+                getSymbolLinks(globalSymbol).isPossibleCompanionReference = true;
+            }
+        }
+        //
+        // TSPLUS END
+        //
+
         // We just climbed up parents looking for the name, meaning that we started in a descendant node of `lastLocation`.
         // If `result === lastSelfReferenceLocation.symbol`, that means that we are somewhere inside `lastSelfReferenceLocation` looking up a name, and resolving to `lastLocation` itself.
         // That means that this is a self-reference of `lastLocation`, and shouldn't count this when considering whether `lastLocation` is used.
@@ -11684,4 +11783,8 @@ export function hasInferredType(node: Node): node is HasInferredType {
             assertType<never>(node);
             return false;
     }
+}
+
+export function isParameterDeclaration(node: Declaration): node is ParameterDeclaration {
+    return node.kind === SyntaxKind.Parameter
 }

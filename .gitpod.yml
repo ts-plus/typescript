@@ -1,0 +1,6 @@
+tasks:
+  - init: npm install && npm run build && npm run gulp local && cd effect && npm install && npm run build
+
+github:
+  prebuilds:
+    addCheck: true

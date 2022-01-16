@@ -1,0 +1,23 @@
+{
+    "name": "@tsplus-test/package1",
+    "type": "module",
+    "exports": {
+      "./*": {
+        "import": "./build/esm/*.js"
+      }
+    },
+    "typesVersions": {
+      "*": {
+        "*": ["./build/dts/*"]
+      }
+    },
+    "scripts": {
+        "build:esm": "node ../../../built/local/tsc.js -p ./tsconfig.json",
+        "build:cjs": "esbuild `find build/esm \\( -name '*.js' \\)` --platform=node --target=node10.4 --format=cjs --outdir=build/cjs --log-level=error",
+        "build": "rm -rf build; npm run build:esm; npm run build:cjs"
+    },
+    "dependencies": {
+        "@effect-ts/core": "^0.52.1",
+        "esbuild": "^0.14.12"
+    }
+}

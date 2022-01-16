@@ -1,0 +1,74 @@
+{
+  "@fp-ts/core/Async": [
+    {
+      "definitionName": "Async",
+      "definitionKind": "interface",
+      "extensions": [
+        {
+          "kind": "type",
+          "typeName": "fp-ts/Async"
+        },
+        {
+          "kind": "companion",
+          "typeName": "fp-ts/AsyncOps"
+        }
+      ]
+    },
+    {
+      "definitionName": "fromSync",
+      "definitionKind": "const",
+      "extensions": [
+        {
+          "kind": "static",
+          "typeName": "fp-ts/AsyncOps",
+          "name": "fromSync"
+        }
+      ]
+    },
+    {
+      "definitionName": "delay",
+      "definitionKind": "const",
+      "extensions": [
+        {
+          "kind": "pipeable",
+          "typeName": "fp-ts/Async",
+          "name": "delay"
+        }
+      ]
+    },
+    {
+      "definitionName": "map",
+      "definitionKind": "const",
+      "extensions": [
+        {
+          "kind": "pipeable",
+          "typeName": "fp-ts/Async",
+          "name": "map"
+        }
+      ]
+    }
+  ],
+  "@fp-ts/core/Option": [
+    {
+      "definitionName": "Option",
+      "definitionKind": "type",
+      "extensions": [
+        {
+          "kind": "type",
+          "typeName": "fp-ts/Option"
+        }
+      ]
+    },
+    {
+      "definitionName": "filter",
+      "definitionKind": "const",
+      "extensions": [
+        {
+          "kind": "pipeable",
+          "typeName": "fp-ts/Option",
+          "name": "filter"
+        }
+      ]
+    }
+  ]
+}

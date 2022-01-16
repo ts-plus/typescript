@@ -17,6 +17,7 @@ import {
     chainBundle,
     ClassDeclaration,
     collectExternalModuleInfo,
+    concatenate,
     Debug,
     Declaration,
     DefaultClause,
@@ -103,6 +104,7 @@ import {
     isLocalName,
     isModifier,
     isModifierLike,
+    isNamedDeclaration,
     isNamedExports,
     isObjectLiteralExpression,
     isOmittedExpression,
@@ -117,6 +119,7 @@ import {
     isVariableDeclaration,
     isVariableDeclarationList,
     LabeledStatement,
+    isTsPlusUniqueIdentifier,
     length,
     mapDefined,
     Modifier,
@@ -2068,12 +2071,28 @@ export function transformModule(context: TransformationContext): (x: SourceFile 
      */
     function appendExportsOfDeclaration(statements: Statement[] | undefined, seen: IdentifierNameMap<boolean>, decl: Declaration, liveBinding?: boolean): Statement[] | undefined {
         const name = factory.getDeclarationName(decl);
-        const exportSpecifiers = currentModuleInfo.exportSpecifiers.get(name);
+        let exportSpecifiers = currentModuleInfo.exportSpecifiers.get(name);
+        // TSPLUS EXTENSION START
         if (exportSpecifiers) {
+            if (currentModuleInfo.generatedExportSpecifiers) {
+                if (currentModuleInfo.generatedExportSpecifiers.has(name)) {
+                    exportSpecifiers = concatenate(exportSpecifiers, currentModuleInfo.generatedExportSpecifiers.get(name)!)
+                }
+            }
+            // TSPLUS EXTENSION END
             for (const exportSpecifier of exportSpecifiers) {
                 statements = appendExportStatement(statements, seen, exportSpecifier.name, name, /*location*/ exportSpecifier.name, /*allowComments*/ undefined, liveBinding);
             }
+            // TSPLUS EXTENSION START
+            if (isNamedDeclaration(decl) && isIdentifier(decl.name) && isTsPlusUniqueIdentifier(decl.name) && currentModuleInfo.generatedExportSpecifiers) {
+                if (currentModuleInfo.generatedExportSpecifiers.has(decl.name)) {
+                    for (const exportSpecifier of currentModuleInfo.generatedExportSpecifiers.get(decl.name)!) {
+                        statements = appendExportStatement(statements, seen, exportSpecifier.name, decl.name, exportSpecifier.name, undefined, liveBinding);
+                    }
+                }
+            }
         }
+        // TSPLUS EXTENSION END
         return statements;
     }
 
