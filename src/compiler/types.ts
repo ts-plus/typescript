@@ -868,6 +868,7 @@ namespace ts {
         /* @internal */ emitNode?: EmitNode;                  // Associated EmitNode (initialized by transforms)
         /* @internal */ contextualType?: Type;                // Used to temporarily assign a contextual type during overload resolution
         /* @internal */ inferenceContext?: InferenceContext;  // Inference context for contextual type
+        /* @internal */ tsPlusName?: string;
     }
 
     export interface JSDocContainer {
@@ -3259,6 +3260,200 @@ namespace ts {
         readonly comment?: string | NodeArray<JSDocComment>;
     }
 
+    export interface TsPlusJSDocTypeTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `type ${string}`
+    }
+
+    export interface TsPlusJSDocUnifyTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `unify ${string}`
+    }
+    
+    export interface TsPlusJSDocIndexTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `index ${string}`
+    }
+
+    export interface TsPlusJSDocExtensionTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `fluent ${string} ${string}`
+    }
+    
+    export interface TsPlusJSDocGetterTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `getter ${string} ${string}`
+    }
+
+    export interface TsPlusJSDocStaticTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `static ${string} ${string}`
+    }
+
+    export interface TsPlusJSDocOperatorTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `operator ${string} ${string}`
+    }
+
+    export interface TsPlusJSDocMacroTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `macro ${string}`
+    }
+
+
+    export type TsPlusMacroCallExpression<K extends string> = CallExpression & { __tsplus_brand: K };
+
+    export const enum TsPlusSymbolTag {
+        Fluent = "TsPlusFluentSymbol",
+        StaticFunction = "TsPlusStaticFunctionSymbol",
+        StaticValue = "TsPlusStaticValueSymbol",
+        UnresolvedStatic = "TsPlusUnresolvedStatic",
+        Getter = "TsPlusGetterSymbol",
+        GetterVariable = "TsPlusGetterVariableSymbol",
+        PipeableMacro = "TsPlusPipeableMacroSymbol",
+        PipeableIdentifier = "TsPlusPipeableSymbol",
+        PipeableDeclaration = "TsPlusPipeableDeclarationSymbol"
+    }
+
+    export interface TsPlusPipeableDeclarationSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.PipeableDeclaration
+        tsPlusDeclaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType;
+    }
+
+    export interface TsPlusPipeableIdentifierSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.PipeableIdentifier;
+        tsPlusDeclaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType;
+        tsPlusDataFirstType: Type;
+        tsPlusTypeName: string;
+        tsPlusName: string;
+    }
+
+    export interface TsPlusPipeableMacroSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.PipeableMacro;
+        tsPlusDeclaration: VariableDeclaration;
+        tsPlusDataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression;
+        tsPlusSourceFile: SourceFile;
+        tsPlusExportName: string;
+    }
+
+    export interface TsPlusFluentSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.Fluent;
+        tsPlusName: string;
+        tsPlusResolvedSignatures: TsPlusSignature[];
+    }
+
+    export type VariableDeclarationWithFunction = Omit<VariableDeclaration, "name" | "initializer"> & { name: Identifier, initializer: ArrowFunction | FunctionExpression };
+
+    export type VariableDeclarationWithFunctionType = Omit<VariableDeclaration, "name" | "type"> & { name: Identifier, type: FunctionTypeNode };
+
+    export interface TsPlusUnresolvedStaticSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.UnresolvedStatic
+        tsPlusDeclaration: VariableDeclaration
+        tsPlusName: string
+    }
+
+    export interface TsPlusStaticFunctionSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.StaticFunction;
+        tsPlusDeclaration: FunctionDeclaration | VariableDeclaration;
+        tsPlusResolvedSignatures: Signature[];
+        tsPlusName: string;
+    }
+
+    export interface TsPlusStaticValueSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.StaticValue;
+        tsPlusResolvedSignatures: TsPlusSignature[];
+        tsPlusName: string;
+        tsPlusDeclaration: VariableDeclaration & { name: Identifier };
+    }
+
+    export interface TsPlusGetterSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.Getter;
+        tsPlusSelfType: Type;
+        tsPlusDeclaration: FunctionDeclaration;
+        tsPlusName: string;
+    }
+
+    export interface TsPlusGetterVariableSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.GetterVariable;
+        tsPlusDeclaration: VariableDeclaration & { name: Identifier };
+        tsPlusSelfType: Type;
+        tsPlusName: string;
+    }
+
+    export type TsPlusSymbol =
+        | TsPlusFluentSymbol
+        | TsPlusStaticFunctionSymbol
+        | TsPlusStaticValueSymbol
+        | TsPlusGetterSymbol
+        | TsPlusGetterVariableSymbol
+        | TsPlusPipeableMacroSymbol
+        | TsPlusPipeableIdentifierSymbol
+        | TsPlusPipeableDeclarationSymbol;
+
+    export interface TsPlusFluentExtension {
+        patched: Symbol;
+        types: { type: Type, signatures: readonly TsPlusSignature[] }[];
+        signatures: readonly TsPlusSignature[];
+    }
+
+    export interface TsPlusUnresolvedStaticExtension {
+        symbol: Symbol;
+        declaration: VariableDeclaration;
+        definition: SourceFile;
+        target: string;
+        name: string;
+        exportName: string;
+    }
+
+    export interface TsPlusUnresolvedFluentExtensionDefinition {
+        declaration: (VariableDeclaration & { name: Identifier }) | FunctionDeclaration;
+        exportName: string;
+        definition: SourceFile;
+    }
+
+    export interface TsPlusUnresolvedFluentExtension {
+        definition: Set<TsPlusUnresolvedFluentExtensionDefinition>;
+        target: string;
+        name: string;
+    }
+
+    export interface TsPlusStaticFunctionExtension {
+        patched: Symbol;
+        definition: SourceFile;
+        exportName: string;
+    }
+
+    export interface TsPlusStaticValueExtension {
+        patched: Symbol;
+        definition: SourceFile;
+        exportName: string;
+    }
+
+    export interface TsPlusPipeableExtension {
+        patched: Symbol;
+        definition: SourceFile;
+        exportName: string;
+    }
+
+    export interface TsPlusType extends Type {
+        tsPlusSymbol: TsPlusSymbol;
+    }
+
+    export interface TsPlusSignature extends Signature {
+        tsPlusTag: "TsPlusSignature";
+        tsPlusFile: SourceFile;
+        tsPlusExportName: string;
+        tsPlusPipeable?: boolean
+    }
+
     export interface JSDocLink extends Node {
         readonly kind: SyntaxKind.JSDocLink;
         readonly name?: EntityName | JSDocMemberName;
@@ -3662,6 +3857,8 @@ namespace ts {
 
         /* @internal */ exportedModulesFromDeclarationEmit?: ExportedModulesFromDeclarationEmit;
         /* @internal */ endFlowNode?: FlowNode;
+
+        tsPlusImportAs?: () => string | undefined
     }
 
     /* @internal */
@@ -4419,6 +4616,30 @@ namespace ts {
         /* @internal */ isPropertyAccessible(node: Node, isSuper: boolean, isWrite: boolean, containingType: Type, property: Symbol): boolean;
         /* @internal */ getTypeOnlyAliasDeclaration(symbol: Symbol): TypeOnlyAliasDeclaration | undefined;
         /* @internal */ getMemberOverrideModifierStatus(node: ClassLikeDeclaration, member: ClassElement): MemberOverrideStatus;
+
+        getGlobalImport(file: SourceFile): string
+        getLocalImport(from: SourceFile, file: SourceFile): string
+        getExtensions(selfNode: Expression): ESMap<string, Symbol>
+        getFluentExtension(target: Type, name: string): TsPlusFluentExtension | undefined
+        getGetterExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
+        getGetterCompanionExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
+        getStaticFunctionExtension(target: Type, name: string): TsPlusStaticFunctionExtension | undefined
+        getStaticValueExtension(target: Type, name: string): TsPlusStaticValueExtension | undefined
+        getOperatorExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
+        getStaticFunctionCompanionExtension(target: Type, name: string): TsPlusStaticFunctionExtension | undefined
+        getStaticValueCompanionExtension(target: Type, name: string): TsPlusStaticValueExtension | undefined
+        shouldMakeLazy(signatureParam: Symbol, callArg: Type): boolean
+        isPipeCall(node: CallExpression): boolean
+        getCallExtension(node: Node): TsPlusStaticFunctionExtension | undefined
+        isTailRec(node: Node): boolean
+        cloneSymbol(symbol: Symbol): Symbol
+        getTextOfBinaryOp(kind: SyntaxKind): string | undefined
+        getInstantiatedTsPlusSignature(declaration: Declaration, args: Expression[], checkMode: CheckMode | undefined): Signature
+        getIndexAccessExpressionCache(): ESMap<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>
+        isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
+        isClassCompanionReference(node: Expression): boolean
+        collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocExtensionTag[]
+        getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
     }
 
     /* @internal */
@@ -6181,6 +6402,9 @@ namespace ts {
         useDefineForClassFields?: boolean;
 
         [option: string]: CompilerOptionsValue | TsConfigSourceFile | undefined;
+
+        tsPlusModuleDiscoveryLocalSuffix?: "js"
+        tsPlusTracingPackageName?: string
     }
 
     export interface WatchOptions {
@@ -6846,7 +7070,8 @@ namespace ts {
         helpers?: EmitHelper[];                  // Emit helpers for the node
         startsOnNewLine?: boolean;               // If the node should begin on a new line
         snippetElement?: SnippetElement;         // Snippet element of the node
-        typeNode?: TypeNode;                         // VariableDeclaration type
+        typeNode?: TypeNode;                     // VariableDeclaration type
+        tsPlusPipeableComment?: boolean;
     }
 
     /* @internal */
