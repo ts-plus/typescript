@@ -1,0 +1,9 @@
+{
+    "scripts": {
+        "postinstall": "npm run build",
+        "build": "cd packages/package1 && npm run build:esm && cd ../package2 && npm run build:esm"
+    },
+    "workspaces": [
+        "packages/*"
+    ]
+}
