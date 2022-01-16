@@ -17,12 +17,12 @@ function main(): void {
     if (args.length < 3) {
         const thisProgramName = relative(process.cwd(), __filename);
         console.log("Usage:");
-        console.log(`\tnode ${thisProgramName} <dev|insiders> <package.json location> <file containing version>`);
+        console.log(`\tnode ${thisProgramName} <dev|insiders|ets> <package.json location> <file containing version>`);
         return;
     }
 
     const tag = args[0];
-    if (tag !== "dev" && tag !== "insiders" && tag !== "experimental") {
+    if (tag !== "dev" && tag !== "insiders" && tag !== "experimental" && tag !== "ets") {
         throw new Error(`Unexpected tag name '${tag}'.`);
     }
 
