@@ -1,4 +1,5 @@
 namespace ts {
+    const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/;
     const enum SignatureFlags {
         None = 0,
         Yield = 1 << 0,
@@ -64,8 +65,7 @@ namespace ts {
     export function isFileProbablyExternalModule(sourceFile: SourceFile) {
         // Try to use the first top-level import/export when available, then
         // fall back to looking for an 'import.meta' somewhere in the tree if necessary.
-        return forEach(sourceFile.statements, isAnExternalModuleIndicatorNode) ||
-            getImportMetaIfNecessary(sourceFile);
+        return forEach(sourceFile.statements, isAnExternalModuleIndicatorNode) || getImportMetaIfNecessary(sourceFile);
     }
 
     function isAnExternalModuleIndicatorNode(node: Node) {
@@ -1183,6 +1183,9 @@ namespace ts {
             sourceFile.nodeCount = nodeCount;
             sourceFile.identifierCount = identifierCount;
             sourceFile.identifiers = identifiers;
+
+            collectTsPlusFileSymbols(sourceFile, sourceFile.statements);
+
             sourceFile.parseDiagnostics = attachFileToDiagnostics(parseDiagnostics, sourceFile);
             if (jsDocDiagnostics) {
                 sourceFile.jsDocDiagnostics = attachFileToDiagnostics(jsDocDiagnostics, sourceFile);
@@ -1192,6 +1195,7 @@ namespace ts {
                 fixupParentReferences(sourceFile);
             }
 
+
             return sourceFile;
 
             function reportPragmaDiagnostic(pos: number, end: number, diagnostic: DiagnosticMessage) {
@@ -1199,10 +1203,117 @@ namespace ts {
             }
         }
 
+        function collectTsPlusFileSymbols(file: SourceFile, statements: NodeArray<Statement>, collectTypesIfNotExported = false) {
+            for (const statement of statements) {
+                if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
+                    if (statement.name.kind === SyntaxKind.Identifier && (statement.name as Identifier).escapedText === "global" as __String) {
+                        collectTsPlusFileSymbols(file, statement.body.statements, true);
+                    }
+                    else if (statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
+                        collectTsPlusFileSymbols(file, statement.body.statements, true)
+                    }
+                    else {
+                        collectTsPlusFileSymbols(file, statement.body.statements, collectTypesIfNotExported);
+                    }
+                }
+                if (
+                    (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement) || isClassDeclaration(statement)) &&
+                    (collectTypesIfNotExported || hasModifierOfKind(statement, SyntaxKind.ExportKeyword))
+                ) {
+                    if (statement.tsPlusTypeTags && statement.tsPlusTypeTags.length > 0) {
+                        file.tsPlusContext.type.push(statement);                        
+                    }
+                    if (isClassDeclaration(statement) && statement.tsPlusCompanionTags && statement.tsPlusCompanionTags.length > 0) {
+                        file.tsPlusContext.companion.push(statement);
+                    }
+                }
+                if(
+                    (isVariableStatement(statement) || isFunctionDeclaration(statement) || isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement) || isClassDeclaration(statement)) &&
+                    hasModifierOfKind(statement, SyntaxKind.ExportKeyword)
+                ) {
+                    if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                        const declaration = statement.declarationList.declarations[0];
+                        if (declaration.name && declaration.name.kind === SyntaxKind.Identifier) {
+                            if (declaration.tsPlusFluentTags && declaration.tsPlusFluentTags.length > 0) {
+                                file.tsPlusContext.fluent.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                            if (declaration.tsPlusPipeableTags && declaration.tsPlusPipeableTags.length > 0) {
+                                file.tsPlusContext.pipeable.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                            if (declaration.tsPlusOperatorTags && declaration.tsPlusOperatorTags.length > 0) {
+                                file.tsPlusContext.operator.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                            if (declaration.tsPlusStaticTags && declaration.tsPlusStaticTags.length > 0) {
+                                file.tsPlusContext.static.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                            if (declaration.tsPlusGetterTags && declaration.tsPlusGetterTags.length > 0) {
+                                file.tsPlusContext.getter.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                        }
+                    }
+                    if (isFunctionDeclaration(statement) && statement.name) {
+                        if (statement.tsPlusFluentTags && statement.tsPlusFluentTags.length > 0) {
+                            file.tsPlusContext.fluent.push(statement);
+                        }
+                        if (statement.tsPlusPipeableTags && statement.tsPlusPipeableTags.length > 0) {
+                            file.tsPlusContext.pipeable.push(statement);
+                        }
+                        if (statement.tsPlusOperatorTags && statement.tsPlusOperatorTags.length > 0) {
+                            file.tsPlusContext.operator.push(statement);
+                        }
+                        if (statement.tsPlusStaticTags && statement.tsPlusStaticTags.length > 0) {
+                            file.tsPlusContext.static.push(statement);
+                        }
+                        if (statement.tsPlusGetterTags && statement.tsPlusGetterTags.length > 0) {
+                            file.tsPlusContext.getter.push(statement);
+                        }
+                        if (statement.tsPlusUnifyTags && statement.tsPlusUnifyTags.length > 0) {
+                            file.tsPlusContext.unify.push(statement);
+                        }
+                        if (statement.tsPlusIndexTags && statement.tsPlusIndexTags.length > 0) {
+                            file.tsPlusContext.index.push(statement);
+                        }
+                    }
+                }
+                else {
+                    if (!collectTypesIfNotExported) {
+                        if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
+                            checkTsPlusNonExportedExtension(statement)
+                        }
+                        if (isClassDeclaration(statement)) {
+                            checkTsPlusNonExportedExtension(statement)
+                        }
+                    }
+                    if (isFunctionDeclaration(statement)) {
+                        checkTsPlusNonExportedExtension(statement)
+                    }
+                    if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                        checkTsPlusNonExportedVariableExtension(statement, statement.declarationList.declarations[0]);
+                    }
+                }
+            }
+        }
+        function hasTsPlusExportedExtensionTags(statement: InterfaceDeclaration | ClassDeclaration | TypeAliasDeclaration | FunctionDeclaration | VariableStatement) {
+            for (const tag of flatMap(statement.jsDoc, (doc) => doc.tags)) {
+                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tsPlusExportedExtensionRegex.test(tag.comment)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        function checkTsPlusNonExportedExtension(declaration: InterfaceDeclaration | ClassDeclaration | TypeAliasDeclaration | FunctionDeclaration): void {
+            if (hasTsPlusExportedExtensionTags(declaration)) {
+                parseErrorAt(declaration.name!.pos + 1, declaration.name!.end, Diagnostics.Declaration_of_an_extension_must_be_exported);
+            }
+        }
+        function checkTsPlusNonExportedVariableExtension(statement: VariableStatement, declaration: VariableDeclaration): void {
+            if (hasTsPlusExportedExtensionTags(statement)) {
+                parseErrorAt(declaration.name!.pos + 1, declaration.name!.end, Diagnostics.Declaration_of_an_extension_must_be_exported);
+            }
+        }
         function withJSDoc<T extends HasJSDoc>(node: T, hasJSDoc: boolean): T {
             return hasJSDoc ? addJSDocComment(node) : node;
         }
-
         let hasDeprecatedTag = false;
         function addJSDocComment<T extends HasJSDoc>(node: T): T {
             Debug.assert(!node.jsDoc); // Should only be called once per node
@@ -3381,6 +3492,11 @@ namespace ts {
                 hasJSDoc
             );
             topLevel = savedTopLevel;
+
+            if (node.jsDoc && find(node.jsDoc, (doc) => !!doc.tags && !!find(doc.tags, (tag) => tag.tagName.escapedText === "tsplus" && tag.comment === "auto"))) {
+                node.isAuto = true;
+            }
+
             return node;
         }
 
@@ -3438,6 +3554,19 @@ namespace ts {
             setYieldContext(savedYieldContext);
             setAwaitContext(savedAwaitContext);
 
+            if (parameters) {
+                let seenAutoParameter = false
+                for (let i = 0; i < parameters.length; i++) {
+                    const param = parameters[i];
+                    if (param.isAuto) {
+                        seenAutoParameter = true;
+                    }
+                    if (!param.isAuto && seenAutoParameter) {
+                        parseErrorAt(param.pos, param.end, Diagnostics.A_non_derived_parameter_cannot_follow_a_derived_parameter);
+                    }
+                }
+            }
+
             return parameters;
         }
 
@@ -3489,7 +3618,21 @@ namespace ts {
             const node = kind === SyntaxKind.CallSignature
                 ? factory.createCallSignature(typeParameters, parameters, type)
                 : factory.createConstructSignature(typeParameters, parameters, type);
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (kind === SyntaxKind.CallSignature && finished.jsDoc) {
+                (finished as CallSignatureDeclaration).tsPlusMacroTags = undefinedIfZeroLength(flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
+                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("macro")) {
+                        const [_, target] = tag.comment.split(" ");
+                        if (!target) {
+                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
+                            return [];
+                        }
+                        return [target];
+                    }
+                    return [];
+                })))
+            }
+            return finished;
         }
 
         function isIndexSignature(): boolean {
@@ -6847,7 +6990,148 @@ namespace ts {
             const node = factory.createVariableStatement(modifiers, declarationList);
             // Decorators are not allowed on a variable statement, so we keep track of them to report them in the grammar checker.
             node.decorators = decorators;
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (finished.jsDoc && finished.declarationList.declarations.length === 1) {
+                addTsPlusValueTags(finished.declarationList.declarations[0], finished.jsDoc);
+            }
+            return finished;
+        }
+
+        function parseTsPlusExtensionTag(tagType: string, typeName: string | undefined, functionName: string | undefined, priority: string | undefined): TsPlusPrioritizedExtensionTag | undefined {
+            if (!typeName || !functionName) {
+                return undefined;
+            }
+            let parsedPriority: number;
+            if (priority) {
+                const n = Number.parseFloat(priority);
+                if (Number.isNaN(n)) {
+                    return undefined;
+                }
+                if (n >= 0) {
+                    parsedPriority = n;
+                }
+            }
+            parsedPriority ||= 0;
+            return { tagType, target: typeName, name: functionName, priority: parsedPriority };
+        }
+
+        function undefinedIfZeroLength<A>(as: A[]): A[] | undefined {
+            if (as.length > 0) {
+                return as;
+            }
+            return undefined;
+        }
+        function addTsPlusValueTags(declaration: FunctionDeclaration | VariableDeclaration, jsDoc: JSDoc[] | undefined): void {
+            if (!jsDoc) return;
+            const deriveTags: string[] = [];
+            const fluentTags: TsPlusPrioritizedExtensionTag[] = [];
+            const staticTags: TsPlusExtensionTag[] = [];
+            const pipeableTags: TsPlusExtensionTag[] = [];
+            const getterTags: TsPlusExtensionTag[] = [];
+            const operatorTags: TsPlusPrioritizedExtensionTag[] = [];
+            const unifyTags: string[] = [];
+            const macroTags: string[] = [];
+            const indexTags: string[] = [];
+            let isImplicit = false;
+            for (const doc of jsDoc) {
+                if (doc.tags) {
+                    for (const tag of doc.tags) {
+                        if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                            const [tagType, target, name, priority] = tag.comment.split(" ")
+                            switch(tagType) {
+                                case "derive": {
+                                    deriveTags.push(tag.comment);
+                                    break;
+                                }
+                                case "fluent": {
+                                    const parsedTag = parseTsPlusExtensionTag(tagType, target, name, priority);
+                                    if (!parsedTag) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
+                                        break;
+                                    }
+                                    fluentTags.push(parsedTag);
+                                    break;
+                                }
+                                case "static": {
+                                    if (!target || !name) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
+                                        break;
+                                    }
+                                    staticTags.push({ tagType, target, name });
+                                    break;
+                                }
+                                case "pipeable": {
+                                    if(!target || !name) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
+                                        break;
+                                    }
+                                    pipeableTags.push({ tagType, target, name });
+                                    break;
+                                }
+                                case "getter": {
+                                    if (!target || !name) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_getter_extension_must_have_the_form_tsplus_getter_typename_name);
+                                        break;
+                                    }
+                                    getterTags.push({ tagType, target, name });
+                                    break;
+                                }
+                                case "operator": {
+                                    const parsedTag = parseTsPlusExtensionTag(tagType, target, name, priority);
+                                    if (!parsedTag) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
+                                        break;
+                                    }
+                                    operatorTags.push(parsedTag);
+                                    break;
+                                }
+                                case "implicit": {
+                                    if (!tag.comment.includes("local")) {
+                                        isImplicit = true;
+                                    }
+                                    break;
+                                }
+                                case "macro": {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
+                                        break;
+                                    }
+                                    macroTags.push(target);
+                                    break;
+                                }
+                                case "unify": {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_unify_extension_must_have_the_form_tsplus_unify_typename);
+                                        break;
+                                    }
+                                    unifyTags.push(target);
+                                    break;
+                                }
+                                case "index": {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_an_index_extension_must_have_the_form_tsplus_index_typename);
+                                        break;
+                                    }
+                                    indexTags.push(target);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusFluentTags = undefinedIfZeroLength(fluentTags);
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusStaticTags = undefinedIfZeroLength(staticTags);
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusPipeableTags = undefinedIfZeroLength(pipeableTags);
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusGetterTags = undefinedIfZeroLength(getterTags);
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusOperatorTags = undefinedIfZeroLength(operatorTags);
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusMacroTags = undefinedIfZeroLength(macroTags);
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusUnifyTags = undefinedIfZeroLength(unifyTags);
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusIndexTags = undefinedIfZeroLength(indexTags);
+            if (isVariableDeclaration(declaration)) {
+                declaration.isTsPlusImplicit = isImplicit;
+            }
         }
 
         function parseFunctionDeclaration(pos: number, hasJSDoc: boolean, decorators: NodeArray<Decorator> | undefined, modifiers: NodeArray<Modifier> | undefined): FunctionDeclaration {
@@ -6868,7 +7152,9 @@ namespace ts {
             setAwaitContext(savedAwaitContext);
             const node = factory.createFunctionDeclaration(modifiers, asteriskToken, name, typeParameters, parameters, type, body);
             (node as Mutable<FunctionDeclaration>).decorators = decorators;
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            addTsPlusValueTags(finished, finished.jsDoc);
+            return finished;
         }
 
         function parseConstructorName() {
@@ -7267,7 +7553,53 @@ namespace ts {
             const node = kind === SyntaxKind.ClassDeclaration
                 ? factory.createClassDeclaration(combineDecoratorsAndModifiers(decorators, modifiers), name, typeParameters, heritageClauses, members)
                 : factory.createClassExpression(combineDecoratorsAndModifiers(decorators, modifiers), name, typeParameters, heritageClauses, members);
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (isClassDeclaration(finished)) {
+                if (finished.jsDoc) {
+                    const typeTags: string[] = [];
+                    const companionTags: string[] = [];
+                    const deriveTags: string[] = [];
+                    for (const doc of finished.jsDoc) {
+                        if (doc.tags) {
+                            for (const tag of doc.tags) {
+                                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                                    const [tagName, target] = tag.comment.split(" ");
+                                    switch (tagName) {
+                                        case "type": {
+                                            if (!target) {
+                                                parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                                break;
+                                            }
+                                            typeTags.push(target);
+                                            break;
+                                        }
+                                        case "companion": {
+                                            if (!target) {
+                                                parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
+                                                break;
+                                            }
+                                            companionTags.push(target);
+                                            break;
+                                        }
+                                        case "derive": {
+                                            if (!target || target !== "nominal") {
+                                                parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_derive_extension_on_a_type_must_have_the_form_tsplus_derive_nominal);
+                                                continue;
+                                            }
+                                            deriveTags.push(target);
+                                            break
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    (finished as Mutable<ClassDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+                    (finished as Mutable<ClassDeclaration>).tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
+                    (finished as Mutable<ClassDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
+                }
+            }
+            return finished;
         }
 
         function parseNameOfClassDeclarationOrExpression(): Identifier | undefined {
@@ -7336,7 +7668,37 @@ namespace ts {
             const members = parseObjectTypeMembers();
             const node = factory.createInterfaceDeclaration(modifiers, name, typeParameters, heritageClauses, members);
             (node as Mutable<InterfaceDeclaration>).decorators = decorators;
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (finished.jsDoc) {
+                const typeTags: string[] = [];
+                const deriveTags: string[] = [];
+                for (const doc of finished.jsDoc) {
+                    if (doc.tags) {
+                        for (const tag of doc.tags) {
+                            if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                                const [tagName, target] = tag.comment.split(" ");
+                                if (tagName === "type") {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                        continue;
+                                    }
+                                    typeTags.push(target);
+                                }
+                                if (tagName === "derive") {
+                                    if (!target || target !== "nominal") {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_derive_extension_on_a_type_must_have_the_form_tsplus_derive_nominal);
+                                        continue;
+                                    }
+                                    deriveTags.push(target);
+                                }
+                            }
+                        }
+                    }
+                }
+                (finished as Mutable<InterfaceDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+                (finished as Mutable<InterfaceDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
+            }
+            return finished;
         }
 
         function parseTypeAliasDeclaration(pos: number, hasJSDoc: boolean, decorators: NodeArray<Decorator> | undefined, modifiers: NodeArray<Modifier> | undefined): TypeAliasDeclaration {
@@ -7348,7 +7710,28 @@ namespace ts {
             parseSemicolon();
             const node = factory.createTypeAliasDeclaration(modifiers, name, typeParameters, type);
             (node as Mutable<TypeAliasDeclaration>).decorators = decorators;
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (finished.jsDoc) {
+                const typeTags: string[] = [];
+                for (const doc of finished.jsDoc) {
+                    if (doc.tags) {
+                        for (const tag of doc.tags) {
+                            if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                                const [tagName, target] = tag.comment.split(" ");
+                                if (tagName === "type") {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                        continue;
+                                    }
+                                    typeTags.push(target);
+                                }
+                            }
+                        }
+                    }
+                }
+                (finished as Mutable<TypeAliasDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+            }
+            return finished;
         }
 
         // In an ambient declaration, the grammar only allows integer literals as initializers.
@@ -7521,7 +7904,12 @@ namespace ts {
             parseSemicolon();
             const node = factory.createImportDeclaration(modifiers, importClause, moduleSpecifier, assertClause);
             (node as Mutable<ImportDeclaration>).decorators = decorators;
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (finished.jsDoc && finished.importClause && finished.importClause.namedBindings && isNamedImports(finished.importClause.namedBindings) && isStringLiteral(finished.moduleSpecifier)) {
+                const tags = flatMap(finished.jsDoc, (doc) => filter(doc.tags, (tag) => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("global")));
+                (finished as Mutable<ImportDeclaration>).isTsPlusGlobal = tags.length > 0;
+            }
+            return finished;
         }
 
         function parseAssertEntry() {
