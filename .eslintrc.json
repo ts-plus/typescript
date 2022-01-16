@@ -1,5 +1,6 @@
 {
     "parser": "@typescript-eslint/parser",
+    "ignorePatterns": ["src/**/*.ts", "effect/**/*.ts"],
     "parserOptions": {
         "warnOnUnsupportedTypeScriptVersion": false,
         "ecmaVersion": 6,

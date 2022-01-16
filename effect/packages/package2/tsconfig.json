@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "build/esm",
+    "declarationDir": "build/dts",
+    "tsPlusConfig": "../../tsplus.config.json",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "files": [
+    "./prelude.d.ts"
+  ],
+  "include": ["src/**/*.ts"]
+}
