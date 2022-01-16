@@ -2033,6 +2033,7 @@ namespace ts {
                 if (result) return result;
             }
 
+            const checker = getTypeChecker();
             // Create the emit resolver outside of the "emitTime" tracking code below.  That way
             // any cost associated with it (like type checking) are appropriate associated with
             // the type-checking counter.
@@ -2041,15 +2042,20 @@ namespace ts {
             // This is because in the -out scenario all files need to be emitted, and therefore all
             // files need to be type checked. And the way to specify that all files need to be type
             // checked is to not pass the file to getEmitResolver.
-            const emitResolver = getTypeChecker().getEmitResolver(outFile(options) ? undefined : sourceFile, cancellationToken);
+            const emitResolver = checker.getEmitResolver(outFile(options) ? undefined : sourceFile, cancellationToken);
 
             performance.mark("beforeEmit");
 
+            const emitTransformers = getTransformers(options, customTransformers, emitOnlyDtsFiles);
+            const patchedTransformers: EmitTransformers = {
+                scriptTransformers: [transformTsPlus(checker, options, host), transformTailRec(checker, options, host), ...emitTransformers.scriptTransformers],
+                declarationTransformers: [transformTsPlusDeclaration(checker, options, host), ...emitTransformers.declarationTransformers]
+            }
             const emitResult = emitFiles(
                 emitResolver,
                 getEmitHost(writeFileCallback),
                 sourceFile,
-                getTransformers(options, customTransformers, emitOnlyDtsFiles),
+                patchedTransformers,
                 emitOnlyDtsFiles,
                 /*onlyBuildInfo*/ false,
                 forceDtsEmit
