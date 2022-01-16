@@ -1,0 +1,20 @@
+{
+    "name": "@org/demo",
+    "type": "module",
+    "exports": {
+        "./*": {
+            "import": "./build/esm/*.js"
+        }
+    },
+    "typesVersions": {
+        "*": {
+            "*": [
+                "./build/dts/*"
+            ]
+        }
+    },
+    "scripts": {
+        "build:esm": "node ../../../built/local/tsc.js -p ./tsconfig.json",
+        "build": "rm -rf build; npm run build:esm;"
+    }
+}

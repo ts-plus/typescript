@@ -82,6 +82,8 @@ import {
     toPath,
     tryCast,
     TryStatement,
+    BinaryExpression,
+    isBinaryExpression,
 } from "./_namespaces/ts";
 
 export interface DocumentHighlights {
@@ -99,6 +101,17 @@ export namespace DocumentHighlights {
             const { openingElement, closingElement } = node.parent.parent;
             const highlightSpans = [openingElement, closingElement].map(({ tagName }) => getHighlightSpanForNode(tagName, sourceFile));
             return [{ fileName: sourceFile.fileName, highlightSpans }];
+        }
+
+        program.getTypeChecker().findAndCheckDoAncestor(node)
+        let currentBinaryAnchestor: BinaryExpression | undefined = findAncestor(node, isBinaryExpression);
+        let binaryExpressionParent = currentBinaryAnchestor;
+        while (currentBinaryAnchestor) {
+            binaryExpressionParent = currentBinaryAnchestor;
+            currentBinaryAnchestor = findAncestor(currentBinaryAnchestor.parent, isBinaryExpression);
+        }
+        if (binaryExpressionParent) {
+            program.getTypeChecker().getTypeAtLocation(binaryExpressionParent);
         }
 
         return getSemanticDocumentHighlights(position, node, program, cancellationToken, sourceFilesToSearch) || getSyntacticDocumentHighlights(node, sourceFile);
