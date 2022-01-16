@@ -16,6 +16,16 @@ namespace ts {
                 return [{ fileName: sourceFile.fileName, highlightSpans }];
             }
 
+            let currentBinaryAnchestor: BinaryExpression | undefined = findAncestor(node, isBinaryExpression);
+            let binaryExpressionParent = currentBinaryAnchestor;
+            while (currentBinaryAnchestor) {
+                binaryExpressionParent = currentBinaryAnchestor;
+                currentBinaryAnchestor = findAncestor(currentBinaryAnchestor.parent, isBinaryExpression);
+            }
+            if (binaryExpressionParent) {
+                program.getTypeChecker().getTypeAtLocation(binaryExpressionParent);
+            }
+
             return getSemanticDocumentHighlights(position, node, program, cancellationToken, sourceFilesToSearch) || getSyntacticDocumentHighlights(node, sourceFile);
         }
 
