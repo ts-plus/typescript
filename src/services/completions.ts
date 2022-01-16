@@ -2173,6 +2173,15 @@ namespace ts.Completions {
                 }
             }
 
+            if (isExpression(node)) {
+                const extensions = typeChecker.getExtensions(node);
+                if (extensions) {
+                    extensions.forEach((extension) => {
+                        addPropertySymbol(extension, /* insertAwait */ false, /* insertQuestionDot */ false);
+                    });
+                }
+            }
+
             if (insertAwait && preferences.includeCompletionsWithInsertText) {
                 const promiseType = typeChecker.getPromisedTypeOfPromise(type);
                 if (promiseType) {
