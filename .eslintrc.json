@@ -1,6 +1,7 @@
 {
     "root": true,
     "parser": "@typescript-eslint/parser",
+    "ignorePatterns": ["src/**/*.ts", "effect/**/*.ts"],
     "parserOptions": {
         "warnOnUnsupportedTypeScriptVersion": false,
         "sourceType": "module"

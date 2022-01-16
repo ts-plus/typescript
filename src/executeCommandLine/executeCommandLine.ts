@@ -791,7 +791,7 @@ function reportWatchModeWithoutSysSupport(sys: System, reportDiagnostic: Diagnos
 }
 
 // This could be inlined everywhere, but this is convenient for debugging and patching.
-const defaultJSDocParsingMode = JSDocParsingMode.ParseForTypeErrors;
+const defaultJSDocParsingMode = JSDocParsingMode.ParseAll;
 
 function performBuild(
     sys: System,
