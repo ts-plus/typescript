@@ -2187,6 +2187,17 @@ namespace ts.Completions {
                 }
             }
 
+            // TSPLUS EXTENSION START
+            if (isExpression(node)) {
+                const extensions = typeChecker.getExtensions(node);
+                if (extensions) {
+                    extensions.forEach((extension) => {
+                        addPropertySymbol(extension, /* insertAwait */ false, /* insertQuestionDot */ false);
+                    });
+                }
+            }
+            // TSPLUS EXTENSION END
+
             if (insertAwait && preferences.includeCompletionsWithInsertText) {
                 const promiseType = typeChecker.getPromisedTypeOfPromise(type);
                 if (promiseType) {
