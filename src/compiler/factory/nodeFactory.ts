@@ -72,7 +72,7 @@ import {
     TaggedTemplateExpression, TemplateExpression, TemplateHead, TemplateLiteral, TemplateLiteralLikeNode,
     TemplateLiteralToken, TemplateLiteralTypeNode, TemplateLiteralTypeSpan, TemplateMiddle, TemplateSpan, TemplateTail,
     TextRange, ThisExpression, ThisTypeNode, ThrowStatement, Token, TokenFlags, TransformFlags, TrueLiteral,
-    TryStatement, TupleTypeNode, Type, TypeAliasDeclaration, TypeAssertion, TypeElement, TypeLiteralNode, TypeNode,
+    TryStatement, TsPlusUniqueIdentifier, TupleTypeNode, Type, TypeAliasDeclaration, TypeAssertion, TypeElement, TypeLiteralNode, TypeNode,
     TypeOfExpression, TypeOfTag, TypeOperatorNode, TypeParameterDeclaration, TypePredicateNode, TypeQueryNode,
     TypeReferenceNode, UnionOrIntersectionTypeNode, UnionTypeNode, UnparsedNode, UnparsedPrepend, UnparsedPrologue,
     UnparsedSource, UnparsedSourceText, UnparsedSyntheticReference, UnparsedTextLike, UnscopedEmitHelper,
@@ -147,6 +147,7 @@ export function createNodeFactory(flags: NodeFactoryFlags, baseFactory: BaseNode
         createTempVariable,
         createLoopVariable,
         createUniqueName,
+        createTsPlusUniqueName,
         getGeneratedNameForNode,
         createPrivateIdentifier,
         createUniquePrivateName,
@@ -1014,6 +1015,15 @@ export function createNodeFactory(flags: NodeFactoryFlags, baseFactory: BaseNode
         Debug.assert((flags & (GeneratedIdentifierFlags.Optimistic | GeneratedIdentifierFlags.FileLevel)) !== GeneratedIdentifierFlags.FileLevel, "GeneratedIdentifierFlags.FileLevel cannot be set without also setting GeneratedIdentifierFlags.Optimistic");
         return createBaseGeneratedIdentifier(text, GeneratedIdentifierFlags.Unique | flags, prefix, suffix);
     }
+
+    // TSPLUS EXTENSION START
+    /** Create a unique name based on the supplied text. */
+    function createTsPlusUniqueName(text: string, flags: GeneratedIdentifierFlags = GeneratedIdentifierFlags.None): TsPlusUniqueIdentifier {
+        const identifier = createUniqueName(text, flags);
+        (identifier as TsPlusUniqueIdentifier).tsPlusUniqueIdentifier = true;
+        return identifier as TsPlusUniqueIdentifier;
+    }
+    // TSPLUS EXTENSION END
 
     /** Create a unique name generated for a node. */
     // @api
@@ -3742,6 +3752,7 @@ export function createNodeFactory(flags: NodeFactoryFlags, baseFactory: BaseNode
         if (exclamationToken) {
             node.transformFlags |= TransformFlags.ContainsTypeScript;
         }
+        node.isTsPlusImplicit = false;
         return node;
     }
 
@@ -4197,6 +4208,7 @@ export function createNodeFactory(flags: NodeFactoryFlags, baseFactory: BaseNode
         assertClause: AssertClause | undefined
     ): ImportDeclaration {
         const node = createBaseDeclaration<ImportDeclaration>(SyntaxKind.ImportDeclaration);
+        node.isTsPlusGlobal = false;
         node.modifiers = asNodeArray(modifiers);
         node.importClause = importClause;
         node.moduleSpecifier = moduleSpecifier;
@@ -5457,6 +5469,20 @@ export function createNodeFactory(flags: NodeFactoryFlags, baseFactory: BaseNode
         node.transformFlags |=
             propagateChildrenFlags(node.statements) |
             propagateChildFlags(node.endOfFileToken);
+        node.tsPlusContext = {
+            type: [],
+            companion: [],
+            noInherit: [],
+            fluent: [],
+            pipeable: [],
+            operator: [],
+            pipeableOperator: [],
+            pipeableIndex: [],
+            static: [],
+            getter: [],
+            unify: [],
+            index: [],
+        };
         return node;
     }
 
@@ -6995,7 +7021,16 @@ function mergeEmitNode(sourceEmitNode: EmitNode, destEmitNode: EmitNode | undefi
     } = sourceEmitNode;
     if (!destEmitNode) destEmitNode = {} as EmitNode;
     // We are using `.slice()` here in case `destEmitNode.leadingComments` is pushed to later.
-    if (leadingComments) destEmitNode.leadingComments = addRange(leadingComments.slice(), destEmitNode.leadingComments);
+    if (leadingComments) {
+        // TSPLUS EXTENSION START
+        if (sourceEmitNode.tsPlusPipeableComment || sourceEmitNode.tsPlusLocationComment) {
+            destEmitNode.leadingComments = leadingComments.slice();
+        }
+        else {
+            destEmitNode.leadingComments = addRange(leadingComments.slice(), destEmitNode.leadingComments);
+        }
+        // TSPLUS EXTENSION END
+    }
     if (trailingComments) destEmitNode.trailingComments = addRange(trailingComments.slice(), destEmitNode.trailingComments);
     if (flags) destEmitNode.flags = flags & ~EmitFlags.Immutable;
     if (commentRange) destEmitNode.commentRange = commentRange;

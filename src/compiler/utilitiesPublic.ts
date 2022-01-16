@@ -45,7 +45,7 @@ import {
     some, sortAndDeduplicate, SortedReadonlyArray, Statement, StringLiteral, StringLiteralLike, Symbol, SyntaxKind,
     TemplateLiteral, TemplateLiteralToken, TemplateMiddle, TemplateTail, TextChangeRange, TextRange, TextSpan,
     TypeElement, TypeNode, TypeOnlyAliasDeclaration, TypeParameterDeclaration, TypeReferenceType, UnaryExpression,
-    UnparsedNode, UnparsedTextLike, VariableDeclaration,
+    UnparsedNode, UnparsedTextLike, VariableDeclaration, TsPlusUniqueIdentifier,
 } from "./_namespaces/ts";
 
 export function isExternalModuleNameRelative(moduleName: string): boolean {
@@ -2159,3 +2159,9 @@ export function isRestParameter(node: ParameterDeclaration | JSDocParameterTag):
     const type = isJSDocParameterTag(node) ? (node.typeExpression && node.typeExpression.type) : node.type;
     return (node as ParameterDeclaration).dotDotDotToken !== undefined || !!type && type.kind === SyntaxKind.JSDocVariadicType;
 }
+
+// TSPLUS EXTENSION START
+export function isTsPlusUniqueIdentifier(node: Identifier): node is TsPlusUniqueIdentifier {
+    return !!(node as TsPlusUniqueIdentifier).tsPlusUniqueIdentifier;
+}
+// TSPLUS EXTENSION END

@@ -1,7 +1,7 @@
 import {
     addEmitFlags, addEmitHelper, addEmitHelpers, addRange, append, ArrowFunction, BinaryExpression, BindingElement,
     Bundle,
-    CallExpression, chainBundle, ClassDeclaration, collectExternalModuleInfo, Debug, Declaration,
+    CallExpression, chainBundle, ClassDeclaration, collectExternalModuleInfo, concatenate, Debug, Declaration,
     DestructuringAssignment, EmitFlags, EmitHelper, EmitHint, emptyArray, EndOfDeclarationMarker, ExportAssignment,
     ExportDeclaration, Expression, ExpressionStatement, ExternalModuleInfo, firstOrUndefined,
     flattenDestructuringAssignment, FlattenLevel, ForStatement, FunctionDeclaration, FunctionExpression,
@@ -16,9 +16,9 @@ import {
     isExportDeclaration, isExportName, isExportNamespaceAsDefaultDeclaration, isExpression, isExternalModule,
     isExternalModuleImportEqualsDeclaration, isForInitializer, isFunctionExpression, isGeneratedIdentifier,
     isIdentifier, isImportCall, isImportClause, isImportEqualsDeclaration, isImportSpecifier, isJsonSourceFile,
-    isLocalName, isModifier, isModifierLike, isNamedExports, isObjectLiteralExpression, isOmittedExpression,
+    isLocalName, isModifier, isModifierLike, isNamedDeclaration, isNamedExports, isObjectLiteralExpression, isOmittedExpression,
     isPrefixUnaryExpression, isShorthandPropertyAssignment, isSimpleCopiableExpression, isSimpleInlineableExpression,
-    isSpreadElement, isStatement, isStringLiteral, length, mapDefined, MergeDeclarationMarker, Modifier, ModifierFlags,
+    isSpreadElement, isStatement, isStringLiteral, isTsPlusUniqueIdentifier, length, mapDefined, MergeDeclarationMarker, Modifier, ModifierFlags,
     ModuleKind, Node, NodeArray, NodeFlags, ObjectLiteralElementLike, outFile, ParameterDeclaration,
     ParenthesizedExpression, PartiallyEmittedExpression, PostfixUnaryExpression, PrefixUnaryExpression, reduceLeft,
     removeAllComments, ScriptTarget, setEmitFlags, setOriginalNode, setTextRange, ShorthandPropertyAssignment,
@@ -1652,12 +1652,27 @@ export function transformModule(context: TransformationContext): (x: SourceFile 
      */
     function appendExportsOfDeclaration(statements: Statement[] | undefined, decl: Declaration, liveBinding?: boolean): Statement[] | undefined {
         const name = factory.getDeclarationName(decl);
-        const exportSpecifiers = currentModuleInfo.exportSpecifiers.get(idText(name));
-        if (exportSpecifiers) {
-            for (const exportSpecifier of exportSpecifiers) {
-                statements = appendExportStatement(statements, exportSpecifier.name, name, /*location*/ exportSpecifier.name, /* allowComments */ undefined, liveBinding);
+        // TSPLUS EXTENSION START
+        let exportSpecifiers = currentModuleInfo.exportSpecifiers.get(idText(name));
+        exportSpecifiers ||= [];
+        if (currentModuleInfo.generatedExportSpecifiers) {
+            if (currentModuleInfo.generatedExportSpecifiers.has(name)) {
+                exportSpecifiers = concatenate(exportSpecifiers, currentModuleInfo.generatedExportSpecifiers.get(name)!)
             }
         }
+        // TSPLUS EXTENSION END
+        for (const exportSpecifier of exportSpecifiers) {
+            statements = appendExportStatement(statements, exportSpecifier.name, name, /*location*/ exportSpecifier.name, /* allowComments */ undefined, liveBinding);
+        }
+        // TSPLUS EXTENSION START
+        if (isNamedDeclaration(decl) && isIdentifier(decl.name) && isTsPlusUniqueIdentifier(decl.name) && currentModuleInfo.generatedExportSpecifiers) {
+            if (currentModuleInfo.generatedExportSpecifiers.has(decl.name)) {
+                for (const exportSpecifier of currentModuleInfo.generatedExportSpecifiers.get(decl.name)!) {
+                    statements = appendExportStatement(statements, exportSpecifier.name, decl.name, exportSpecifier.name, undefined, liveBinding);
+                }
+            }
+        }
+        // TSPLUS EXTENSION END
         return statements;
     }
 
