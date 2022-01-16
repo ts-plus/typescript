@@ -198,6 +198,14 @@ namespace ts {
             defaultValueDescription: false,
         },
         {
+            name: "tsPlusModuleDiscoveryLocalSuffix",
+            type: "string"
+        },
+        {
+            name: "tsPlusTracingPackageName",
+            type: "string"
+        },
+        {
             name: "watch",
             shortName: "w",
             type: "boolean",
