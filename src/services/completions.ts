@@ -2213,7 +2213,18 @@ namespace ts.Completions {
         const getModuleSpecifierResolutionHost = memoizeOne((isFromPackageJson: boolean) => {
             return createModuleSpecifierResolutionHost(isFromPackageJson ? host.getPackageJsonAutoImportProvider!()! : program, host);
         });
-
+        // TSPLUS EXTENSION START
+        typeChecker.findAndCheckDoAncestor(node);
+        let currentBinaryAncestor: BinaryExpression | undefined = findAncestor(node, isBinaryExpression);
+        let binaryExpressionParent = currentBinaryAncestor;
+        while (currentBinaryAncestor) {
+            binaryExpressionParent = currentBinaryAncestor;
+            currentBinaryAncestor = findAncestor(currentBinaryAncestor.parent, isBinaryExpression);
+        }
+        if (binaryExpressionParent) {
+            typeChecker.getTypeAtLocation(binaryExpressionParent);
+        }
+        // TSPLUS EXTENSION END
         if (isRightOfDot || isRightOfQuestionDot) {
             getTypeScriptMemberSymbols();
         }
@@ -2414,6 +2425,17 @@ namespace ts.Completions {
                 }
             }
 
+            // TSPLUS EXTENSION START
+            if (isExpression(node)) {
+                const extensions = typeChecker.getExtensions(node);
+                if (extensions) {
+                    extensions.forEach((extension) => {
+                        addPropertySymbol(extension, /* insertAwait */ false, /* insertQuestionDot */ false);
+                    });
+                }
+            }
+            // TSPLUS EXTENSION END
+
             if (insertAwait && preferences.includeCompletionsWithInsertText) {
                 const promiseType = typeChecker.getPromisedTypeOfPromise(type);
                 if (promiseType) {
@@ -2600,6 +2622,7 @@ namespace ts.Completions {
             const typeOnlyAliasNeedsPromotion = previousToken && !isValidTypeOnlyAliasUseSite(previousToken);
 
             symbols = concatenate(symbols, typeChecker.getSymbolsInScope(scopeNode, symbolMeanings));
+
             Debug.assertEachIsDefined(symbols, "getSymbolsInScope() should all be defined");
             for (let i = 0; i < symbols.length; i++) {
                 const symbol = symbols[i];
@@ -2633,6 +2656,9 @@ namespace ts.Completions {
                     ? KeywordCompletionFilters.TypeAssertionKeywords
                     : KeywordCompletionFilters.TypeKeywords;
             }
+            // TSPLUS EXTENSION START
+            symbols = concatenate(symbols, typeChecker.getTsPlusGlobals());
+            // TSPLUS EXTENSION END
         }
 
         function shouldOfferImportCompletions(): boolean {
