@@ -213,6 +213,7 @@ function createBundler(entrypoint, outfile, taskOptions = {}) {
             external: [
                 ...(taskOptions.external ?? []),
                 "source-map-support",
+                "ts-node",
             ],
             logLevel: "warning",
             // legalComments: "none", // If we add copyright headers to the source files, uncomment.
@@ -920,6 +921,12 @@ export const configureExperimental = task({
     name: "configure-experimental",
     description: "Runs scripts/configurePrerelease.mjs to prepare a build for experimental publishing",
     run: () => exec(process.execPath, ["scripts/configurePrerelease.mjs", "experimental", "package.json", "src/compiler/corePublic.ts"]),
+});
+
+export const configureTsPlus = task({
+    name: "configure-tsplus",
+    description: "Runs scripts/configurePrerelease.mjs to prepare a build for tsplus publishing",
+    run: () => exec(process.execPath, ["scripts/configurePrerelease.mjs", "tsplus", "package.json", "src/compiler/corePublic.ts"]),
 });
 
 export const help = task({

@@ -257,6 +257,22 @@ export namespace BuilderState {
             }
         }
 
+        // TSPLUS START
+        program.getTypeChecker().getTsPlusFiles().get(sourceFile)?.forEach((file) => {
+            if (file !== sourceFile) {
+                addReferencedFile(file.resolvedPath);
+            }
+        })
+        if (!sourceFile.isDeclarationFile) {
+            program.getTypeChecker().getTsPlusGlobalImports().forEach((imp) => {
+                const file = getSourceFileOfNode(imp.declaration);
+                if (file !== sourceFile) {
+                    addReferencedFile(file.resolvedPath);
+                }
+            })
+        }
+        // TSPLUS END
+
         // From ambient modules
         for (const ambientModule of program.getTypeChecker().getAmbientModules()) {
             if (ambientModule.declarations && ambientModule.declarations.length > 1) {
