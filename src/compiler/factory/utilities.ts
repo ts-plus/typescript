@@ -1283,4 +1283,13 @@ namespace ts {
         if (nodes.length === 0) return nodes;
         return setTextRange(factory.createNodeArray([], nodes.hasTrailingComma), nodes);
     }
+
+    export function getParametersOfFunctionOrVariableDeclaration(node: FunctionDeclaration | VariableDeclaration): readonly ParameterDeclaration[] | undefined {
+        if (isFunctionDeclaration(node)) {
+            return node.parameters;
+        }
+        if (node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer))) {
+            return node.initializer.parameters
+        }
+    }
 }
