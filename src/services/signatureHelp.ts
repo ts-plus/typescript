@@ -39,6 +39,11 @@ namespace ts.SignatureHelp {
         }
 
         const isManuallyInvoked = !!triggerReason && triggerReason.kind === "invoked";
+
+        // TSPLUS EXTENSION START
+        typeChecker.findAndCheckDoAncestor(startingToken);
+        // TSPLUS EXTENSION END
+
         const argumentInfo = getContainingArgumentInfo(startingToken, position, sourceFile, typeChecker, isManuallyInvoked);
         if (!argumentInfo) return undefined;
 
@@ -77,8 +82,40 @@ namespace ts.SignatureHelp {
                 if (onlyUseSyntacticOwners && !isSyntacticOwner(startingToken, invocation.node, sourceFile)) {
                     return undefined;
                 }
-                const candidates: Signature[] = [];
-                const resolvedSignature = checker.getResolvedSignatureForSignatureHelp(invocation.node, candidates, argumentCount)!; // TODO: GH#18217
+                let candidates: Signature[] = [];
+                let resolvedSignature = checker.getResolvedSignatureForSignatureHelp(invocation.node, candidates, argumentCount)!; // TODO: GH#18217
+                // TSPLUS EXTENSION BEGIN
+                if(resolvedSignature.declaration && isFunctionDeclaration(resolvedSignature.declaration) && resolvedSignature.parameters.every(isSymbolParameterDeclaration)) {
+                    const declaration = resolvedSignature.declaration;
+                    const lastParam = declaration.parameters[declaration.parameters.length - 1];
+                    const parameterCount = resolvedSignature.thisParameter ? declaration.parameters.length - 1 : declaration.parameters.length;
+                    if(declaration.name && lastParam && isIdentifier(lastParam.name) && lastParam.name.escapedText.toString() === "___tsplusTrace" && argumentCount < parameterCount) {
+                        const untracedDeclaration = factory.createFunctionDeclaration(
+                            declaration.modifiers,
+                            declaration.asteriskToken,
+                            declaration.name,
+                            declaration.typeParameters,
+                            declaration.parameters.slice(0, declaration.parameters.length - 1),
+                            declaration.type,
+                            undefined
+                        );
+                        setParent(untracedDeclaration, declaration.parent);
+                        untracedDeclaration.jsDoc = declaration.jsDoc;
+                        const untracedSignature = checker.createSignature(
+                            untracedDeclaration,
+                            resolvedSignature.typeParameters,
+                            resolvedSignature.thisParameter,
+                            resolvedSignature.parameters.slice(0, resolvedSignature.parameters.length - 1),
+                            resolvedSignature.getReturnType(),
+                            resolvedSignature.resolvedTypePredicate,
+                            resolvedSignature.minArgumentCount,
+                            resolvedSignature.flags
+                        );
+                        resolvedSignature = untracedSignature;
+                        candidates = [untracedSignature];
+                    }
+                }
+                // TSPLUS EXTENSION END
                 return candidates.length === 0 ? undefined : { kind: CandidateOrTypeKind.Candidate, candidates, resolvedSignature };
             }
             case InvocationKind.TypeArgs: {
