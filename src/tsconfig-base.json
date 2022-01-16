@@ -16,7 +16,7 @@
         "noImplicitAny": true,
         "noImplicitThis": true,
         "strictPropertyInitialization": true,
-        "noUnusedLocals": true,
+        "noUnusedLocals": false,
         "noUnusedParameters": true,
 
         "skipLibCheck": true,
