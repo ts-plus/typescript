@@ -2064,4 +2064,10 @@ namespace ts {
     }
 
     // #endregion
+
+    // TSPLUS EXTENSION START
+    export function isTsPlusUniqueIdentifier(node: Identifier): node is TsPlusUniqueIdentifier {
+        return !!(node as TsPlusUniqueIdentifier).tsPlusUniqueIdentifier;
+    }
+    // TSPLUS EXTENSION END
 }
