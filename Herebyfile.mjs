@@ -873,6 +873,12 @@ export const configureExperimental = task({
     run: () => exec(process.execPath, ["scripts/configurePrerelease.mjs", "experimental", "package.json", "src/compiler/corePublic.ts"]),
 });
 
+export const configureTsPlus = task({
+    name: "configure-tsplus",
+    description: "Runs scripts/configurePrerelease.mjs to prepare a build for tsplus publishing",
+    run: () => exec(process.execPath, ["scripts/configurePrerelease.mjs", "tsplus", "package.json", "src/compiler/corePublic.ts"]),
+});
+
 export const help = task({
     name: "help",
     description: "Prints the top-level tasks.",

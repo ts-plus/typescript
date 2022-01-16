@@ -7764,5 +7764,153 @@
     "Non-abstract class '{0}' does not implement all abstract members of '{1}'": {
         "category": "Error",
         "code": 18052
+    },
+    "A recursive call must be in a tail position of a 'tailRec' annotated function.": {
+        "category": "Error",
+        "code": 50000
+    },
+    "A recursive call cannot cross a function boundary in a 'tailRec' annotated function.": {
+        "category": "Error",
+        "code": 50001
+    },
+    "Parameter destructuring is not allowed in a 'tailRec' annotated function.": {
+        "category": "Error",
+        "code": 50002
+    },
+    "Invalid declaration annotated as 'tailRec'": {
+        "category": "Error",
+        "code": 50003
+    },
+    "Values of type 'any' or 'never' are not allowed in lazy function arguments, if the behaviour is intended use an arrow function.": {
+        "category": "Error",
+        "code": 50004
+    },
+    "'Pipeable' macro is only allowed in variable declarations.": {
+        "category": "Error",
+        "code": 50005
+    },
+    "Annotation of a static extension must have the form '@tsplus static [typename] [name]'.": {
+        "category": "Error",
+        "code": 50006
+    },
+    "Annotation of a fluent extension must have the form '@tsplus fluent [typename] [name] [priority?]'.": {
+        "category": "Error",
+        "code": 50007
+    },
+    "Annotation of a getter extension must have the form '@tsplus getter [typename] [name]'.": {
+        "category": "Error",
+        "code": 50008
+    },
+    "Annotation of an operator extension must have the form '@tsplus operator [typename] [symbol] [priority?]'.": {
+        "category": "Error",
+        "code": 50009
+    },
+    "Annotation of a type extension must have the form '@tsplus type [typename]'.": {
+        "category": "Error",
+        "code": 50010
+    },
+    "Annotation of a unify extension must have the form '@tsplus unify [typename]'.": {
+        "category": "Error",
+        "code": 50011
+    },
+    "Annotation of an index extension must have the form '@tsplus index [typename]'.": {
+        "category": "Error",
+        "code": 50012
+    },
+    "Annotation of a companion extension must have the form '@tsplus companion [typename]'.": {
+        "category": "Error",
+        "code": 50013
+    },
+    "Annotation of a macro must have the form '@tsplus macro [name]'.": {
+        "category": "Error",
+        "code": 50014
+    },
+    "The argument of an 'identity' macro must not be a spread element.": {
+        "category": "Error",
+        "code": 50015
+    },
+    "Invalid declaration annotated as 'pipeable'.": {
+        "category": "Error",
+        "code": 50016
+    },
+    "Annotation of a pipeable extension must have the form '@tsplus pipeable [typename] [name]'.": {
+        "category": "Error",
+        "code": 50017
+    },
+    "Declaration annotated as 'pipeable' is not assignable to its corresponding fluent declaration.": {
+        "category": "Error",
+        "code": 50018
+    },
+    "The first parameter of a fluent function cannot be a rest parameter.": {
+        "category": "Error",
+        "code": 50019
+    },
+    "The first parameter of a 'pipeable' annotated function cannot be a rest parameter.": {
+        "category": "Error",
+        "code": 50020
+    },
+    "Declaration of an extension must be exported.": {
+        "category": "Error",
+        "code": 50021
+    },
+    "Global import path cannot be relative.": {
+        "category": "Error",
+        "code": 50022
+    },
+    "Annotation of a derive extension on a type must have the form '@tsplus derive nominal'.": {
+        "category": "Error",
+        "code": 50023
+    },
+    "Annotation of a no-inherit extension must have the form '@tsplus no-inherit [typename]": {
+        "category": "Error",
+        "code": 50024
+    },
+    "A call to bind is only allowed in the context of a Do.": {
+        "category": "Error",
+        "code": 51000
+    },
+    "Cannot find a valid flatMap extension for type '{0}'.": {
+        "category": "Error",
+        "code": 51001
+    },
+    "Cannot find a valid map extension for type '{0}'.": {
+        "category": "Error",
+        "code": 51002
+    },
+    "A Do block must contain at least 1 bound value": {
+        "category": "Error",
+        "code": 51003
+    },
+    "Cannot find a valid '{0}' that can handle all the types of '{1}'": {
+        "category": "Error",
+        "code": 51004
+    },
+    "The first argument of a Do must be an arrow function": {
+        "category": "Error",
+        "code": 51005
+    },
+    "Cannot derive type '{0}' and no derivation rules are found.": {
+        "category": "Error",
+        "code": 60000
+    },
+    "Cannot derive type '{0}', you may want to try add an implicit for '{1}' in scope.": {
+        "category": "Error",
+        "code": 60001
+    },
+    "Cannot derive type '{0}', the derivation requires a lazy rule to be in scope as it is cyclic for the type '{1}'.": {
+        "category": "Error",
+        "code": 60002
+    },
+    "Failed derivation of type '{0}'.": {
+        "category": "Error",
+        "code": 60003
+    },
+    "Deriving type '{0}' {1}.": {
+        "category": "Error",
+        "code": 60004
+    },
+    "A non-derived parameter cannot follow a derived parameter.": {
+        "category": "Error",
+        "code": 60005
     }
 }
