@@ -1,0 +1,27 @@
+{
+    "name": "@org/demo",
+    "type": "module",
+    "exports": {
+        "./*": {
+            "import": "./build/esm/*.js"
+        }
+    },
+    "typesVersions": {
+        "*": {
+            "*": [
+                "./build/dts/*"
+            ]
+        }
+    },
+    "scripts": {
+        "build:esm": "node ../../../built/local/tsc.js -p ./tsconfig.json",
+        "build": "rm -rf build; npm run build:esm;"
+    },
+    "devDependencies": {
+        "@tsplus/stdlib-global": "^0.0.15"
+    },
+    "dependencies": {
+        "@tsplus/stdlib": "^0.0.50",
+        "@effect/core": "^0.0.1"
+    }
+}

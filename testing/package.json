@@ -1,0 +1,11 @@
+{
+    "name": "org",
+    "scripts": {
+        "postinstall": "npm run build",
+        "clean": "cd packages/demo && rm -rf build",
+        "build": "cd packages/demo && npm run build:esm"
+    },
+    "workspaces": [
+        "packages/*"
+    ]
+}
