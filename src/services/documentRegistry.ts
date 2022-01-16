@@ -306,7 +306,7 @@ export function createDocumentRegistryInternal(useCaseSensitiveFileNames?: boole
 
         if (!entry) {
             // Have never seen this file with these settings.  Create a new source file for it.
-            const sourceFile = createLanguageServiceSourceFile(fileName, scriptSnapshot, sourceFileOptions, version, /*setNodeParents*/ false, scriptKind);
+            const sourceFile = createLanguageServiceSourceFile(fileName, scriptSnapshot, sourceFileOptions, version, /*setNodeParents*/ false, scriptKind, host?.getCompilationSettings());
             if (externalCache) {
                 externalCache.setDocument(keyWithMode, path, sourceFile);
             }
@@ -322,7 +322,7 @@ export function createDocumentRegistryInternal(useCaseSensitiveFileNames?: boole
             // return it as is.
             if (entry.sourceFile.version !== version) {
                 entry.sourceFile = updateLanguageServiceSourceFile(entry.sourceFile, scriptSnapshot, version,
-                    scriptSnapshot.getChangeRange(entry.sourceFile.scriptSnapshot!)); // TODO: GH#18217
+                    scriptSnapshot.getChangeRange(entry.sourceFile.scriptSnapshot!), undefined, compilationSettings); // TODO: GH#18217
                 if (externalCache) {
                     externalCache.setDocument(keyWithMode, path, entry.sourceFile);
                 }
