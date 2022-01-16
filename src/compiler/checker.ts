@@ -1031,9 +1031,80 @@ import {
     WideningContext,
     WithStatement,
     YieldExpression,
+    ClassDeclarationWithIdentifier,
+    Derivation,
+    flatMapIterator,
+    FromObjectStructure,
+    FromPriorDerivation,
+    FromRule,
+    getAllJSDocTags,
+    getFileMap,
+    getImportLocation,
+    getJSDocCommentsAndTags,
+    isReturnStatement,
+    JSDocTag,
+    mapIterator,
+    NamedImports,
+    Rule,
+    TsPlusFluentExtension,
+    TsPlusFluentSymbol,
+    TsPlusGetterExtension,
+    TsPlusGetterSymbol,
+    TsPlusGetterVariableSymbol,
+    TsPlusGlobalImport,
+    TsPlusMacroCallExpression,
+    TsPlusOperatorExtension,
+    TsPlusPipeableDeclarationSymbol,
+    TsPlusPipeableExtension,
+    TsPlusPipeableIdentifierSymbol,
+    TsPlusPipeableMacroSymbol,
+    TsPlusSignature,
+    TsPlusStaticFunctionExtension,
+    TsPlusStaticFunctionSymbol,
+    TsPlusStaticValueExtension,
+    TsPlusStaticValueSymbol,
+    TsPlusSymbol,
+    TsPlusSymbolTag,
+    TsPlusType,
+    TsPlusUnresolvedFluentExtension,
+    TsPlusUnresolvedPipeableExtension,
+    TsPlusUnresolvedStaticExtension,
+    VariableDeclarationWithFunction,
+    VariableDeclarationWithFunctionType,
+    VariableDeclarationWithIdentifier,
+    LocalsContainer,
 } from "./_namespaces/ts";
 import * as performance from "./_namespaces/ts.performance";
 import * as moduleSpecifiers from "./_namespaces/ts.moduleSpecifiers";
+
+// TSPLUS EXTENSION START
+const tsPlusDebug = false;
+const invertedBinaryOp = {
+    [SyntaxKind.LessThanToken]: "<" as __String,
+    [SyntaxKind.GreaterThanToken]: ">" as __String,
+    [SyntaxKind.LessThanEqualsToken]: "<=" as __String,
+    [SyntaxKind.GreaterThanEqualsToken]: ">=" as __String,
+    [SyntaxKind.EqualsEqualsToken]: "==" as __String,
+    [SyntaxKind.ExclamationEqualsToken]: "!=" as __String,
+    [SyntaxKind.EqualsEqualsEqualsToken]: "===" as __String,
+    [SyntaxKind.ExclamationEqualsEqualsToken]: "!==" as __String,
+    [SyntaxKind.PlusToken]: "+" as __String,
+    [SyntaxKind.MinusToken]: "-" as __String,
+    [SyntaxKind.AsteriskAsteriskToken]: "**" as __String,
+    [SyntaxKind.AsteriskToken]: "*" as __String,
+    [SyntaxKind.SlashToken]: "/" as __String,
+    [SyntaxKind.PercentToken]: "%" as __String,
+    [SyntaxKind.LessThanLessThanToken]: "<<" as __String,
+    [SyntaxKind.GreaterThanGreaterThanToken]: ">>" as __String,
+    [SyntaxKind.GreaterThanGreaterThanGreaterThanToken]: ">>>" as __String,
+    [SyntaxKind.AmpersandToken]: "&" as __String,
+    [SyntaxKind.BarToken]: "|" as __String,
+    [SyntaxKind.CaretToken]: "^" as __String,
+    [SyntaxKind.AmpersandAmpersandToken]: "&&" as __String,
+    [SyntaxKind.BarBarToken]: "||" as __String,
+    [SyntaxKind.QuestionQuestionToken]: "??" as __String
+} as const;
+// TSPLUS EXTENSION END
 
 const ambientModuleSymbolRegex = /^".+"$/;
 const anon = "(anonymous)" as __String & string;
@@ -1366,6 +1437,42 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         deferredDiagnosticsCallbacks.push(arg);
     };
 
+    // TSPLUS EXTENSION START
+    const typeHashCache = new Map<Type, number>();
+    const typeSymbolCache = new Map<Symbol, string[]>();
+    const companionSymbolCache = new Map<Symbol, string[]>();
+    const resolvedFluentCache = new Map<string, Map<string, TsPlusFluentExtension>>();
+    const fluentCache = new Map<string, Map<string, () => TsPlusFluentExtension | undefined>>();
+    const fileMap = {
+        map: getFileMap(host.getCompilerOptions(), host)
+    };
+    const tsPlusWorldScope: {
+        implicits: Map<string, Set<Symbol>>;
+        rules: Map<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Declaration, Set<string>][] }>;
+    } = {
+        implicits: new Map(),
+        rules: new Map()
+    };
+    const unresolvedFluentCache = new Map<string, Map<string, TsPlusUnresolvedFluentExtension>>();
+    const unresolvedPipeableCache = new Map<string, Map<string, TsPlusUnresolvedPipeableExtension>>();
+    const unresolvedPipeableOperatorCache = new Map<string, Map<string, TsPlusUnresolvedPipeableExtension>>();
+    const getterCache = new Map<string, Map<string, TsPlusGetterExtension>>();
+    const operatorCache = new Map<string, Map<string, TsPlusOperatorExtension[]>>();
+    const staticFunctionCache = new Map<string, Map<string, TsPlusStaticFunctionExtension>>()
+    const staticValueCache = new Map<string, Map<string, TsPlusStaticValueExtension>>();
+    const staticCache = new Map<string, Map<string, () => TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined>>();
+    const unresolvedStaticCache = new Map<string, Map<string, TsPlusUnresolvedStaticExtension>>();
+    const identityCache = new Map<string, FunctionDeclaration>();
+    const callCache = new Map<Node, TsPlusStaticFunctionExtension>();
+    const indexCache = new Map<string, () => { declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, signature: Signature, definition: SourceFile, exportName: string } | undefined>();
+    const resolvedIndexCache = new Map<string, { declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, signature: Signature, definition: SourceFile, exportName: string }>();
+    const indexAccessExpressionCache = new Map<Node, { signature: Signature, declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, definition: SourceFile, exportName: string }>();
+    const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
+    const tsPlusGlobalImportCache = new Map<string, TsPlusGlobalImport>()
+    const tsPlusFiles = new Map<string, Set<SourceFile>>();
+    const tsPlusFilesFinal = new Map<SourceFile, Set<SourceFile>>();
+    // TSPLUS EXTENSION END
+
     // Cancellation that controls whether or not we can cancel in the middle of type checking.
     // In general cancelling is *not* safe for the type checker.  We might be in the middle of
     // computing something, and we will leave our internals in an inconsistent state.  Callers
@@ -1394,6 +1501,15 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
 
     const emptySymbols = createSymbolTable();
     const arrayVariances = [VarianceFlags.Covariant];
+
+    const tsplusStringPrimitiveSymbol = createSymbol(SymbolFlags.None, "string" as __String);
+    const tsplusNumberPrimitiveSymbol = createSymbol(SymbolFlags.None, "number" as __String);
+    const tsplusBooleanPrimitiveSymbol = createSymbol(SymbolFlags.None, "boolean" as __String);
+    const tsplusBigIntPrimitiveSymbol = createSymbol(SymbolFlags.None, "bigint" as __String);
+    const tsplusFunctionPrimitiveSymbol = createSymbol(SymbolFlags.None, "function" as __String);
+    const tsplusObjectPrimitiveSymbol = createSymbol(SymbolFlags.None, "object" as __String);
+    const tsplusArraySymbol = createSymbol(SymbolFlags.None, "array" as __String);
+    const tsplusReadonlyArraySymbol = createSymbol(SymbolFlags.None, "readonlyArray" as __String);
 
     const compilerOptions = host.getCompilerOptions();
     const languageVersion = getEmitScriptTarget(compilerOptions);
@@ -1776,6 +1892,123 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         getTypeOnlyAliasDeclaration,
         getMemberOverrideModifierStatus,
         isTypeParameterPossiblyReferenced,
+        // TSPLUS EXTENSION BEGIN
+        getExtensions,
+        getGetterExtension,
+        getFluentExtension,
+        getStaticExtension,
+        getStaticCompanionExtension,
+        getGetterCompanionExtension,
+        getCallExtension,
+        isPipeCall: (node) => {
+            const type = getTypeOfNode(node.expression);
+            if (type.symbol && type.symbol.declarations) {
+                return type.symbol.declarations.flatMap(collectTsPlusMacroTags).findIndex((tag) => tag === "pipe") !== -1;
+            }
+            return false;
+        },
+        isTailRec,
+        cloneSymbol,
+        getTextOfBinaryOp,
+        getInstantiatedTsPlusSignature,
+        getIndexAccessExpressionCache: () => indexAccessExpressionCache,
+        isTsPlusMacroCall,
+        isTsPlusMacroGetter,
+        isCompanionReference,
+        collectTsPlusFluentTags,
+        hasExportedPlusTags: (declaration) => {
+            return collectTsPlusFluentTags(declaration).length > 0 ||
+                collectTsPlusPipeableTags(declaration).length > 0 ||
+                collectTsPlusGetterTags(declaration).length > 0 ||
+                collectTsPlusIndexTags(declaration).length > 0 ||
+                collectTsPlusPipeableIndexTags(declaration).length > 0 ||
+                collectTsPlusOperatorTags(declaration).length > 0 ||
+                collectTsPlusPipeableOperatorTags(declaration).length > 0 ||
+                collectTsPlusStaticTags(declaration).length > 0 ||
+                isTsPlusImplicit(declaration) ||
+                collectTsPlusDeriveTags(declaration).length > 0
+        },
+        getFluentExtensionForPipeableSymbol,
+        getPrimitiveTypeName,
+        getResolvedOperator: (node) => {
+            const nodeLinks = getNodeLinks(node.operatorToken);
+            if (nodeLinks.resolvedSignature === undefined && nodeLinks.isTsPlusOperatorToken === undefined) {
+                checkBinaryLikeExpression(node.left, node.operatorToken, node.right);
+            }
+            return nodeLinks.resolvedSignature;
+        },
+        getNodeLinks,
+        collectTsPlusMacroTags,
+        getTsPlusGlobals: () => {
+            return arrayFrom(mapIterator(tsPlusGlobalImportCache.values(), ({ importSpecifier }) => getSymbolAtLocation(importSpecifier.name)!));
+        },
+        getTsPlusGlobal: (name) => {
+            return tsPlusGlobalImportCache.get(name);
+        },
+        findAndCheckDoAncestor: (node) => {
+            const doCall = findAncestor(node, (node): node is CallExpression => {
+                if (isCallExpression(node) && isIdentifier(node.expression)) {
+                    const symbol = checker.getSymbolAtLocation(node.expression)
+                    if (symbol && symbol.declarations) {
+                        for (const declaration of symbol.declarations) {
+                            return collectTsPlusMacroTags(declaration).indexOf("Do") !== -1;
+                        }
+                    }
+                }
+                return false;
+            })
+            if (doCall) {
+                checker.getTypeAtLocation(doCall);
+            }
+        },
+        getTsPlusSymbolAtLocation: (node) => {
+            const type = checker.getTypeAtLocation(node);
+            let symbol: TsPlusSymbol | undefined;
+            if (isTsPlusType(type)) {
+                symbol = type.tsPlusSymbol;
+            }
+            if (type.symbol && isTsPlusSymbol(type.symbol)) {
+                symbol = type.symbol;
+            }
+            if (type.aliasSymbol && isTsPlusSymbol(type.aliasSymbol)) {
+                symbol = type.aliasSymbol;
+            }
+            if (!symbol) {
+                symbol = getNodeLinks(node.parent).tsPlusSymbol;
+            }
+            return symbol;
+        },
+        getTsPlusExtensionsAtLocation: (node) => {
+            const symbol = checker.getTsPlusSymbolAtLocation(node);
+            if (symbol) {
+                switch (symbol.tsPlusTag) {
+                    case TsPlusSymbolTag.Fluent: {
+                        const signature = symbol.tsPlusResolvedSignatures[0];
+                        if (signature && signature.tsPlusDeclaration) {
+                            return checker.getExtensionsForDeclaration(signature.tsPlusDeclaration);
+                        }
+                        break;
+                    }
+                    case TsPlusSymbolTag.Getter:
+                    case TsPlusSymbolTag.GetterVariable:
+                    case TsPlusSymbolTag.StaticValue:
+                    case TsPlusSymbolTag.StaticFunction: {
+                        return checker.getExtensionsForDeclaration(symbol.tsPlusDeclaration);
+                    }
+                }
+            }
+            return [];
+        },
+        getExtensionsForDeclaration: (node) => {
+            return collectTsPlusStaticTags(node)
+                .concat(collectTsPlusFluentTags(node))
+                .concat(collectTsPlusGetterTags(node))
+                .concat(collectTsPlusOperatorTags(node))
+        },
+        getTsPlusFiles: () => tsPlusFilesFinal,
+        getTsPlusGlobalImports: () => tsPlusGlobalImportCache,
+        getSymbolLinks,
+        // TSPLUS EXTENSION END
     };
 
     function runWithInferenceBlockedFromSourceNode<T>(node: Node | undefined, fn: () => T): T {
@@ -1801,6 +2034,667 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return result;
     }
 
+    // TSPLUS EXTENSION BEGIN
+    function getPrimitiveTypeName(type: Type): string | undefined {
+        if (type.flags & TypeFlags.StringLike) {
+            return "String";
+        }
+        if (type.flags & TypeFlags.NumberLike) {
+            return "Number";
+        }
+        if (type.flags & TypeFlags.BooleanLike) {
+            return "Boolean";
+        }
+        if (type.flags & TypeFlags.BigIntLike) {
+            return "BigInt";
+        }
+    }
+    function getTextOfBinaryOp(kind: SyntaxKind): string | undefined {
+        return invertedBinaryOp[kind as keyof typeof invertedBinaryOp] as string | undefined;
+    }
+    function getCallExtension(node: Node) {
+        return callCache.get(node);
+    }
+    function isTailRec(node: Node) {
+        const links = getNodeLinks(node);
+        if (links.isTsPlusTailRec === undefined) {
+            for (const tag of getJSDocTags(node)) {
+                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment === "tailRec") {
+                    links.isTsPlusTailRec = true;
+                    return links.isTsPlusTailRec;
+                }
+            }
+            links.isTsPlusTailRec = false;
+        }
+        return links.isTsPlusTailRec;
+    }
+    function getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol) {
+        const extension = fluentCache.get(symbol.tsPlusTypeName)?.get(symbol.tsPlusName)?.();
+        if (extension && every(extension.signatures, (sig) => !sig.tsPlusPipeable)) {
+            return extension;
+        }
+    }
+    function intersectSets<A>(sets: readonly Set<A>[]): Set<A> {
+        if (sets.length === 0) {
+            return new Set();
+        }
+        if (sets.length === 1) {
+            return sets[0];
+        }
+
+        let shortest: Set<A> | undefined;
+        for (const set of sets) {
+            if (shortest === undefined || shortest.size > set.size) {
+                shortest = set
+            }
+        }
+
+        // copy the shortest set, so as not to iterate over and delete items from the same set
+        const out = new Set(shortest)
+
+        for (const set of sets) {
+            shortest!.forEach((a) => {
+                if (!set.has(a)) {
+                    out.delete(a)
+                }
+            })
+        }
+
+        return out;
+    }
+    function collectRelevantSymbolsLoop(target: Type, lastNoInherit: Set<string>, lastSeen?: Set<Type>) {
+        const seen: Set<Type> = new Set(lastSeen);
+        const noInherit: Set<string> = new Set(lastNoInherit);
+        const relevant: Set<Symbol> = new Set();
+        let queue: Type[] = [target]
+        while (queue.length > 0) {
+            const target = queue.shift()!
+            if (target.symbol) {
+                collectExcludedInheritance(target.symbol);
+            }
+            if (target.aliasSymbol) {
+                collectExcludedInheritance(target.aliasSymbol);
+            }
+            if (target.symbol && shouldInherit(target.symbol)) {
+                // Add the current symbol to the return Set
+                relevant.add(target.symbol)
+                // Check if the current type inherits other types
+                if (inheritanceSymbolCache.has(target.symbol)) {
+                    inheritanceSymbolCache.get(target.symbol)!.forEach(addInheritedSymbol);
+                }
+                else if (target.symbol.declarations) {
+                    target.symbol.declarations.forEach((declaration) => {
+                        if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.heritageClauses) {
+                            tryCacheTsPlusInheritance(target.symbol, declaration.heritageClauses);
+                            if (inheritanceSymbolCache.has(target.symbol)) {
+                                inheritanceSymbolCache.get(target.symbol)!.forEach(addInheritedSymbol);
+                            }
+                        }
+                    })
+                }
+            }
+            if (target.aliasSymbol && shouldInherit(target.aliasSymbol)) {
+                // Add the current symbol to the return Set
+                relevant.add(target.aliasSymbol);
+                if (inheritanceSymbolCache.has(target.aliasSymbol)) {
+                    inheritanceSymbolCache.get(target.aliasSymbol)!.forEach(addInheritedSymbol)
+                }
+                // If the current type is a union type, add the inherited type symbols common to all members
+                if (target.flags & TypeFlags.Union) {
+                    collectUnionType(target as UnionType);
+                }
+                // If the current type is an intersection type, simply enqueue all unseen members
+                if (target.flags & TypeFlags.Intersection) {
+                    collectIntersectionType(target as IntersectionType)
+                }
+            }
+            if (!target.symbol && !target.aliasSymbol) {
+                if (target.flags & TypeFlags.Union) {
+                    collectUnionType(target as UnionType);
+                }
+                if (target.flags & TypeFlags.Intersection) {
+                    collectIntersectionType(target as IntersectionType)
+                }
+            }
+        }
+        seen.clear();
+        return relevant;
+
+        function addInheritedSymbol(symbol: Symbol) {
+            if (shouldInherit(symbol) && symbol.declarations && symbol.declarations.length > 0) {
+                for (const decl of symbol.declarations) {
+                    // Exclude all declarations but interface and class declarations.
+                    // Symbol declarations can also include other declarations, such as variable declarations
+                    // and module declarations, which we do not want to include for inheritance
+                    if (isInterfaceDeclaration(decl) || isClassDeclaration(decl) || isTypeAliasDeclaration(decl)) {
+                        const type = getTypeOfNode(decl);
+                        if (seen.has(type)) {
+                            continue;
+                        }
+
+                        if (!isErrorType(type)) {
+                            seen.add(type);
+                            queue.push(type);
+                        }
+                    }
+                }
+            }
+        }
+
+        function collectUnionType(type: UnionType) {
+            const types = (type as UnionType).types;
+            const inherited: Set<Symbol>[] = []
+            for (const member of types) {
+                if (!seen.has(member)) {
+                    inherited.push(collectRelevantSymbolsLoop(member, noInherit, seen));
+                }
+            }
+            // Add union members as "seen" only after the union has been collected
+            for (const member of types) {
+                seen.add(member);
+            }
+
+            intersectSets(inherited).forEach((s) => {
+                shouldInherit(s) && relevant.add(s)
+            })
+        }
+
+        function collectIntersectionType(type: IntersectionType) {
+            for (const member of type.types) {
+                if (!seen.has(member)) {
+                    seen.add(member);
+                    queue.push(member);
+                }
+            }
+        }
+
+        function collectExcludedInheritance(symbol: Symbol) {
+            if (symbol.declarations) {
+                symbol.declarations.forEach((declaration) => {
+                    if ((isInterfaceDeclaration(declaration) || isTypeAliasDeclaration(declaration) || isClassDeclaration(declaration)) &&
+                        declaration.tsPlusNoInheritTags) {
+                        declaration.tsPlusNoInheritTags.forEach((tag) => {
+                            noInherit.add(tag)
+                        })
+                    }
+                })
+            }
+        }
+
+        function shouldInherit(symbol: Symbol) {
+            const tags = typeSymbolCache.get(symbol);
+            if (tags) {
+                for (const tag of tags) {
+                    if (noInherit.has(tag)) return false;
+                }
+            }
+            return true;
+        }
+    }
+    function collectRelevantSymbols(target: Type) {
+        const symbols = new Set<Symbol>();
+        for (const symbol of collectRelevantSymbolsWorker(getBaseConstraintOrType(target))) {
+            symbols.add(symbol)
+        }
+        if (symbols.size === 0) {
+            for (const symbol of collectRelevantSymbolsWorker(target)) {
+                symbols.add(symbol)
+            }
+        }
+        return arrayFrom(symbols.values());
+    }
+    /**
+        * Recursively collects the symbols associated with the given type. Index 0 is the given type's symbol,
+        * followed by subtypes, subtypes of subtypes, etc.
+        */
+    function collectRelevantSymbolsWorker(target: Type) {
+        let returnArray = arrayFrom(collectRelevantSymbolsLoop(target, new Set()).values())
+
+        // collect primitive symbols last, in case they have overridden extensions
+        if (target.flags & TypeFlags.StringLike) {
+            returnArray.push(tsplusStringPrimitiveSymbol);
+        }
+        if (target.flags & TypeFlags.NumberLike) {
+            returnArray.push(tsplusNumberPrimitiveSymbol);
+        }
+        if (target.flags & TypeFlags.BooleanLike) {
+            returnArray.push(tsplusBooleanPrimitiveSymbol);
+        }
+        if (target.flags & TypeFlags.BigIntLike) {
+            returnArray.push(tsplusBigIntPrimitiveSymbol);
+        }
+        if (isFunctionType(target)) {
+            returnArray.push(tsplusFunctionPrimitiveSymbol);
+        }
+        if (isTupleType(target)) {
+            if (target.target.readonly) {
+                returnArray.push(tsplusReadonlyArraySymbol);
+            }
+            else {
+                returnArray.push(tsplusArraySymbol);
+            }
+        }
+        if (target.flags & TypeFlags.Object) {
+            returnArray.push(tsplusObjectPrimitiveSymbol);
+        }
+        return returnArray
+    }
+    function getExtensions(selfNode: Expression) {
+        const targetType: Type = getTypeOfNode(selfNode);
+        const symbols = collectRelevantSymbols(targetType);
+        const copy: Map<string, Symbol> = new Map();
+        const copyFluent: Map<string, Set<TsPlusFluentExtension>> = new Map();
+        symbols.forEach((target) => {
+            if (typeSymbolCache.has(target) && !isCompanionReference(selfNode)) {
+                typeSymbolCache.get(target)!.forEach((typeSymbol) => {
+                    const _static = staticCache.get(typeSymbol);
+                    if (_static) {
+                        _static.forEach((v, k) => {
+                            if (copy.has(k)) {
+                                return;
+                            }
+                            const ext = v();
+                            if (ext) {
+                                copy.set(k, ext.patched)
+                            }
+                        });
+                    }
+                    const _fluent = fluentCache.get(typeSymbol);
+                    if (_fluent) {
+                        _fluent.forEach((v, k) => {
+                            const extension = v()
+                            if (extension) {
+                                if (isExtensionValidForTarget(getTypeOfSymbol(extension.patched), targetType)) {
+                                    if (!copyFluent.has(k)) {
+                                        copyFluent.set(k, new Set());
+                                    }
+                                    copyFluent.get(k)!.add(extension);
+                                }
+                            }
+                        });
+                    }
+                    const _getter = getterCache.get(typeSymbol);
+                    if (_getter) {
+                        _getter.forEach((v, k) => {
+                            if (copy.has(k)) {
+                                return;
+                            }
+                            const symbol = v.patched(selfNode);
+                            if (symbol) {
+                                copy.set(k, symbol);
+                            }
+                        });
+                    }
+                });
+            }
+            if (companionSymbolCache.has(target) && isCompanionReference(selfNode)) {
+                companionSymbolCache.get(target)!.forEach((typeSymbol) => {
+                    const _static = staticCache.get(typeSymbol);
+                    if (_static) {
+                        _static.forEach((v, k) => {
+                            if (copy.has(k)) {
+                                return;
+                            }
+                            const ext = v()
+                            if (ext) {
+                                copy.set(k, ext.patched)
+                            }
+                        });
+                    }
+                })
+            }
+        })
+        fluentCache.get("global")?.forEach((v, k) => {
+            const extension = v()
+            if (extension) {
+                if (isExtensionValidForTarget(getTypeOfSymbol(extension.patched), targetType)) {
+                    if (!copyFluent.has(k)) {
+                        copyFluent.set(k, new Set());
+                    }
+                    copyFluent.get(k)!.add(extension);
+                }
+            }
+        });
+        getterCache.get("global")?.forEach((v, k) => {
+            if (copy.has(k)) {
+                return;
+            }
+            const symbol = v.patched(selfNode);
+            if (symbol) {
+                copy.set(k, symbol);
+            }
+        });
+        copyFluent.forEach((extensions, k) => {
+            copy.set(
+                k,
+                createTsPlusFluentSymbolWithType(k, arrayFrom(flatMapIterator(extensions.values(), (e) => getSignaturesOfType(getTypeOfSymbol(e.patched), SignatureKind.Call))) as TsPlusSignature[])
+            );
+        });
+        copy.delete("__call");
+        return copy;
+    }
+    function isExtensionValidForTarget(extension: Type, targetType: Type): boolean {
+        return getSignaturesOfType(extension, SignatureKind.Call).find((candidate) => {
+            if (candidate.thisParameter) {
+                const paramType = unionIfLazy(getTypeOfSymbol(candidate.thisParameter));
+                if (!candidate.typeParameters) {
+                    return isTypeAssignableTo(targetType, paramType);
+                } else {
+                    const inferenceContext = createInferenceContext(
+                        candidate.typeParameters,
+                        candidate,
+                        InferenceFlags.None
+                    );
+                    inferTypes(inferenceContext.inferences, targetType, paramType);
+                    const instantiatedThisType = instantiateType(paramType, inferenceContext.mapper);
+                    return isTypeAssignableTo(targetType, instantiatedThisType);
+                }
+            }
+            return false;
+        }) !== undefined;
+    }
+    function unionIfLazy(_paramType: Type) {
+        const isLazy = isLazyParameterByType(_paramType);
+        const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]], UnionReduction.None) : _paramType;
+        return paramType
+    }
+    function getFluentExtension(targetType: Type, name: string): Type | undefined {
+        const symbols = collectRelevantSymbols(targetType);
+        const candidates: Set<TsPlusSignature> = new Set();
+        for (const target of symbols) {
+            if (typeSymbolCache.has(target)) {
+                const x = typeSymbolCache.get(target)!.flatMap(
+                    (tag) => {
+                        if (fluentCache.has(tag)) {
+                            const cache = fluentCache.get(tag)
+                            if (cache?.has(name)) {
+                                return [cache.get(name)!]
+                            }
+                        }
+                        return []
+                    }
+                )
+                if (x.length === 0) {
+                    continue;
+                }
+                else {
+                    x.forEach((getExt) => {
+                        const ext = getExt();
+                        if (ext) {
+                            for (const signature of ext.signatures) {
+                                candidates.add(signature);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+        const globalExtension = fluentCache.get("global")?.get(name)?.();
+        if (globalExtension) {
+            for (const signature of globalExtension.signatures) {
+                candidates.add(signature)
+            }
+        }
+        if (candidates.size > 0) {
+            return getTypeOfSymbol(createTsPlusFluentSymbolWithType(name, arrayFrom(candidates.values())));
+        }
+    }
+    function getGetterExtension(targetType: Type, name: string) {
+        const symbols = collectRelevantSymbols(targetType)
+        for (const target of symbols) {
+            if (typeSymbolCache.has(target)) {
+                const x = typeSymbolCache.get(target)!.flatMap(
+                    (tag) => {
+                        if (getterCache.has(tag)) {
+                            const cache = getterCache.get(tag)
+                            if (cache?.has(name)) {
+                                return [cache.get(name)!]
+                            }
+                        }
+                        return []
+                    }
+                )
+                if (x.length === 0) {
+                    continue;
+                }
+                else {
+                    return x[x.length - 1];
+                }
+            }
+        }
+        return getterCache.get("global")?.get(name);
+    }
+    function getGetterCompanionExtension(targetType: Type, name: string) {
+        const symbols = collectRelevantSymbols(targetType)
+        for (const target of symbols) {
+            if (companionSymbolCache.has(target)) {
+                const x = companionSymbolCache.get(target)!.flatMap(
+                    (tag) => {
+                        if (getterCache.has(tag)) {
+                            const cache = getterCache.get(tag)
+                            if (cache?.has(name)) {
+                                return [cache.get(name)!]
+                            }
+                        }
+                        return []
+                    }
+                )
+                if (x.length === 0) {
+                    continue;
+                }
+                else {
+                    return x[x.length - 1];
+                }
+            }
+        }
+    }
+    function getStaticExtension(targetType: Type, name: string) {
+        const symbols = collectRelevantSymbols(targetType)
+        for (const target of symbols) {
+            if (typeSymbolCache.has(target)) {
+                const x = typeSymbolCache.get(target)!.flatMap(
+                    (tag) => {
+                        if (staticCache.has(tag)) {
+                            const cache = staticCache.get(tag)
+                            if (cache?.has(name)) {
+                                return [cache.get(name)!]
+                            }
+                        }
+                        return []
+                    }
+                )
+                if (x.length === 0) {
+                    continue;
+                }
+                else {
+                    return x[x.length - 1]();
+                }
+            }
+        }
+    }
+    function getStaticCompanionExtension(targetType: Type, name: string) {
+        const symbols = collectRelevantSymbols(targetType)
+        for (const target of symbols) {
+            if (companionSymbolCache.has(target)) {
+                const x = companionSymbolCache.get(target)!.flatMap(
+                    (tag) => {
+                        if (staticCache.has(tag)) {
+                            const cache = staticCache.get(tag)
+                            if (cache?.has(name)) {
+                                return [cache.get(name)!]
+                            }
+                        }
+                        return []
+                    }
+                )
+                if (x.length === 0) {
+                    continue;
+                }
+                else {
+                    return x[x.length - 1]();
+                }
+            }
+        }
+    }
+    function isTransformablePipeableExtension(type: Type): boolean {
+        if (type.symbol) {
+            if (isTsPlusSymbol(type.symbol)) {
+                if (type.symbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
+                    const fluent = getFluentExtensionForPipeableSymbol(type.symbol);
+                    if (fluent) {
+                        return true;
+                    }
+                }
+                if (type.symbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    function markUsedParams(params: readonly TypeParameterDeclaration[], types: readonly Type[], cache: Set<TypeParameterDeclaration>, node: Node) {
+        function visitor(node: Node): Node {
+            const t = getTypeOfNode(node);
+            for (let i = 0; i < params.length; i++) {
+                const type = types[i];
+                if (isTypeIdenticalTo(type, t)) {
+                    cache.add(params[i]);
+                }
+            }
+            return visitEachChild(node, visitor, nullTransformationContext);
+        }
+        visitNode(node, visitor);
+    }
+    function partitionTypeParametersForPipeable(dataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression): [TypeParameterDeclaration[] | undefined, TypeParameterDeclaration[] | undefined] {
+        if (!dataFirst.typeParameters) {
+            return [undefined, undefined];
+        }
+        const typeParams = dataFirst.typeParameters;
+        const types = map(typeParams, getTypeOfNode);
+        const cache = new Set<TypeParameterDeclaration>()
+        for (let i = 1; i < dataFirst.parameters.length; i++) {
+            const param = dataFirst.parameters[i];
+            markUsedParams(typeParams, types, cache, param);
+        }
+        let loop = true;
+        const processed = new Set<TypeParameterDeclaration>();
+        while (loop) {
+            const pre = cache.size;
+            cache.forEach((typeParam) => {
+                if (!processed.has(typeParam)) {
+                    processed.add(typeParam);
+                    if (typeParam.constraint) {
+                        markUsedParams(typeParams, types, cache, typeParam.constraint);
+                    }
+                    if (typeParam.default) {
+                        markUsedParams(typeParams, types, cache, typeParam.default);
+                    }
+                }
+            })
+            if (cache.size === pre) {
+                loop = false;
+            }
+        }
+        const left: TypeParameterDeclaration[] = [];
+        const right: TypeParameterDeclaration[] = [];
+        forEach(dataFirst.typeParameters, (param) => {
+            if (cache.has(param)) {
+                left.push(param);
+            }
+            else {
+                right.push(param);
+            }
+        });
+        return [
+            left.length > 0 ? left : undefined,
+            right.length > 0 ? right : undefined
+        ];
+    }
+    function generatePipeable(declarationNode: VariableDeclaration, dataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression): Type | undefined {
+        const signatures = getSignaturesOfType(getTypeOfNode(dataFirst), SignatureKind.Call)
+        if (signatures.length > 0) {
+            const returnExpression = createSyntheticExpression(dataFirst, getReturnTypeOfSignature(signatures[0]))
+            const [paramsFirst, paramsSecond] = partitionTypeParametersForPipeable(dataFirst);
+            const returnFunction = factory.createFunctionExpression(
+                undefined,
+                undefined,
+                undefined,
+                paramsSecond,
+                [dataFirst.parameters[0]],
+                undefined,
+                factory.createBlock(
+                    [factory.createReturnStatement(returnExpression)],
+                    true
+                )
+            );
+            setParent(returnFunction.body, returnFunction);
+            setParent((returnFunction.body).statements[0], returnFunction.body);
+            returnFunction.locals = createSymbolTable();
+            const returnFunctionSymbol = createSymbol(
+                SymbolFlags.Function,
+                InternalSymbolName.Function
+            );
+            returnFunction.symbol = returnFunctionSymbol;
+            returnFunctionSymbol.declarations = [returnFunction];
+            returnFunctionSymbol.valueDeclaration = returnFunction;
+            const pipeable = factory.createFunctionDeclaration(
+                [factory.createModifier(SyntaxKind.DeclareKeyword)],
+                undefined,
+                dataFirst.name,
+                paramsFirst,
+                dataFirst.parameters.slice(1, dataFirst.parameters.length),
+                undefined,
+                factory.createBlock(
+                    [factory.createReturnStatement(returnFunction)],
+                    true
+                )
+            );
+            setParent(returnFunction, pipeable);
+            setParent(pipeable.body, pipeable);
+            setParent((pipeable.body as Block).statements[0], pipeable.body);
+            pipeable.locals = createSymbolTable();
+            const pipeableSymbol = createSymbol(
+                SymbolFlags.Function,
+                InternalSymbolName.Function
+            ) as TsPlusPipeableMacroSymbol;
+            pipeableSymbol.tsPlusTag = TsPlusSymbolTag.PipeableMacro;
+            pipeableSymbol.tsPlusDeclaration = declarationNode;
+            pipeableSymbol.tsPlusDataFirst = dataFirst;
+            pipeableSymbol.tsPlusSourceFile = getSourceFileOfNode(dataFirst);
+            pipeableSymbol.tsPlusExportName = dataFirst.name!.escapedText.toString();
+            pipeable.symbol = pipeableSymbol;
+            pipeableSymbol.declarations = [pipeable];
+            setParent(pipeable, declarationNode);
+            const declarationSymbol = getSymbolAtLocation(declarationNode)
+            if (declarationSymbol) {
+                declarationSymbol.declarations = [pipeable]
+                declarationSymbol.valueDeclaration = pipeable
+            }
+            return getTypeOfNode(pipeable);
+        }
+    }
+    function isTsPlusMacroGetter(node: Node, macro: string): boolean {
+        const links = getNodeLinks(node)
+        return !!links.tsPlusGetterExtension &&
+            !!links.tsPlusGetterExtension.declaration.tsPlusMacroTags &&
+            links.tsPlusGetterExtension.declaration.tsPlusMacroTags.includes(macro);
+    }
+    function isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K> {
+        if (!isCallExpression(node) && !isBinaryExpression(node)) {
+            return false;
+        }
+        const links = getNodeLinks(isCallExpression(node) ? node : node.operatorToken);
+        if (
+            links.resolvedSignature &&
+            links.resolvedSignature.declaration &&
+            collectTsPlusMacroTags(links.resolvedSignature.declaration).findIndex((tag) => tag === macro) !== -1
+        ) {
+            return true;
+        }
+        return false;
+    }
+    // TSPLUS EXTENSION END
+
     function getResolvedSignatureWorker(nodeIn: CallLikeExpression, candidatesOutArray: Signature[] | undefined, argumentCount: number | undefined, checkMode: CheckMode, editingArgument?: Node): Signature | undefined {
         const node = getParseTreeNode(nodeIn, isCallLikeExpression);
         apparentArgumentCount = argumentCount;
@@ -1813,7 +2707,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
     }
 
     const tupleTypes = new Map<string, GenericType>();
-    const unionTypes = new Map<string, UnionType>();
+    const unionTypes = new Map<string, Type>();
     const intersectionTypes = new Map<string, Type>();
     const stringLiteralTypes = new Map<string, StringLiteralType>();
     const numberLiteralTypes = new Map<number, NumberLiteralType>();
@@ -2912,7 +3806,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         isUse: boolean,
         excludeGlobals = false,
         getSpellingSuggestions = true): Symbol | undefined {
-        return resolveNameHelper(location, name, meaning, nameNotFoundMessage, nameArg, isUse, excludeGlobals, getSpellingSuggestions, getSymbol);
+        return resolveNameHelper(location, name, meaning, nameNotFoundMessage, nameArg, isUse, excludeGlobals, getSpellingSuggestions, getSymbol, true);
     }
 
     function resolveNameHelper(
@@ -2924,7 +3818,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         isUse: boolean,
         excludeGlobals: boolean,
         getSpellingSuggestions: boolean,
-        lookup: typeof getSymbol): Symbol | undefined {
+        lookup: typeof getSymbol,
+        checkTsPlusGlobals = true): Symbol | undefined {
         const originalLocation = location; // needed for did-you-mean error reporting, which gathers candidates starting from the original location
         let result: Symbol | undefined;
         let lastLocation: Node | undefined;
@@ -2996,6 +3891,34 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         result = undefined;
                     }
                 }
+                // TSPLUS EXTENSION START
+                else {
+                    if (originalLocation && originalLocation.parent && (isPropertyAccessExpression(originalLocation.parent) || isCallExpression(originalLocation.parent))) {
+                        const symbol = location.locals.get(name)
+                        if (symbol) {
+                            if (companionSymbolCache.has(symbol)) {
+                                result = symbol;
+                                getSymbolLinks(symbol).isPossibleCompanionReference = true;
+                                break loop;
+                            }
+                            if (symbol.exportSymbol && companionSymbolCache.has(symbol.exportSymbol)) {
+                                result = symbol.exportSymbol;
+                                getSymbolLinks(symbol.exportSymbol).isPossibleCompanionReference = true;
+                                break loop;
+                            }
+                            if (symbol.declarations && symbol.declarations[0] && isImportSpecifier(symbol.declarations[0])) {
+                                const originalSymbol = getTargetOfImportSpecifier(symbol.declarations[0], false);
+                                if (originalSymbol && companionSymbolCache.has(originalSymbol)) {
+                                    result = originalSymbol;
+                                    getSymbolLinks(originalSymbol).isPossibleCompanionReference = true;
+                                    symbol.isReferenced = SymbolFlags.Value;
+                                    break loop;
+                                }
+                            }
+                        }
+                    }
+                }
+                // TSPLUS EXTENSION END
             }
             withinDeferredContext = withinDeferredContext || getIsDeferredContext(location, lastLocation);
             switch (location.kind) {
@@ -3237,6 +4160,39 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 isJSDocParameterTag(location) || isJSDocReturnTag(location) ? getHostSignatureFromJSDoc(location) || location.parent :
                 location.parent;
         }
+
+        // TSPLUS EXTENSION START
+        if (!result && originalLocation && checkTsPlusGlobals) {
+            const globalImport = tsPlusGlobalImportCache.get(name as string);
+            if (globalImport) {
+                const targetSymbol = getTargetOfImportSpecifier(globalImport.importSpecifier, false);
+                if (targetSymbol &&
+                    ((targetSymbol.flags & meaning) ||
+                    companionSymbolCache.has(targetSymbol) && (isPropertyAccessExpression(originalLocation.parent) || isCallExpression(originalLocation.parent)))
+                ) {
+                    const withoutGlobals = resolveNameHelper(
+                        originalLocation,
+                        name,
+                        SymbolFlags.All,
+                        void 0,
+                        nameArg,
+                        isUse,
+                        excludeGlobals,
+                        getSpellingSuggestions,
+                        lookup,
+                        false
+                    );
+                    if (!withoutGlobals) {
+                        getNodeLinks(originalLocation).isTsPlusGlobalIdentifier = true;
+                        if (companionSymbolCache.has(targetSymbol)) {
+                            getSymbolLinks(targetSymbol).isPossibleCompanionReference = true;
+                        }
+                        result = targetSymbol;
+                    }
+                }
+            }
+        }
+        // TSPLUS EXTENSION END
 
         // We just climbed up parents looking for the name, meaning that we started in a descendant node of `lastLocation`.
         // If `result === lastSelfReferenceLocation.symbol`, that means that we are somewhere inside `lastSelfReferenceLocation` looking up a name, and resolving to `lastLocation` itself.
@@ -6081,6 +7037,39 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return !!type.symbol && !!(type.symbol.flags & SymbolFlags.Class) && (type === getDeclaredTypeOfClassOrInterface(type.symbol) || (!!(type.flags & TypeFlags.Object) && !!(getObjectFlags(type) & ObjectFlags.IsClassInstanceClone)));
     }
 
+    // TSPLUS EXTENSION START
+    function isCompanionReference(node: Expression | QualifiedName): boolean {
+        let type: Type | undefined
+
+        const symbol = getSymbolAtLocation(node);
+        if (symbol) {
+            type = getTypeOfSymbol(symbol);
+        }
+        else {
+            type = getNodeLinks(node).tsPlusResolvedType;
+        }
+
+        if (!type) {
+            return false
+        }
+        
+        // Class companion object
+        if (getObjectFlags(type) & ObjectFlags.Anonymous && type.symbol && type.symbol.flags & SymbolFlags.Class) {
+            return true
+        }
+
+        // Synthetic Interface or TypeAlias companion object
+        if (symbol && symbol.declarations && symbol.declarations.length > 0) {
+            const declaration = symbol.declarations[0]
+            if (isInterfaceDeclaration(declaration) || isTypeAliasDeclaration(declaration)) {
+                return !!getSymbolLinks(symbol).isPossibleCompanionReference;
+            }
+        }
+
+        return false
+    }
+    // TSPLUS EXTENSION END
+
     function createNodeBuilder() {
         return {
             typeToTypeNode: (type: Type, enclosingDeclaration?: Node, flags?: NodeBuilderFlags, tracker?: SymbolTracker) =>
@@ -6121,7 +7110,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
 
         function withContext<T>(enclosingDeclaration: Node | undefined, flags: NodeBuilderFlags | undefined, tracker: SymbolTracker | undefined, cb: (context: NodeBuilderContext) => T): T | undefined {
-            Debug.assert(enclosingDeclaration === undefined || (enclosingDeclaration.flags & NodeFlags.Synthesized) === 0);
+            Debug.assert(enclosingDeclaration === undefined || (enclosingDeclaration.parent && isDeclaration(enclosingDeclaration.parent) && !!enclosingDeclaration.parent?.symbol && isTsPlusSymbol(enclosingDeclaration.parent.symbol)) || (enclosingDeclaration.flags & NodeFlags.Synthesized) === 0);
             const moduleResolverHost =
                 tracker?.trackSymbol ? tracker.moduleResolverHost :
                 flags! & NodeBuilderFlags.DoNotIncludeSymbolChain ? createBasicNodeBuilderModuleSpecifierResolutionHost(host) :
@@ -8999,7 +9988,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         break;
                     case SyntaxKind.NamespaceExportDeclaration:
                         // export as namespace foo
-                        // TODO: Not part of a file's local or export symbol tables
                         // Is bound into file.symbol.globalExports instead, which we don't currently traverse
                         addResult(factory.createNamespaceExportDeclaration(idText((node as NamespaceExportDeclaration).name)), ModifierFlags.None);
                         break;
@@ -11223,6 +12211,13 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
         if (symbol.flags & SymbolFlags.Alias) {
             return getTypeOfAlias(symbol);
+        }
+        if ((symbol.flags & SymbolFlags.Interface) || (symbol.flags & SymbolFlags.TypeAlias)) {
+            if (companionSymbolCache.has(symbol)) {
+                if (symbol.declarations?.[0]) {
+                    return getTypeOfNode(symbol.declarations[0])
+                }
+            }
         }
         return errorType;
     }
@@ -15955,6 +16950,161 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return result;
     }
 
+    // TSPLUS EXTENSION START
+    function checkTsPlusCustomCall(
+        declaration: Declaration,
+        errorNode: Node,
+        args: Expression[],
+        checkMode: CheckMode | undefined,
+        signature?: Signature,
+        addDiagnostic?: (_: Diagnostic) => void,
+    ): Type {
+        const funcType = getTypeOfNode(declaration);
+        const apparentType = getApparentType(funcType);
+        const candidate = signature ?? getSignaturesOfType(apparentType, SignatureKind.Call)[0]!;
+        if (!candidate) {
+            return errorType;
+        }
+        const node = factory.createCallExpression(
+            factory.createIdentifier("$tsplus_custom_call"),
+            [],
+            args
+        );
+        setTextRange(node, errorNode)
+        setParent(node, declaration.parent);
+        if (candidate.typeParameters) {
+            const inferenceContext = createInferenceContext(
+                candidate.typeParameters,
+                candidate,
+                InferenceFlags.None
+            );
+            const typeArgumentTypes = inferTypeArguments(
+                node,
+                candidate,
+                args,
+                checkMode || CheckMode.Normal,
+                inferenceContext
+            );
+            const signature = getSignatureInstantiation(
+                candidate,
+                typeArgumentTypes,
+                /*isJavascript*/ false,
+                inferenceContext && inferenceContext.inferredTypeParameters
+            );
+            const digs = getSignatureApplicabilityError(
+                node,
+                args,
+                signature,
+                assignableRelation,
+                checkMode || CheckMode.Normal,
+                /*reportErrors*/ addDiagnostic ? true : false,
+                /*containingMessageChain*/ void 0
+            );
+            if (digs) {
+                digs.forEach((dig) => {
+                    addDiagnostic?.(dig);
+                });
+                return errorType;
+            }
+            return getReturnTypeOfSignature(signature);
+        }
+        const digs = getSignatureApplicabilityError(
+            node,
+            args,
+            candidate,
+            assignableRelation,
+            CheckMode.Normal,
+            /*reportErrors*/ true,
+            /*containingMessageChain*/ void 0
+        );
+        if (digs) {
+            digs.forEach((dig) => {
+                addDiagnostic?.(dig);
+            });
+            return errorType;
+        }
+        return getReturnTypeOfSignature(candidate);
+    }
+    function getInstantiatedTsPlusSignature(
+        declaration: Declaration,
+        args: Expression[],
+        checkMode: CheckMode | undefined,
+    ): Signature {
+        const funcType = getTypeOfNode(declaration);
+        const apparentType = getApparentType(funcType);
+        const candidate = getSignaturesOfType(apparentType, SignatureKind.Call)[0]!;
+        const node = factory.createCallExpression(
+            factory.createIdentifier("$tsplus_custom_call"),
+            [],
+            args
+        );
+        setParent(node, declaration.parent);
+        if (candidate.typeParameters) {
+            const inferenceContext = createInferenceContext(
+                candidate.typeParameters,
+                candidate,
+                InferenceFlags.None
+            );
+            const typeArgumentTypes = inferTypeArguments(
+                node,
+                candidate,
+                args,
+                checkMode || CheckMode.Normal,
+                inferenceContext
+            );
+            const signature = getSignatureInstantiation(
+                candidate,
+                typeArgumentTypes,
+                /*isJavascript*/ false,
+                inferenceContext && inferenceContext.inferredTypeParameters
+            );
+            return signature;
+        }
+        return candidate;
+    }
+
+    function computeUnifiedType(unifier: FunctionDeclaration, union: Type) {
+        for (const signature of getSignaturesOfType(getTypeOfNode(unifier), SignatureKind.Call)) {
+            if (signature.minArgumentCount === 1 && signature.typeParameters) {
+                const context = createInferenceContext(signature.typeParameters, signature, InferenceFlags.None);
+                inferTypes(context.inferences, union, getTypeOfSymbol(signature.parameters[0]));
+                const instantiated = getSignatureInstantiation(signature, getInferredTypes(context), /*isJavascript*/ false)
+                if (isTypeAssignableTo(union, getTypeOfSymbol(instantiated.parameters[0]))) {
+                    return getReturnTypeOfSignature(instantiated);
+                }
+            }
+        }
+        return errorType;
+    }
+
+    function getUnifiedType(unionType: UnionType): Type {
+        if (unionType.tsPlusUnified) {
+            return unionType;
+        }
+        let type = unionType.types[0];
+        while (type.flags & TypeFlags.Union) {
+            type = (type as UnionType).types[0];
+        }
+        const targetSymbol = type.symbol || type.aliasSymbol;
+        if (targetSymbol) {
+            for (const declaration of (targetSymbol.declarations ?? [])) {
+                for (let target of collectTsPlusTypeTags(declaration)) {
+                    const id = identityCache.get(target);
+                    if (id) {
+                        const unified = computeUnifiedType(id, unionType);
+                        if ((unified.flags & TypeFlags.Union) && unionType.types.length < (unified as UnionType).types.length) {
+                            return unionType;
+                        }
+                        return unified;
+                    }
+                }
+            }
+        }
+        unionType.tsPlusUnified = true;
+        return unionType;
+    }
+    // TSPLUS EXTENSION END
+
     // We sort and deduplicate the constituent types based on object identity. If the subtypeReduction
     // flag is specified we also reduce the constituent type set to only include types that aren't subtypes
     // of other types. Subtype reduction is expensive for large union types and is possible only when union
@@ -16025,7 +17175,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
         const objectFlags = (includes & TypeFlags.NotPrimitiveUnion ? 0 : ObjectFlags.PrimitiveUnion) |
             (includes & TypeFlags.Intersection ? ObjectFlags.ContainsIntersections : 0);
-        return getUnionTypeFromSortedList(typeSet, objectFlags, aliasSymbol, aliasTypeArguments, origin);
+        return getUnionTypeFromSortedList(typeSet, objectFlags, aliasSymbol, aliasTypeArguments, origin, unionReduction);
     }
 
     function getUnionOrIntersectionTypePredicate(signatures: readonly Signature[], kind: TypeFlags | undefined): TypePredicate | undefined {
@@ -16066,7 +17216,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
     }
 
     // This function assumes the constituent type list is sorted and deduplicated.
-    function getUnionTypeFromSortedList(types: Type[], objectFlags: ObjectFlags, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type): Type {
+    function getUnionTypeFromSortedList(types: Type[], objectFlags: ObjectFlags, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type, unionReduction?: UnionReduction): Type {
         if (types.length === 0) {
             return neverType;
         }
@@ -16080,16 +17230,17 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         const id = typeKey + getAliasId(aliasSymbol, aliasTypeArguments);
         let type = unionTypes.get(id);
         if (!type) {
-            type = createType(TypeFlags.Union) as UnionType;
-            type.objectFlags = objectFlags | getPropagatingFlagsOfTypes(types, /*excludeKinds*/ TypeFlags.Nullable);
-            type.types = types;
-            type.origin = origin;
-            type.aliasSymbol = aliasSymbol;
-            type.aliasTypeArguments = aliasTypeArguments;
+            const unionType = createType(TypeFlags.Union) as UnionType;
+            unionType.objectFlags = objectFlags | getPropagatingFlagsOfTypes(types, /*excludeKinds*/ TypeFlags.Nullable);
+            unionType.types = types;
+            unionType.origin = origin;
+            unionType.aliasSymbol = aliasSymbol;
+            unionType.aliasTypeArguments = aliasTypeArguments;
             if (types.length === 2 && types[0].flags & TypeFlags.BooleanLiteral && types[1].flags & TypeFlags.BooleanLiteral) {
-                type.flags |= TypeFlags.Boolean;
-                (type as UnionType & IntrinsicType).intrinsicName = "boolean";
+                unionType.flags |= TypeFlags.Boolean;
+                (unionType as UnionType & IntrinsicType).intrinsicName = "boolean";
             }
+            type = !aliasSymbol && unionReduction !== UnionReduction.None ? getUnifiedType(unionType) : unionType;
             unionTypes.set(id, type);
         }
         return type;
@@ -25539,6 +26690,17 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     const type = getTypeOfDottedName((node as PropertyAccessExpression).expression, diagnostic);
                     if (type) {
                         const name = (node as PropertyAccessExpression).name;
+                        // TSPLUS EXTENSION BEGIN
+                        // Since our fluent properties are "fake", to resolve a dotted name, we have to look up
+                        // the parent type in the cache
+                        const symbol = type.symbol || type.aliasSymbol;
+                        if (symbol && typeSymbolCache.has(symbol)) {
+                            const fluentExtenion = getFluentExtension(type, name.escapedText as string);
+                            if (fluentExtenion) {
+                                return fluentExtenion;
+                            }
+                        }
+                        // TSPLUS EXTENSION END
                         let prop: Symbol | undefined;
                         if (isPrivateIdentifier(name)) {
                             if (!type.symbol) {
@@ -27136,7 +28298,48 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return getTypeOfSymbol(symbol);
     }
 
+    // TSPLUS EXTENSION START
+    function tsPlusShouldMarkIdentifierAliasReferenced(node: Identifier, type: Type): boolean {
+        if (node.parent && isCallExpression(node.parent) && node === node.parent.expression && type.symbol && type.symbol.valueDeclaration) {
+            if (collectTsPlusMacroTags(type.symbol.valueDeclaration).find((tag) => tag === "pipe")) {
+                return false;
+            }
+        }
+        if (
+            !(node.parent &&
+                isCallExpression(node.parent) &&
+                node.parent.expression === node &&
+                getSignaturesOfType(type, SignatureKind.Call).length === 0 &&
+                (
+                    (getStaticExtension(type, "__call") != null) ||
+                    (getStaticCompanionExtension(type, "__call") != null)
+                )
+            ) &&
+            !isTransformablePipeableExtension(type)
+        ) {
+            return true;
+        }
+        return false;
+    }
     function checkIdentifier(node: Identifier, checkMode: CheckMode | undefined): Type {
+        if (isThisInTypeQuery(node)) {
+            return checkThisExpression(node);
+        }
+
+        const type = checkIdentifierOriginal(node, checkMode);
+        // We should only mark aliases as referenced if there isn't a local value declaration
+        // for the symbol. Also, don't mark any property access expression LHS - checkPropertyAccessExpression will handle that
+        if (!(node.parent && isPropertyAccessExpression(node.parent) && node.parent.expression === node)) {
+            // We should also not mark as used identifiers that will be replaced
+            if (tsPlusShouldMarkIdentifierAliasReferenced(node, type)) {
+                markAliasReferenced(getResolvedSymbol(node), node);
+            }
+        }
+        return type;
+    }
+    // TSPLUS EXTENSION END
+
+    function checkIdentifierOriginal(node: Identifier, checkMode: CheckMode | undefined): Type {
         if (isThisInTypeQuery(node)) {
             return checkThisExpression(node);
         }
@@ -30602,7 +31805,82 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             && getThisContainer(node, /*includeArrowFunctions*/ true, /*includeClassComputedPropertyName*/ false) === getDeclaringConstructor(prop);
     }
 
+    // TSPLUS EXTENSION START
+    function checkPropertyAccessForExtension(node: PropertyAccessExpression | QualifiedName, _left: Expression | QualifiedName, leftType: Type, right: Identifier | PrivateIdentifier, _checkMode: CheckMode | undefined) {
+        const inType = getPropertiesOfType(leftType).findIndex((p) => p.escapedName === right.escapedText) !== -1;
+        if (!inType) {
+            const nodeLinks = getNodeLinks(node);
+            if (nodeLinks.tsPlusResolvedType) {
+                return nodeLinks.tsPlusResolvedType;
+            }
+            if (isCompanionReference(_left)) {
+                const companionExt = getStaticCompanionExtension(leftType, right.escapedText.toString());
+                if (companionExt) {
+                    nodeLinks.tsPlusStaticExtension = companionExt;
+                    nodeLinks.tsPlusResolvedType = companionExt.type
+                    return companionExt.type;
+                }
+            }
+            const fluentExtType = getFluentExtension(leftType, right.escapedText.toString());
+            if (fluentExtType && isCallExpression(node.parent) && node.parent.expression === node) {
+                if (isExtensionValidForTarget(fluentExtType, leftType)) {
+                    if (isIdentifier(_left)) {
+                        markAliasReferenced(getResolvedSymbol(_left), _left);
+                    }
+                    nodeLinks.tsPlusResolvedType = fluentExtType;
+                    nodeLinks.isFluent = true;
+                    return fluentExtType;
+                }
+                return;
+            }
+            const getterExt = getGetterExtension(leftType, right.escapedText.toString())
+            if (getterExt && isExpression(_left)) {
+                const symbol = getterExt.patched(_left);
+                if (symbol) {
+                    if (isIdentifier(_left)) {
+                        markAliasReferenced(getResolvedSymbol(_left), _left);
+                    }
+                    const type = getTypeOfSymbol(symbol);
+                    nodeLinks.tsPlusGetterExtension = getterExt;
+                    nodeLinks.tsPlusResolvedType = type;
+                    nodeLinks.tsPlusSymbol = symbol;
+                    return type;
+                }
+            }
+            const staticExt = getStaticExtension(leftType, right.escapedText.toString());
+            if (staticExt) {
+                nodeLinks.tsPlusStaticExtension = staticExt;
+                nodeLinks.tsPlusResolvedType = staticExt.type;
+                return staticExt.type;
+            }
+        }
+    }
+    function checkFluentPipeableAgreement(pipeableExtension: TsPlusPipeableExtension) {
+        if (!fluentCache.has(pipeableExtension.typeName)) {
+            return;
+        }
+        const fluentMap = fluentCache.get(pipeableExtension.typeName)!;
+        if (!fluentMap.has(pipeableExtension.funcName)) {
+            return;
+        }
+        const fluentExtension = fluentMap.get(pipeableExtension.funcName)!();
+        if (!fluentExtension || some(fluentExtension.types, ({ type: fluentType }) => isTypeAssignableTo(fluentType, pipeableExtension.getTypeAndSignatures()[0]))) {
+            return;
+        }
+        else {
+            error(pipeableExtension.declaration, Diagnostics.Declaration_annotated_as_pipeable_is_not_assignable_to_its_corresponding_fluent_declaration);
+            return;
+        }
+    }
+    // TSPLUS EXTENSION END
+
     function checkPropertyAccessExpressionOrQualifiedName(node: PropertyAccessExpression | QualifiedName, left: Expression | QualifiedName, leftType: Type, right: Identifier | PrivateIdentifier, checkMode: CheckMode | undefined) {
+        // TSPLUS EXTENSION START
+        const forExtension = checkPropertyAccessForExtension(node, left, leftType, right, checkMode);
+        if (forExtension) {
+            return forExtension;
+        }
+        // TSPLUS EXTENSION END 
         const parentSymbol = getNodeLinks(left).resolvedSymbol;
         const assignmentKind = getAssignmentTargetKind(node);
         const apparentType = getApparentType(assignmentKind !== AssignmentKind.None || isMethodAccessForCall(node) ? getWidenedType(leftType) : leftType);
@@ -30665,7 +31943,22 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             !(prop && (isConstEnumOrConstEnumOnlyModule(prop) || prop.flags & SymbolFlags.EnumMember && node.parent.kind === SyntaxKind.EnumMember)) ||
             shouldPreserveConstEnums(compilerOptions) && isExportOrExportExpression(node)
         )) {
-            markAliasReferenced(parentSymbol, node);
+            // TSPLUS EXTENSION START
+            if (isIdentifier(right) && prop) {
+                const propLinks = getSymbolLinks(prop);
+                if (propLinks.type) {
+                    if (!isTransformablePipeableExtension(propLinks.type)) {
+                        markAliasReferenced(parentSymbol, node);
+                    }
+                }
+                else {
+                    markAliasReferenced(parentSymbol, node);
+                }
+            }
+            else {
+                markAliasReferenced(parentSymbol, node);
+            }
+            // TSPLUS EXTENSION END
         }
 
         let propType: Type;
@@ -31294,6 +32587,37 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             return errorType;
         }
 
+        // TSPLUS EXTENSION BEGIN
+        const symbols = collectRelevantSymbols(objectType)
+        const tags = symbols.flatMap((symbol) => {
+            const tag = typeSymbolCache.get(symbol)
+            if (tag) {
+                return tag
+            }
+            return []
+        })
+        const indexer = tags.flatMap((tag) => {
+            const indexer = indexCache.get(tag)
+            if (indexer) {
+                return [indexer()]
+            }
+            return []
+        })[0]
+        if (indexer) {
+            const res = checkTsPlusCustomCall(
+                indexer.declaration,
+                node,
+                [node.expression, indexExpression],
+                checkMode,
+                indexer.signature,
+            )
+            if (!isErrorType(res)) {
+                indexAccessExpressionCache.set(node, indexer)
+                return res;
+            }
+        }
+        // TSPLUS EXTENSION END
+
         const effectiveIndexType = isForInVariableForNumericPropertyNames(indexExpression) ? numberType : indexType;
         const accessFlags = isAssignmentTarget(node) ?
             AccessFlags.Writing | (isGenericObjectType(objectType) && !isThisTypeParameter(objectType) ? AccessFlags.NoIndexSignatures : 0) :
@@ -31616,14 +32940,19 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
 
         const thisType = getThisTypeOfSignature(signature);
         if (thisType && couldContainTypeVariables(thisType)) {
+            // TSPLUS EXTENTION BEGIN
+            const paramType = unionIfLazy(thisType);
             const thisArgumentNode = getThisArgumentOfCall(node);
-            inferTypes(context.inferences, getThisArgumentType(thisArgumentNode), thisType);
+            inferTypes(context.inferences, getThisArgumentType(thisArgumentNode), paramType);
+            // TSPLUS EXTENTION END
         }
 
         for (let i = 0; i < argCount; i++) {
             const arg = args[i];
             if (arg.kind !== SyntaxKind.OmittedExpression && !(checkMode & CheckMode.IsForStringLiteralArgumentCompletions && hasSkipDirectInferenceFlag(arg))) {
-                const paramType = getTypeAtPosition(signature, i);
+                // TSPLUS EXTENTION BEGIN
+                const paramType = unionIfLazy(getTypeAtPosition(signature, i));
+                // TSPLUS EXTENTION END
                 if (couldContainTypeVariables(paramType)) {
                     const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
                     inferTypes(context.inferences, argType, paramType);
@@ -31638,6 +32967,18 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
 
         return getInferredTypes(context);
     }
+
+    // TSPLUS EXTENSION BEGIN
+    function isLazyParameterByType(type: Type): type is TypeReference {
+        if (type.symbol && type.symbol.declarations && type.symbol.declarations.length > 0) {
+            const tag = collectTsPlusTypeTags(type.symbol.declarations[0])[0];
+            if (tag === "tsplus/LazyArgument") {
+                return true;
+            }
+        }
+        return false;
+    }
+    // TSPLUS EXTENSION END
 
     function getMutableArrayOrTupleType(type: Type) {
         return type.flags & TypeFlags.Union ? mapType(type, getMutableArrayOrTupleType) :
@@ -31838,7 +33179,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
     }
 
     function getSignatureApplicabilityError(
-        node: CallLikeExpression,
+        node: CallLikeExpression | undefined,
         args: readonly Expression[],
         signature: Signature,
         relation: Map<string, RelationComparisonResult>,
@@ -31848,7 +33189,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
     ): readonly Diagnostic[] | undefined {
 
         const errorOutputContainer: { errors?: Diagnostic[], skipLogging?: boolean } = { errors: undefined, skipLogging: true };
-        if (isJsxOpeningLikeElement(node)) {
+        if (node && isJsxOpeningLikeElement(node)) {
             if (!checkApplicableSignatureForJsxOpeningLikeElement(node, signature, relation, checkMode, reportErrors, containingMessageChain, errorOutputContainer)) {
                 Debug.assert(!reportErrors || !!errorOutputContainer.errors, "jsx should have errors when reporting errors");
                 return errorOutputContainer.errors || emptyArray;
@@ -31856,15 +33197,35 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             return undefined;
         }
         const thisType = getThisTypeOfSignature(signature);
-        if (thisType && thisType !== voidType && node.kind !== SyntaxKind.NewExpression) {
+        if (thisType && thisType !== voidType && node && node.kind !== SyntaxKind.NewExpression) {
             // If the called expression is not of the form `x.f` or `x["f"]`, then sourceType = voidType
             // If the signature's 'this' type is voidType, then the check is skipped -- anything is compatible.
             // If the expression is a new expression, then the check is skipped.
             const thisArgumentNode = getThisArgumentOfCall(node);
             const thisArgumentType = getThisArgumentType(thisArgumentNode);
+            // TSPLUS EXTENTION START
+            const originalParamType = thisType;
+            let paramType = originalParamType;
+            if (isLazyParameterByType(originalParamType) && thisArgumentNode) {
+                const contextFreeArgType = thisArgumentType;
+                if (isTypeIdenticalTo(contextFreeArgType, anyType) || isTypeIdenticalTo(contextFreeArgType, neverType)) {
+                    return [createDiagnosticForNode(
+                        thisArgumentNode,
+                        Diagnostics.Values_of_type_any_or_never_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
+                    )]
+                }
+                const args = getTypeArguments(originalParamType);
+                const genericLazy = cloneTypeReference(originalParamType);
+                genericLazy.resolvedTypeArguments = [anyType];
+                if (!isTypeRelatedTo(contextFreeArgType, genericLazy, relation)) {
+                    paramType = args[0];
+                    getNodeLinks(thisArgumentNode).tsPlusLazy = true;
+                }
+            }
+            // TSPLUS EXTENTION END
             const errorNode = reportErrors ? (thisArgumentNode || node) : undefined;
             const headMessage = Diagnostics.The_this_context_of_type_0_is_not_assignable_to_method_s_this_of_type_1;
-            if (!checkTypeRelatedTo(thisArgumentType, thisType, relation, errorNode, headMessage, containingMessageChain, errorOutputContainer)) {
+            if (!checkTypeRelatedTo(thisArgumentType, paramType, relation, errorNode, headMessage, containingMessageChain, errorOutputContainer)) {
                 Debug.assert(!reportErrors || !!errorOutputContainer.errors, "this parameter should have errors when reporting errors");
                 return errorOutputContainer.errors || emptyArray;
             }
@@ -31875,8 +33236,26 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         for (let i = 0; i < argCount; i++) {
             const arg = args[i];
             if (arg.kind !== SyntaxKind.OmittedExpression) {
-                const paramType = getTypeAtPosition(signature, i);
-                const argType = checkExpressionWithContextualType(arg, paramType, /*inferenceContext*/ undefined, checkMode);
+                // TSPLUS EXTENTION START
+                const originalParamType = getTypeAtPosition(signature, i);
+                const argType = checkExpressionWithContextualType(arg, unionIfLazy(originalParamType), /*inferenceContext*/ undefined, checkMode);
+                let paramType = originalParamType;
+                if (isLazyParameterByType(originalParamType)) {
+                    if ((isTypeIdenticalTo(argType, anyType) || isTypeIdenticalTo(argType, neverType)) && !(checkMode & CheckMode.SkipGenericFunctions)) {
+                        return [createDiagnosticForNode(
+                            arg,
+                            Diagnostics.Values_of_type_any_or_never_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
+                        )]
+                    }
+                    const args = getTypeArguments(originalParamType);
+                    const genericLazy = cloneTypeReference(originalParamType);
+                    genericLazy.resolvedTypeArguments = [anyType];
+                    if (!isTypeRelatedTo(argType, genericLazy, relation)) {
+                        paramType = args[0];
+                        getNodeLinks(arg).tsPlusLazy = true;
+                    }
+                }
+                // TSPLUS EXTENTION END
                 // If one or more arguments are still excluded (as indicated by CheckMode.SkipContextSensitive),
                 // we obtain the regular type of any object literal arguments because we may not have inferred complete
                 // parameter types yet and therefore excess property checks may yield false positives (see #17041).
@@ -31888,7 +33267,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 }
             }
         }
-        if (restType) {
+        if (restType && node) {
             const spreadType = getSpreadArgumentType(args, argCount, args.length, restType, /*context*/ undefined, checkMode);
             const restArgCount = args.length - argCount;
             const errorNode = !reportErrors ? undefined :
@@ -31942,6 +33321,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
      * Returns the effective arguments for an expression that works like a function invocation.
      */
     function getEffectiveCallArguments(node: CallLikeExpression): readonly Expression[] {
+        if (getNodeLinks(node).isFluentCall && isCallExpression(node)) {
+            return [node.expression, ...node.arguments];
+        }
         if (node.kind === SyntaxKind.TaggedTemplateExpression) {
             const template = node.template;
             const args: Expression[] = [createSyntheticExpression(template, getGlobalTemplateStringsArrayType())];
@@ -32262,6 +33644,12 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         const signatureHelpTrailingComma =
             !!(checkMode & CheckMode.IsForSignatureHelp) && node.kind === SyntaxKind.CallExpression && node.arguments.hasTrailingComma;
 
+        if (candidates.length === 1 && candidates[0].declaration) {
+            if (collectTsPlusMacroTags(candidates[0].declaration).findIndex((v) => v.startsWith("Do")) !== -1) {
+                getNodeLinks(node).isTsPlusDoCall = true;
+            }
+        }
+
         // Section 4.12.1:
         // if the candidate list contains one or more signatures for which the type of each argument
         // expression is a subtype of each corresponding parameter type, the return type of the first
@@ -32419,6 +33807,15 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     candidatesForArgumentError = [candidate];
                     return undefined;
                 }
+                // TSPLUS EXTENTION BEGIN
+                for (let i = args.length; i < candidate.parameters.length; i++) {
+                    const param = candidate.parameters[i]
+                    if (param.valueDeclaration && (param.valueDeclaration as ParameterDeclaration).isAuto) {
+                        const paramType = getTypeAtPosition(candidate, i);
+                        deriveParameter(node, paramType, i);
+                    }
+                }
+                // TSPLUS EXTENTION END
                 return candidate;
             }
 
@@ -32482,6 +33879,21 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         continue;
                     }
                 }
+                // TSPLUS EXTENTION BEGIN
+                // Only derive parameters once all type parameters are inferred
+                for (let i = args.length; i < candidate.parameters.length; i++) {
+                    const param = candidate.parameters[i];
+                    if (param.valueDeclaration && (param.valueDeclaration as ParameterDeclaration).isAuto) {
+                        let paramType: Type;
+                        if (inferenceContext) {
+                            paramType = getTypeAtPosition(getSignatureInstantiation(candidate, getInferredTypes(inferenceContext), /* isJavascript */false), i);
+                        } else {
+                            paramType = getTypeAtPosition(candidate, i);
+                        }
+                        deriveParameter(node, paramType, i);
+                    }
+                }
+                // TSPLUS EXTENSION END
                 candidates[candidateIndex] = checkCandidate;
                 return checkCandidate;
             }
@@ -32670,7 +34082,41 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         // but we are not including call signatures that may have been added to the Object or
         // Function interface, since they have none by default. This is a bit of a leap of faith
         // that the user will not add any.
-        const callSignatures = getSignaturesOfType(apparentType, SignatureKind.Call);
+        let callSignatures = getSignaturesOfType(apparentType, SignatureKind.Call);
+
+        // TSPLUS EXTENSION START
+        if (callSignatures.length === 0) {
+            let callExtension: TsPlusStaticFunctionExtension | undefined
+            if (isCompanionReference(node.expression)) {
+                callExtension = getStaticCompanionExtension(apparentType, "__call");
+            }
+            if (!callExtension) {
+                callExtension = getStaticExtension(apparentType, "__call");
+            }
+            if (callExtension) {
+                callSignatures = Array.from(getSignaturesOfType(getTypeOfSymbol(callExtension.patched), SignatureKind.Call));
+                callCache.set(node.expression, callExtension);
+                getNodeLinks(node).tsPlusCallExtension = callExtension;
+            }
+            else {
+                const callFluentExtensions = getFluentExtension(apparentType, "__call");
+                if (callFluentExtensions) {
+                    callSignatures = Array.from(getSignaturesOfType(callFluentExtensions, SignatureKind.Call).map((s) => {
+                        const sig = createTsPlusSignature(
+                            (s as TsPlusSignature).tsPlusOriginal,
+                            (s as TsPlusSignature).tsPlusExportName,
+                            (s as TsPlusSignature).tsPlusFile
+                        );
+                        sig.tsPlusDeclaration = (s as TsPlusSignature).tsPlusDeclaration;
+                        sig.tsPlusPipeable = (s as TsPlusSignature).tsPlusPipeable;
+                        return sig;
+                    }));
+                    getNodeLinks(node).isFluentCall = true;
+                }
+            }
+        }
+        // TSPLUS EXTENSION END
+
         const numConstructSignatures = getSignaturesOfType(apparentType, SignatureKind.Construct).length;
 
         // TS 1.0 Spec: 4.12
@@ -33339,12 +34785,968 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
     }
 
+    // TSPLUS EXTENSION START
+    function tryCacheOptimizedPipeableCall(node: CallExpression): void {
+        if (isIdentifier(node.expression)) {
+            const identifierType = getTypeOfNode(node.expression);
+            const identifierSymbol = identifierType.symbol;
+            if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
+                if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
+                    const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
+                    if (fluentExtension) {
+                        const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.getTsPlusDataFirstType(), type))?.signatures[0];
+                        if (signature) {
+                            getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                                definition: signature.tsPlusFile,
+                                exportName: signature.tsPlusExportName
+                            };
+                        }
+                    }
+                }
+                if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                    getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                        definition: identifierSymbol.tsPlusSourceFile,
+                        exportName: identifierSymbol.tsPlusExportName
+                    };
+                }
+            }
+        }
+        if (isPropertyAccessExpression(node.expression) && isIdentifier(node.expression.name)) {
+            const identifierType = checker.getTypeAtLocation(node.expression.name);
+            const identifierSymbol = identifierType.symbol;
+            if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
+                if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
+                    const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
+                    if (fluentExtension) {
+                        const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.getTsPlusDataFirstType(), type))?.signatures[0];
+                        if (signature) {
+                            getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                                definition: signature.tsPlusFile,
+                                exportName: signature.tsPlusExportName
+                            };
+                        }
+                    }
+                }
+                if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                    getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                        definition: identifierSymbol.tsPlusSourceFile,
+                        exportName: identifierSymbol.tsPlusExportName
+                    };
+                }
+                if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.StaticFunction) {
+                    const declType = checker.getTypeAtLocation(identifierSymbol.tsPlusDeclaration.name!);
+                    const declSym = declType.symbol;
+                    if (declSym && isTsPlusSymbol(declSym)) {
+                        if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
+                            const fluentExtension = checker.getFluentExtensionForPipeableSymbol(declSym);
+                            if (fluentExtension) {
+                                const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(declSym.getTsPlusDataFirstType(), type))?.signatures[0];
+                                if (signature) {
+                                    getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                                        definition: signature.tsPlusFile,
+                                        exportName: signature.tsPlusExportName
+                                    };
+                                }
+                            }
+                        }
+                        if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                            getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                                definition: declSym.tsPlusSourceFile,
+                                exportName: declSym.tsPlusExportName
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+    function getDerivationDebugDiagnostic(location: CallExpression, derivation: Derivation): Diagnostic {
+        switch(derivation._tag) {
+            case "EmptyObjectDerivation": {
+                return createError(
+                    location.arguments[0],
+                    Diagnostics.Deriving_type_0_1,
+                    typeToString(derivation.type),
+                    "intrinsically as it is an empty object"
+                )
+            }
+            case "InvalidDerivation": {
+                throw new Error("Bug, derivation debug called with InvalidDerivation")
+            }
+            case "FromBlockScope": {
+                return createError(
+                    location.arguments[0],
+                    Diagnostics.Deriving_type_0_1,
+                    typeToString(derivation.type),
+                    `using block-scoped implicit ${derivation.implicit.symbol.escapedName}`
+                );
+            }
+            case "FromImplicitScope": {
+                return createError(
+                    location.arguments[0],
+                    Diagnostics.Deriving_type_0_1,
+                    typeToString(derivation.type),
+                    `using implicit ${
+                        getSourceFileOfNode(location).fileName !== getSourceFileOfNode(derivation.implicit).fileName ? 
+                            `${getImportPath(derivation.implicit)}#${derivation.implicit.symbol.escapedName}` : 
+                            derivation.implicit.symbol.escapedName
+                        }`
+                )
+            }
+            case "FromIntersectionStructure": {
+                return createDiagnosticForNodeFromMessageChain(
+                    location.arguments[0],
+                    chainDiagnosticMessages(
+                        derivation.fields.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
+                        Diagnostics.Deriving_type_0_1,
+                        typeToString(derivation.type),
+                        "intrinsically as an intersection"
+                    )
+                )
+            }
+            case "FromObjectStructure": {
+                return createDiagnosticForNodeFromMessageChain(
+                    location.arguments[0],
+                    chainDiagnosticMessages(
+                        derivation.fields.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d.value))),
+                        Diagnostics.Deriving_type_0_1,
+                        typeToString(derivation.type),
+                        "intrinsically as an object structure"
+                    )
+                )
+            }
+            case "FromTupleStructure": {
+                return createDiagnosticForNodeFromMessageChain(
+                    location.arguments[0],
+                    chainDiagnosticMessages(
+                        derivation.fields.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
+                        Diagnostics.Deriving_type_0_1,
+                        typeToString(derivation.type),
+                        "intrinsically as a tuple structure"
+                    )
+                )
+            }
+            case "FromLiteral": {
+                return createError(
+                    location.arguments[0],
+                    Diagnostics.Deriving_type_0_1,
+                    typeToString(derivation.type),
+                    `intrinsically as a literal ${typeof derivation.value}`
+                )
+            }
+            case "FromPriorDerivation": {
+                return createError(
+                    location.arguments[0],
+                    Diagnostics.Deriving_type_0_1,
+                    typeToString(derivation.type),
+                    `from derivation scope`
+                )
+            }
+            case "FromRule": {
+                return createDiagnosticForNodeFromMessageChain(
+                    location.arguments[0],
+                    chainDiagnosticMessages(
+                        derivation.arguments.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
+                        Diagnostics.Deriving_type_0_1,
+                        typeToString(derivation.type),
+                        `using${(derivation.usedBy.length > 0 ? " (recursive)" : "")} rule ${
+                            getSourceFileOfNode(location).fileName !== getSourceFileOfNode(derivation.rule).fileName ? 
+                                `${getImportPath(derivation.rule)}#${derivation.rule.symbol.escapedName}` : 
+                                derivation.rule.symbol.escapedName
+                            }`
+                    )
+                )
+            }
+            default: {
+                // @ts-expect-error
+                derivation._tag
+            }
+            throw new Error("Bug, unreachable")
+        }
+    }
+    function getImportPath(declaration: Declaration) {
+        let path: string | undefined;
+        const locationTag = getAllJSDocTags(declaration, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && tag.comment?.toString().startsWith("location") === true)[0];
+        if (locationTag) {
+            const match = locationTag.comment!.toString().match(/^location "(.*)"/);
+            if (match) {
+                path = match[1]
+            }
+        }
+        if (!path) {
+            path = getImportLocation(fileMap.map, getSourceFileOfNode(declaration).fileName);
+        }
+        return path;
+    }
+    function deriveParameter(deriveCallNode: CallLikeExpression, type: Type, parameterIndex: number): Type {
+        const nodeLinks = getNodeLinks(deriveCallNode);
+        if (!nodeLinks.tsPlusParameterDerivations) {
+            nodeLinks.tsPlusParameterDerivations = new Map();
+        }
+        if (!nodeLinks.tsPlusParameterDerivations!.has(parameterIndex)) {
+            const derivationDiagnostics: Diagnostic[] = [];
+            const derivation = deriveTypeWorker(deriveCallNode, type, type, derivationDiagnostics, [], [], []);
+            nodeLinks.tsPlusParameterDerivations!.set(parameterIndex, derivation);
+            if (isErrorType(derivation.type)) {
+                derivationDiagnostics.forEach((diagnostic) => {
+                    diagnostics.add(diagnostic);
+                })
+                return errorType;
+            }
+        }
+        return nodeLinks.tsPlusParameterDerivations.get(parameterIndex)!.type;
+    }
+    function deriveType(deriveCallNode: CallExpression, type: Type): Type {
+        const nodeLinks = getNodeLinks(deriveCallNode);
+        if (!nodeLinks.tsPlusDerivation) {
+            const derivationDiagnostics: Diagnostic[] = [];
+            const derivation = deriveTypeWorker(deriveCallNode, type, type, derivationDiagnostics, [], [], []);
+            nodeLinks.tsPlusDerivation = derivation;
+            if (isErrorType(derivation.type)) {
+                derivationDiagnostics.forEach((diagnostic) => {
+                    diagnostics.add(diagnostic);
+                })
+                return errorType;
+            } else if (deriveCallNode.arguments.length > 0) {
+                diagnostics.add(getDerivationDebugDiagnostic(deriveCallNode, nodeLinks.tsPlusDerivation));
+                return errorType;
+            }
+        }
+        return nodeLinks.tsPlusDerivation.type;
+    }
+    function getSelfExportStatement(location: Node) {
+        let current = location;
+        while (!isVariableStatement(current) && current.parent) {
+            current = current.parent;
+        }
+        if (current.parent) {
+            return current;
+        }
+    }
+    function isLocalImplicit(node: Node): boolean {
+        return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === 'string' && tag.comment === 'implicit local').length > 0;
+    }
+    function tsPlusFlattenTags(toFlat: string[][]): readonly string[] {
+        let strings: readonly string[] = toFlat[0];
+        for (let i = 1; i < toFlat.length; i++) {
+            strings = flatMap(strings, (prefix) => toFlat[i].map((post) => prefix + "," + post))
+        }
+        return strings.map((s) => `[${s}]`);
+    }
+    function collectTypeTagsOfType(type: Type) {
+        return flatMap(collectRelevantSymbols(type), (s) => typeSymbolCache.get(s));
+    }
+    function getTsPlusDerivationRules(symbol: Symbol, targetTypes: readonly Type[]) {
+        const mergedRules: { lazyRule: Declaration | undefined; rules: [Rule, number, Declaration, Set<string>][]; } = {
+            lazyRule: void 0,
+            rules: []
+        }
+        const paramExtensions = tsPlusFlattenTags(map(targetTypes, (t) => ["_", ...collectTypeTagsOfType(t)]));
+        const dedupe = new Set<Declaration>();
+        forEach(map(symbol.declarations, collectTsPlusTypeTags), (tags) => {
+            forEach(tags, (tag) => {
+                collectForTag(tag);
+                paramExtensions.forEach((extended) => collectForTag(tag + extended));
+            });
+        });
+        mergedRules.rules = mergedRules.rules.sort((a, b) => a[1] - b[1]);
+        return mergedRules;
+        function collectForTag(tag: string) {
+            const foundRules = tsPlusWorldScope.rules.get(tag);
+            if (foundRules) {
+                if (foundRules.lazyRule) {
+                    mergedRules.lazyRule = foundRules.lazyRule;
+                }
+                foundRules.rules.forEach((rule) => {
+                    if (!dedupe.has(rule[2])) {
+                        dedupe.add(rule[2]);
+                        mergedRules.rules.push(rule);
+                    }
+                });
+            }
+        }
+    }
+
+    function shouldTreatNominally(type: Type) {
+        if (type.symbol && type.symbol.declarations) {
+            for (const declaration of type.symbol.declarations) {
+                if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.tsPlusDeriveTags && declaration.tsPlusDeriveTags.length > 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function getImplicitTags(type: Type): Set<string> {
+        const tags = new Set<string>();
+        collectImplicitTagsWorker(type, tags, undefined);
+        return tags;
+    }
+
+    function collectImplicitTagsWorker(type: Type, tags: Set<string>, prefix: string | undefined) {
+        if (type.flags & TypeFlags.UnionOrIntersection) {
+            forEach((type as UnionOrIntersectionType).types, (d) => {
+                collectImplicitTagsWorker(d, tags, prefix);
+            })
+        }
+        else if (shouldTreatNominally(type)) {
+            if ((getObjectFlags(type) & ObjectFlags.Reference)) {
+                const name = symbolName(type.symbol);
+                const args = getTypeArguments(type as TypeReference);
+                forEach(args, (arg) => {
+                    collectImplicitTagsWorker(arg, tags, prefix ? `${prefix}.${name}` : name)
+                })
+            } else {
+                tags.add(prefix ? `${prefix}.${symbolName(type.symbol)}` : symbolName(type.symbol));
+            }
+        }
+        else if (type.flags & (TypeFlags.Intrinsic | TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.TypeParameter)) {
+            tags.add(prefix ? `${prefix}.${typeToString(type)}` : typeToString(type));
+        }
+        else {
+            const props = getPropertiesOfType(type);
+            forEach(props, (prop) => {
+                tags.add(prefix ? `${prefix}.${symbolName(prop)}` : symbolName(prop));
+            })
+            if (props.length === 0) {
+                tags.add(prefix ? `${prefix}._` : `_`);
+            }
+        }
+    }
+
+    function getTypeAndImplicitTags(symbol: Symbol) {
+        const links = getSymbolLinks(symbol);
+        if (!links.tsPlusTypeAndImplicitTags) {
+            const type = getTypeOfSymbol(symbol);
+            const tags = getImplicitTags(type);
+            links.tsPlusTypeAndImplicitTags = {
+                type,
+                tags
+            }
+        }
+        return links.tsPlusTypeAndImplicitTags;
+    }
+
+    function indexInScope(entry: Symbol) {
+        const { tags } = getTypeAndImplicitTags(entry);
+        forEach(arrayFrom(tags.values()), (tag) => {
+            let index = tsPlusWorldScope.implicits.get(tag);
+            if (!index) {
+                index = new Set();
+                tsPlusWorldScope.implicits.set(tag, index);
+            }
+            index.add(entry);
+        });
+    }
+
+    function lookupInGlobalScope(location: Node, type: Type, selfExport: Node | undefined, tags: readonly string[]): Derivation | undefined {
+        let candidates: Set<Symbol> | undefined;
+        for (const tag of tags) {
+            const maybeBetter = tsPlusWorldScope.implicits.get(tag);
+            if (!maybeBetter) {
+                return
+            }
+            if (!candidates || maybeBetter.size < candidates.size) {
+                candidates = maybeBetter;
+            }
+        }
+        const candidatesIterator = candidates?.values();
+        if (!candidatesIterator) {
+            return
+        }
+        let current = candidatesIterator.next();
+        while (!current.done) {
+            const candidate = current.value;
+            if (tags.every((tag) => tsPlusWorldScope.implicits.get(tag)?.has(candidate) === true)) {
+                if (getSelfExportStatement(candidate.valueDeclaration!) !== selfExport &&
+                    isBlockScopedNameDeclaredBeforeUse(candidate.valueDeclaration!, location)) {
+                    const { type: implicitType } = getTypeAndImplicitTags(candidate);
+                    if (isTypeAssignableTo(implicitType, type)) {
+                        return {
+                            _tag: "FromImplicitScope",
+                            type,
+                            implicit: candidate.valueDeclaration!
+                        };
+                    }
+                }
+            }
+            current = candidatesIterator.next();
+        }
+    }
+
+    function lookupInBlockScope(location: Node, type: Type, tags: readonly string[]): Derivation | undefined {
+        let container = getEnclosingBlockScopeContainer(location) as LocalsContainer;
+        while (container) {
+            if (container.locals) {
+                for (const local of arrayFrom(container.locals.values())) {
+                    if (local.valueDeclaration &&
+                        (isParameterDeclaration(local.valueDeclaration as VariableLikeDeclaration) || isLocalImplicit(local.valueDeclaration)) &&
+                        isNamedDeclaration(local.valueDeclaration) &&
+                        isIdentifier(local.valueDeclaration.name) && 
+                        isBlockScopedNameDeclaredBeforeUse(local.valueDeclaration.name, location)
+                        ) {
+                            const { tags: implicitTags, type: implicitType } = getTypeAndImplicitTags(local);
+                            if (tags.every((tag) => implicitTags.has(tag))) {
+                                if (isTypeAssignableTo(implicitType, type)) {
+                                    local.valueDeclaration.symbol.isReferenced = SymbolFlags.Value;
+                                    const blockLinks = getNodeLinks(container);
+                                    if (!blockLinks.uniqueNames) {
+                                        blockLinks.uniqueNames = new Set()
+                                    }
+                                    const declaration = local.valueDeclaration as NamedDeclaration & { name: Identifier };
+                                    blockLinks.uniqueNames.add(declaration);
+                                    const implicitLinks = getNodeLinks(local.valueDeclaration);
+                                    implicitLinks.needsUniqueNameInSope = true;
+                                    return {
+                                        _tag: "FromBlockScope",
+                                        type,
+                                        implicit: declaration
+                                    };
+                                }
+                            }
+                    }
+                }
+            }
+            container = getEnclosingBlockScopeContainer(container) as LocalsContainer;
+        }
+    }
+
+    function deriveTypeWorker(
+        location: Node,
+        originalType: Type,
+        type: Type,
+        diagnostics: Diagnostic[],
+        derivationScope: FromRule[],
+        prohibited: Type[],
+        currentDerivation: Type[]
+    ): Derivation {
+        if (isTypeIdenticalTo(type, emptyObjectType)) {
+            return {
+                _tag: "EmptyObjectDerivation",
+                type
+            };
+        }
+        for (const derivedType of derivationScope) {
+            if (isTypeAssignableTo(derivedType.type, type)) {
+                const rule: FromPriorDerivation = {
+                    _tag: "FromPriorDerivation",
+                    derivation: derivedType,
+                    type
+                };
+                derivedType.usedBy.push(rule);
+                return rule;
+            }
+        }
+        const tagsForLookup = arrayFrom(getImplicitTags(type).values());
+        const inBlockdScope = lookupInBlockScope(location, type, tagsForLookup);
+        if (inBlockdScope) {
+            return inBlockdScope;
+        }
+        const selfExport = getSelfExportStatement(location);
+        const inWorldScope = lookupInGlobalScope(location, type, selfExport, tagsForLookup);
+        if (inWorldScope) {
+            return inWorldScope;
+        }
+        const newCurrentDerivation = [...currentDerivation, type];
+        for (const prohibitedType of prohibited) {
+            if (isTypeIdenticalTo(prohibitedType, type)) {
+                if (diagnostics.length === 0) {
+                    const digs: Diagnostic[] = [];
+                    for (let i = 1; i < newCurrentDerivation.length - 1; i++) {
+                        const step = newCurrentDerivation[i];
+                        digs.push(createError(
+                            location,
+                            Diagnostics.Failed_derivation_of_type_0,
+                            typeToString(step)
+                        ));
+                    }
+                    const diagnostic = createDiagnosticForNodeFromMessageChain(
+                        location,
+                        chainDiagnosticMessages(
+                            map(digs, createDiagnosticMessageChainFromDiagnostic),
+                            Diagnostics.Cannot_derive_type_0_the_derivation_requires_a_lazy_rule_to_be_in_scope_as_it_is_cyclic_for_the_type_1,
+                            typeToString(newCurrentDerivation[0]),
+                            typeToString(newCurrentDerivation[newCurrentDerivation.length - 1])
+                        )
+                    )
+                    diagnostics.push(diagnostic)
+                }
+                return {
+                    _tag: "InvalidDerivation",
+                    type: errorType
+                };
+            }
+        }
+        let hasRules = false;
+        if ((type.flags & TypeFlags.Object) && ((type as ObjectType).objectFlags & ObjectFlags.Reference) && !isTupleType(type) && type.symbol && type.symbol.declarations) {
+            const targetTypes = getTypeArguments(type as TypeReference);
+            const mergedRules = getTsPlusDerivationRules(type.symbol, targetTypes);
+            ruleCheck: for (const [rule, _, ruleDeclaration, options] of mergedRules.rules) {
+                const toCheck: Type[] = [];
+                if (rule.paramActions.length !== targetTypes.length) {
+                    continue ruleCheck;
+                }
+                let index = 0;
+                for (const paramAction of rule.paramActions) {
+                    if (paramAction === "_") {
+                        toCheck.push(targetTypes[index])
+                    } else if (paramAction === "[]") {
+                        if (isTupleType(targetTypes[index])) {
+                            toCheck.push(targetTypes[index])
+                        } else {
+                            continue ruleCheck;
+                        }
+                    } else if (paramAction === "|") {
+                        if (targetTypes[index].flags & TypeFlags.Union) {
+                            const typesInUnion = (targetTypes[index] as UnionType).types;
+                            const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
+                            toCheck.push(typesInUnionTuple)
+                        } else {
+                            continue ruleCheck;
+                        }
+                    } else if (paramAction === "&") {
+                        if (targetTypes[index].flags & TypeFlags.Intersection) {
+                            const typesInUnion = (targetTypes[index] as IntersectionType).types;
+                            const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
+                            toCheck.push(typesInUnionTuple)
+                        } else {
+                            continue ruleCheck;
+                        }
+                    } else {
+                        continue ruleCheck;
+                    }
+                    index++;
+                }
+                if (toCheck.length !== targetTypes.length) {
+                    continue ruleCheck;
+                }
+                const signatures = getSignaturesOfType(getTypeOfNode(ruleDeclaration), SignatureKind.Call);
+                for (const signature of signatures) {
+                    if (signature.typeParameters && signature.typeParameters.length === toCheck.length) {
+                        const mapper = createTypeMapper(signature.typeParameters, toCheck);
+                        if (every(signature.typeParameters, (param, i) => {
+                            const constraint = instantiateType(getConstraintOfTypeParameter(param), mapper);
+                            if (!constraint) {
+                                return true;
+                            }
+                            return isTypeAssignableTo(toCheck[i], constraint);
+                        })) {
+                            const instantiated = getSignatureInstantiation(signature, toCheck, false);
+                            if (instantiated.parameters.length === 1 &&
+                                instantiated.parameters[0].valueDeclaration &&
+                                (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
+                            ) {
+                                const residualType = getTypeOfSymbol(instantiated.parameters[0]);
+                                if (isTupleType(residualType)) {
+                                    const types = getTypeArguments(residualType);
+                                    const selfRule: FromRule = {
+                                        _tag: "FromRule",
+                                        type,
+                                        rule: ruleDeclaration,
+                                        arguments: [],
+                                        usedBy: [],
+                                        lazyRule: mergedRules.lazyRule
+                                    };
+                                    const supportsLazy = !!mergedRules.lazyRule && !options.has("no-recursion");
+                                    const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
+                                    const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
+                                    const derivations = map(types, (childType) => deriveTypeWorker(
+                                        location,
+                                        originalType,
+                                        childType,
+                                        diagnostics,
+                                        newDerivationScope,
+                                        newProhibited,
+                                        newCurrentDerivation
+                                    ));
+                                    if (!find(derivations, (d) => isErrorType(d.type))) {
+                                        selfRule.arguments.push(...derivations);
+                                        return selfRule;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (diagnostics.length > 0) {
+                    break ruleCheck;
+                }
+            }
+        }
+        if (diagnostics.length === 0 && !hasRules && isTupleType(type)) {
+            const props = getTypeArguments(type);
+            const derivations = map(props, (prop) => deriveTypeWorker(
+                location,
+                originalType,
+                prop,
+                diagnostics,
+                derivationScope,
+                prohibited,
+                newCurrentDerivation
+            ));
+            if (!find(derivations, (d) => isErrorType(d.type))) {
+                return {
+                    _tag: "FromTupleStructure",
+                    type,
+                    fields: derivations
+                };
+            }
+        }
+        if (diagnostics.length === 0 && !hasRules && (type.flags & TypeFlags.Intersection)) {
+            const props = (type as IntersectionType).types;
+            const canIntersect = !find(props, (p) => {
+                if ((p.flags & TypeFlags.Object) && getSignaturesOfType(p, SignatureKind.Call).length === 0 && getSignaturesOfType(p, SignatureKind.Construct).length === 0 && !isArrayOrTupleLikeType(p)) {
+                    return false
+                }
+                return true
+            })
+            if (canIntersect) {
+                const derivations = map(props, (prop) => deriveTypeWorker(
+                    location,
+                    originalType,
+                    prop,
+                    diagnostics,
+                    derivationScope,
+                    prohibited,
+                    newCurrentDerivation
+                ));
+                if (!find(derivations, (d) => isErrorType(d.type))) {
+                    return {
+                        _tag: "FromIntersectionStructure",
+                        type,
+                        fields: derivations
+                    };
+                }
+            }
+        }
+        if (diagnostics.length === 0 && !hasRules && (type.flags & TypeFlags.Object)) {
+            const call = getSignaturesOfType(type, SignatureKind.Call);
+            const construct = getSignaturesOfType(type, SignatureKind.Construct);
+            if (call.length === 0 && construct.length === 0) {
+                const props = getPropertiesOfType(type);
+                if (!find(props, (p) => p.escapedName.toString().startsWith("__@"))) {
+                    const fields: FromObjectStructure["fields"] = [];
+                    for (const prop of props) {
+                        fields.push({
+                            prop,
+                            value: deriveTypeWorker(
+                                location,
+                                originalType,
+                                getTypeOfSymbol(prop),
+                                diagnostics,
+                                derivationScope,
+                                prohibited,
+                                newCurrentDerivation
+                            )
+                        })
+                    }
+                    if (!find(fields, (d) => isErrorType(d.value.type))) {
+                        return {
+                            _tag: "FromObjectStructure",
+                            type,
+                            fields
+                        };
+                    }
+                }
+            }
+        }
+        if (diagnostics.length === 0 && !hasRules && (type.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral))) {
+            return {
+                _tag: "FromLiteral",
+                type,
+                value: (type as StringLiteralType | NumberLiteralType).value
+            };
+        }
+        if (diagnostics.length === 0) {
+            if (isTypeIdenticalTo(originalType, type)) {
+                diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_and_no_derivation_rules_are_found, typeToString(originalType)));
+            } else {
+                const digs: Diagnostic[] = [];
+                for (let i = 1; i < newCurrentDerivation.length - 1; i++) {
+                    const step = newCurrentDerivation[i];
+                    digs.push(createError(
+                        location,
+                        Diagnostics.Failed_derivation_of_type_0,
+                        typeToString(step)
+                    ));
+                }
+                const diagnostic = createDiagnosticForNodeFromMessageChain(
+                    location,
+                    chainDiagnosticMessages(
+                        map(digs, createDiagnosticMessageChainFromDiagnostic),
+                        Diagnostics.Cannot_derive_type_0_you_may_want_to_try_add_an_implicit_for_1_in_scope,
+                        typeToString(newCurrentDerivation[0]),
+                        typeToString(newCurrentDerivation[newCurrentDerivation.length - 1])
+                    )
+                )
+                diagnostics.push(diagnostic)
+            }
+        }
+        return {
+            _tag: "InvalidDerivation",
+            type: errorType
+        };
+    }
+    function tsPlusDoGetBindOutput(node: CallExpression, resultType: Type, statementNode: Statement) {
+        const mapFluent = getFluentExtension(resultType, "map");
+        if (mapFluent) {
+            for (const signature of getSignaturesOfType(mapFluent, SignatureKind.Call)) {
+                const original = (signature as TsPlusSignature).tsPlusOriginal;
+                if (original.minArgumentCount === 2 && original.typeParameters) {
+                    const context = createInferenceContext(original.typeParameters, original, InferenceFlags.None);
+                    inferTypes(context.inferences, resultType, getTypeOfSymbol(original.parameters[0]));
+                    const instantiated = getSignatureInstantiation(original, getInferredTypes(context), /* isJavascript */ false);
+                    if (isTypeAssignableTo(resultType, getTypeOfSymbol(instantiated.parameters[0]))) {
+                        const funcType = getTypeOfSymbol(instantiated.parameters[1]);
+                        const statementLinks = getNodeLinks(statementNode);
+                        statementLinks.tsPlusDoBindType = [node, resultType];
+                        return getTypeOfSymbol(getSignaturesOfType(funcType, SignatureKind.Call)[0].parameters[0]);
+                    }
+                }
+            }
+        }
+        diagnostics.add(error(node, Diagnostics.Cannot_find_a_valid_flatMap_extension_for_type_0, typeToString(resultType)));
+        return errorType;
+    }
+    function tsPlusDoCheckBind(node: CallExpression, resultType: Type) {
+        const links = getNodeLinks(node);
+        if (!links.tsPlusResolvedType) {
+            links.tsPlusResolvedType = tsPlusDoCheckBindWorker(node, resultType);
+        }
+        return links.tsPlusResolvedType;
+    }
+    function tsPlusDoCheckBindWorker(node: CallExpression, resultType: Type) {
+        if (
+            isVariableDeclaration(node.parent) &&
+            isVariableDeclarationList(node.parent.parent) &&
+            (node.parent.parent.flags & NodeFlags.Const) &&
+            isVariableStatement(node.parent.parent.parent) &&
+            isBlock(node.parent.parent.parent.parent) &&
+            isArrowFunction(node.parent.parent.parent.parent.parent) &&
+            isCallExpression(node.parent.parent.parent.parent.parent.parent)
+        ) {
+            const callExp = node.parent.parent.parent.parent.parent.parent as CallExpression;
+            const links = getNodeLinks(callExp);
+            if (links.isTsPlusDoCall) {
+                return tsPlusDoGetBindOutput(node, resultType, node.parent.parent.parent);
+            }
+        }
+        else if (
+            isExpressionStatement(node.parent) &&
+            isBlock(node.parent.parent) &&
+            isArrowFunction(node.parent.parent.parent) &&
+            isCallExpression(node.parent.parent.parent.parent)
+        ) {
+            const callExp = node.parent.parent.parent.parent as CallExpression;
+            const links = getNodeLinks(callExp);
+            if (links.isTsPlusDoCall) {
+                return tsPlusDoGetBindOutput(node, resultType, node.parent);
+            }
+        }
+        else if (
+            isReturnStatement(node.parent) &&
+            isBlock(node.parent.parent) &&
+            isArrowFunction(node.parent.parent.parent) &&
+            isCallExpression(node.parent.parent.parent.parent)
+        ) {
+            const callExp = node.parent.parent.parent.parent as CallExpression;
+            const links = getNodeLinks(callExp);
+            if (links.isTsPlusDoCall) {
+                links.isTsPlusDoReturnBound = true;
+                return tsPlusDoGetBindOutput(node, resultType, node.parent);
+            }
+        }
+        diagnostics.add(error(node, Diagnostics.A_call_to_bind_is_only_allowed_in_the_context_of_a_Do));
+        return errorType;
+    }
+    function tsPlusDoCheckChain(types: readonly [CallExpression, Type][], signature: Signature): Type {
+        let current = types[types.length - 1][1];
+        for (let i = types.length - 2; i >= 0; i--) {
+            const [node, type] = types[i];
+            const context = createInferenceContext(signature.typeParameters!, signature, InferenceFlags.None);
+            inferTypes(context.inferences, type, getTypeOfSymbol(signature.parameters[0]));
+            const childType = createAnonymousType(
+                void 0,
+                emptySymbols,
+                [createSignature(
+                    void 0,
+                    [],
+                    void 0,
+                    [],
+                    current,
+                    void 0,
+                    0,
+                    SignatureFlags.None
+                )],
+                [],
+                []
+            );
+            inferTypes(context.inferences, childType, getTypeOfSymbol(signature.parameters[1]));
+            const instantiated = getSignatureInstantiation(signature, getInferredTypes(context), /* isJavascript */ false);
+            if (!isTypeAssignableTo(type, getTypeOfSymbol(instantiated.parameters[0]))) {
+                error(node, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(type), typeToString(getTypeOfSymbol(instantiated.parameters[0])));
+                return errorType;
+            }
+            if (!isTypeAssignableTo(childType, getTypeOfSymbol(instantiated.parameters[1]))) {
+                error(node, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(childType), typeToString(getTypeOfSymbol(instantiated.parameters[1])));
+                return errorType;
+            }
+            current = getReturnTypeOfSignature(instantiated);
+            if (isErrorType(current)) {
+                return errorType;
+            }
+        }
+        return current;
+    }
+    function tsPlusDoCheckLastBind(node: CallExpression, mapFunction: Signature, lastBind: Type, result: Type) {
+        const context = createInferenceContext(mapFunction.typeParameters!, mapFunction, InferenceFlags.None);
+        const createdFunction = createAnonymousType(
+            void 0,
+            emptySymbols,
+            [createSignature(
+                void 0,
+                [],
+                void 0,
+                [],
+                result,
+                void 0,
+                0,
+                SignatureFlags.None
+            )],
+            [],
+            []
+        );
+        inferTypes(context.inferences, lastBind, getTypeOfSymbol(mapFunction.parameters[0]));
+        inferTypes(context.inferences, createdFunction, getTypeOfSymbol(mapFunction.parameters[1]));
+        const instantiated = getSignatureInstantiation(mapFunction, getInferredTypes(context), /* isJavascript */ false);
+        if (!isTypeAssignableTo(lastBind, getTypeOfSymbol(instantiated.parameters[0]))) {
+            error(node, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(lastBind), typeToString(getTypeOfSymbol(instantiated.parameters[0])));
+            return errorType;
+        }
+        if (!isTypeAssignableTo(createdFunction, getTypeOfSymbol(instantiated.parameters[1]))) {
+            error(node, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(createdFunction), typeToString(getTypeOfSymbol(instantiated.parameters[1])));
+            return errorType;
+        }
+        return getReturnTypeOfSignature(instantiated);
+    }
+    function tsPlusDoChooseImplementation(types: [CallExpression, Type][], name: string) {
+        const seen = new Set<Signature>();
+        for (const [_, type] of types) {
+            const flatMap = getFluentExtension(type, name);
+            if (flatMap) {
+                for (const signature of getSignaturesOfType(flatMap, SignatureKind.Call)) {
+                    const original = (signature as TsPlusSignature).tsPlusOriginal;
+                    if (!seen.has(original)) {
+                        seen.add(original);
+                        if (original.minArgumentCount === 2 && original.typeParameters) {
+                            const mapper = createTypeMapper(original.typeParameters, original.typeParameters.map(() => anyType));
+                            const p0 = instantiateType(getTypeOfSymbol(original.parameters[0]), mapper);
+                            if (types.every((target) => isTypeAssignableTo(target[1], p0))) {
+                                return signature as TsPlusSignature;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    function tsPlusDoCheckDo(node: CallExpression, checked: Type) {
+        const links = getNodeLinks(node);
+        if (!links.tsPlusResolvedType) {
+            links.tsPlusResolvedType = tsPlusDoCheckDoWorker(node, checked);
+        }
+        return links.tsPlusResolvedType;
+    }
+    function tsPlusDoCheckDoWorker(node: CallExpression, checked: Type) {
+        if (isArrowFunction(node.arguments[0]) && isBlock(node.arguments[0].body)) {
+            const types: [CallExpression, Type][] = [];
+            forEach(node.arguments[0].body.statements, (statement) => {
+                checkSourceElement(statement);
+                const links = getNodeLinks(statement);
+                if (links.tsPlusDoBindType) {
+                    types.push(links.tsPlusDoBindType);
+                }
+            });
+            if (types.length === 0) {
+                error(node, Diagnostics.A_Do_block_must_contain_at_least_1_bound_value);
+                return errorType;
+            }
+            getNodeLinks(node).tsPlusDoBindTypes = types;
+            const mapFn = tsPlusDoChooseImplementation(types, "map");
+            if (!mapFn) {
+                error(node, Diagnostics.Cannot_find_a_valid_0_that_can_handle_all_the_types_of_1, "map", typeToString(getUnionType(types.map((t) => t[1]))))
+                return errorType;
+            }
+            const flatMapFn = tsPlusDoChooseImplementation(types, "flatMap");
+            if (!flatMapFn) {
+                error(node, Diagnostics.Cannot_find_a_valid_0_that_can_handle_all_the_types_of_1, "flatMap", typeToString(getUnionType(types.map((t) => t[1]))))
+                return errorType;
+            }
+            getNodeLinks(node).tsPlusDoFunctions = {
+                flatMap: flatMapFn,
+                map: mapFn
+            };
+            const lastBind = types[types.length - 1];
+            const links = getNodeLinks(node);
+            const mapped = links.isTsPlusDoReturnBound ? lastBind[1] : tsPlusDoCheckLastBind(lastBind[0], mapFn.tsPlusOriginal, lastBind[1], checked)
+            const toBeFlatMapped = types.map((t, i) => i !== types.length - 1 ? t : [t[0], mapped] as typeof t);
+            return tsPlusDoCheckChain(toBeFlatMapped, flatMapFn.tsPlusOriginal);
+        }
+        error(node, Diagnostics.The_first_argument_of_a_Do_must_be_an_arrow_function);
+        return errorType;
+    }
+    function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
+        let checked = checkCallExpressionOriginal(node, checkMode);
+        if (isTsPlusMacroCall(node, "Bind") && !isErrorType(checked)) {
+            return tsPlusDoCheckBind(node, checked);
+        }
+        if (isTsPlusMacroCall(node, "Do") && !isErrorType(checked)) {
+            return tsPlusDoCheckDo(node, checked);
+        }
+        if (isTsPlusMacroCall(node, "Derive") && !isErrorType(checked)) {
+            return deriveType(node, checked);
+        }
+        if (isTsPlusMacroCall(node, "pipeable") && !isErrorType(checked)) {
+            if (!isVariableDeclaration(node.parent)) {
+                error(node, Diagnostics.Pipeable_macro_is_only_allowed_in_variable_declarations);
+                return checked;
+            }
+            if (node.arguments.length > 0) {
+                const dataFirstSymbol = getTypeOfNode(node.arguments[0]).symbol;
+                if (dataFirstSymbol && dataFirstSymbol.declarations) {
+                    const dataFirstDeclaration = find(dataFirstSymbol.declarations, (decl): decl is FunctionDeclaration | ArrowFunction | FunctionExpression => isFunctionDeclaration(decl) || isArrowFunction(decl) || isFunctionExpression(decl))
+                    if (dataFirstDeclaration) {
+                        const type = generatePipeable(node.parent, dataFirstDeclaration);
+                        if (type) {
+                            getNodeLinks(node.parent).tsPlusDataFirstDeclaration = dataFirstDeclaration;
+                            return type;
+                        }
+                    }
+                }
+            }
+        }
+        if (isTsPlusMacroCall(node, "identity") && !isErrorType(checked)) {
+            if (node.arguments.length === 1) {
+                if (isSpreadArgument(node.arguments[0])) {
+                    error(node.arguments[0], Diagnostics.The_argument_of_an_identity_macro_must_not_be_a_spread_element);
+                    return checked;
+                }
+            }
+        }
+        if (isCallExpression(node)) {
+            tryCacheOptimizedPipeableCall(node);
+        }
+        return checked;
+    }
+    // TSPLUS EXTENSION END 
+
     /**
      * Syntactically and semantically checks a call or new expression.
      * @param node The call/new expression to be checked.
      * @returns On success, the expression's signature's return type. On failure, anyType.
      */
-    function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
+    function checkCallExpressionOriginal(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
         checkGrammarTypeArguments(node, node.typeArguments);
 
         const signature = getResolvedSignature(node, /*candidatesOutArray*/ undefined, checkMode);
@@ -33971,6 +36373,12 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     return 0;
                 }
                 minArgumentCount = signature.minArgumentCount;
+            }
+            for (let i = 0; i < signature.parameters.length; i++) {
+                if (signature.parameters[i].valueDeclaration && (signature.parameters[i].valueDeclaration as ParameterDeclaration).isAuto) {
+                    minArgumentCount = signature.parameters.length - (signature.parameters.length - i);
+                    break;
+                }
             }
             if (voidIsNonOptional) {
                 return minArgumentCount;
@@ -35487,6 +37895,13 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         errorNode?: Node
     ): Type {
         const operator = operatorToken.kind;
+
+        const links = getNodeLinks(operatorToken);
+
+        if (links.isTsPlusOperatorToken) {
+            return links.resolvedSignature ? getReturnTypeOfSignature(links.resolvedSignature) : errorType;
+        }
+
         switch (operator) {
             case SyntaxKind.AsteriskToken:
             case SyntaxKind.AsteriskAsteriskToken:
@@ -36464,7 +38879,181 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return checkExpression(node.expression, checkMode);
     }
 
+    function getOperatorExtensionsForSymbols(name: string, symbols: readonly Symbol[]): Signature[] {
+        const signatures = new Set<Signature>();
+        for (const target of symbols) {
+            if (typeSymbolCache.has(target)) {
+                for (const tag of typeSymbolCache.get(target)!) {
+                    if (operatorCache.has(tag)) {
+                        const cache = operatorCache.get(tag)
+                        const extensions = cache?.get(name);
+                        if (extensions) {
+                            for (const extension of extensions) {
+                                for (const signature of getSignaturesOfType(getTypeOfSymbol(extension.patched), SignatureKind.Call)) {
+                                    signatures.add(signature)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return arrayFrom(signatures.values());
+    }
+    function getOperatorExtensionsForTypes(name: string, types: Type[]): Signature[] {
+        const symbols = new Set<Symbol>();
+        for (const type of types) {
+            collectRelevantSymbols(type).forEach((symbol) => {
+                symbols.add(symbol)
+            })
+        }
+        return getOperatorExtensionsForSymbols(name, arrayFrom(symbols.values()));
+    }
+
+
+    function checkTsPlusOperator(left: Expression, right: Expression): readonly [Type, Type] | undefined {
+        // potentially captured by resolution
+        let lastSignature: Signature | undefined;
+        const resolutionDiagnostics = new Map<Signature, () => readonly Diagnostic[]>();
+        // not captured
+        const parent = right.parent as BinaryExpression;
+        const links = getNodeLinks(parent.operatorToken);
+        const alreadyResolved = links.resolvedSignature;
+        if (alreadyResolved && alreadyResolved === resolvingSignature) {
+            return; // in resolution
+        }
+        if (alreadyResolved) {
+            return [getTypeAtPosition(alreadyResolved, 0), getTypeAtPosition(alreadyResolved, 1)];
+        }
+        if (links.isTsPlusOperatorToken === false) {
+            return; // already checked and not a custom operator
+        }
+        links.resolvedSignature = resolvingSignature;
+        const operator = invertedBinaryOp[parent.operatorToken.kind as keyof typeof invertedBinaryOp] as string | undefined;
+        if (operator) {
+            let resolved: Signature | undefined;
+            const leftType = getTypeOfNode(parent.left);
+            const leftOperators = getOperatorExtensionsForTypes(operator, [leftType]);
+            resolved = resolveTsPlusOperator(left, right, leftOperators);
+            if (!resolved) {
+                const rightType = checkExpression(right, CheckMode.Normal);
+                const rightOperators = getOperatorExtensionsForTypes(operator, [rightType]);
+                resolved = resolveTsPlusOperator(left, right, rightOperators);
+            }
+            if (resolved) {
+                links.resolvedSignature = resolved;
+                links.isTsPlusOperatorToken = true;
+                return [getTypeAtPosition(resolved, 0), getTypeAtPosition(resolved, 1)] as const;
+            }
+            else {
+                if (lastSignature) {
+                    links.resolvedSignature = lastSignature;
+                    links.isTsPlusOperatorToken = true;
+                    const diagnosticsForSignature = resolutionDiagnostics.get(lastSignature);
+                    if (diagnosticsForSignature) {
+                        diagnosticsForSignature().forEach((diagnostic) => diagnostics.add(diagnostic));
+                        links.resolvedSignature = undefined;
+                    }
+                    return [errorType, errorType] as const;
+                }
+            }
+        }
+        links.isTsPlusOperatorToken = false;
+        return;
+        function resolveTsPlusOperator(left: Expression, right: Expression, signatures: Signature[]) {
+            for (let signature of signatures) {
+                if (resolutionDiagnostics.has(signature)) {
+                    continue;
+                }
+                lastSignature = signature;
+                if (signature.typeParameters) {
+                    const context = createInferenceContext(signature.typeParameters, signature, InferenceFlags.None)
+                    const leftParam = unionIfLazy(getTypeAtPosition(signature, 0));
+                    const leftType = checkExpressionWithContextualType(left, leftParam, context, CheckMode.Normal);
+                    inferTypes(context.inferences, leftType, leftParam);
+                    const rightParam = unionIfLazy(getTypeAtPosition(signature, 1));
+                    const rightType = checkExpressionWithContextualType(right, rightParam, context, CheckMode.Normal);
+                    inferTypes(context.inferences, rightType, rightParam);
+                    const instantiated = getSignatureInstantiation(signature, getInferredTypes(context), /** isJavascript */ false);
+                    const diagnostics = getSignatureApplicabilityError(
+                        undefined,
+                        [left, right],
+                        instantiated,
+                        assignableRelation,
+                        CheckMode.Normal,
+                        false,
+                        undefined
+                    );
+                    if (diagnostics) {
+                        const leftParam = getTypeAtPosition(instantiated, 0);
+                        const rightParam = getTypeAtPosition(instantiated, 1);
+                        resolutionDiagnostics.set(signature, () => {
+                            const diags: Diagnostic[] = [];
+                            if (!isTypeAssignableTo(rightType, rightParam)) {
+                                diags.push(error(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightParam)));
+                            }
+                            if (!isTypeAssignableTo(leftType, leftParam)) {
+                                diags.push(error(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightParam)));
+                            }
+                            if (diags.length === 0) {
+                                Debug.fail("Cannot find diagnostics");
+                            }
+                            return diags;
+                        });
+                    } else {
+                        return instantiated;
+                    }
+                }
+                else {
+                    const diagnostics = getSignatureApplicabilityError(
+                        undefined,
+                        [left, right],
+                        signature,
+                        assignableRelation,
+                        CheckMode.Normal,
+                        false,
+                        undefined
+                    );
+                    if (diagnostics) {
+                        resolutionDiagnostics.set(signature, () => {
+                            const diags: Diagnostic[] = [];
+                            const leftParam = getTypeAtPosition(signature, 0);
+                            const rightParam = getTypeAtPosition(signature, 1);
+                            const leftType = getTypeOfNode(left);
+                            const rightType = getTypeOfNode(right);
+                            if (!isTypeAssignableTo(rightType, rightParam)) {
+                                diags.push(error(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightParam)));
+                            }
+                            if (!isTypeAssignableTo(leftType, leftParam)) {
+                                diags.push(error(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightParam)));
+                            }
+                            if (diags.length === 0) {
+                                Debug.fail("Cannot find diagnostics");
+                            }
+                            return diags;
+                        });
+                    } else {
+                        return signature;
+                    }
+                }
+            }
+        }
+    }
+
     function checkExpressionWorker(node: Expression | QualifiedName, checkMode: CheckMode | undefined, forceTuple?: boolean): Type {
+        if (node.kind !== SyntaxKind.QualifiedName && node.parent && node.parent.kind === SyntaxKind.BinaryExpression) {
+            const result = checkTsPlusOperator((node.parent as BinaryExpression).left, (node.parent as BinaryExpression).right);
+            if (result) {
+                return node === (node.parent as BinaryExpression).right ? result[1] : result[0];
+            }
+        }
+        if (node.kind === SyntaxKind.BinaryExpression) {
+            checkTsPlusOperator((node as BinaryExpression).left, (node as BinaryExpression).right);
+            const links = getNodeLinks((node as BinaryExpression).operatorToken);
+            if (links.isTsPlusOperatorToken) {
+                return links.resolvedSignature ? getReturnTypeOfSignature(links.resolvedSignature) : errorType;
+            }
+        }
         const kind = node.kind;
         if (cancellationToken) {
             // Only bother checking on a few construct kinds.  We don't want to be excessively
@@ -38656,13 +41245,132 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
     }
 
+    function checkTailRecFunction(node: FunctionDeclaration): void {
+        if (node.body && node.name) {
+            const funcNameSymbol = getSymbolAtLocation(node.name)
+            if (funcNameSymbol) {
+                checkTailRecFunctionParameters(node.parameters);
+                const paramSymbols = flatMap(node.parameters, (param) => getSymbolsOfBindingName(param.name));
+                forEach(node.body.statements, (s) => {
+                    visitNode(s, checkTailRecFunctionVisitor(funcNameSymbol, paramSymbols));
+                });
+            }
+        }
+        else {
+            error(node, Diagnostics.Invalid_declaration_annotated_as_tailRec);
+        }
+    }
+    function checkTailRecVariableDeclaration(node: VariableDeclaration): void {
+        if (isIdentifier(node.name) && node.initializer && isArrowFunction(node.initializer)) {
+            const funcNameSymbol = getSymbolAtLocation(node.name)
+            if (funcNameSymbol) {
+                checkTailRecFunctionParameters(node.initializer.parameters);
+                const paramSymbols = flatMap(node.initializer.parameters, (param) => getSymbolsOfBindingName(param.name));
+                if (isBlock(node.initializer.body)) {
+                    forEach(node.initializer.body.statements, (s) => {
+                        visitNode(s, checkTailRecFunctionVisitor(funcNameSymbol, paramSymbols));
+                    });
+                }
+                else {
+                    checkTailRecReturnStatement(funcNameSymbol, paramSymbols)(node.initializer.body);
+                }
+            }
+        }
+        else {
+            error(node, Diagnostics.Invalid_declaration_annotated_as_tailRec);
+        }
+    }
+    function checkTailRecFunctionParameters(params: NodeArray<ParameterDeclaration>): void {
+        forEach(params, (param) => {
+            if (!isIdentifier(param.name)) {
+                error(param, Diagnostics.Parameter_destructuring_is_not_allowed_in_a_tailRec_annotated_function);
+            }
+        });
+    }
+    function checkTailRecFunctionVisitor(funcNameSymbol: Symbol, parameterSymbols: readonly Symbol[]) {
+        return function (node: Node): VisitResult<Node> {
+            if (isReturnStatement(node) && node.expression) {
+                return visitEachChild(
+                    node,
+                    checkTailRecReturnStatement(funcNameSymbol, parameterSymbols),
+                    nullTransformationContext
+                );
+            }
+            else if (isFunctionDeclaration(node) || isArrowFunction(node)) {
+                return visitEachChild(
+                    node,
+                    checkTailRecNestedFunction(funcNameSymbol),
+                    nullTransformationContext
+                );
+            }
+            else if (isCallExpression(node)) {
+                const symbol = getSymbolAtLocation(node.expression);
+                if (symbol === funcNameSymbol) {
+                    error(node, Diagnostics.A_recursive_call_must_be_in_a_tail_position_of_a_tailRec_annotated_function);
+                    return node;
+                }
+            }
+            return visitEachChild(
+                node,
+                checkTailRecFunctionVisitor(funcNameSymbol, parameterSymbols),
+                nullTransformationContext
+            );
+        };
+    }
+    function getSymbolsOfBindingName(node: BindingName): readonly Symbol[] {
+        if (isIdentifier(node)) {
+            const symbol = getSymbolAtLocation(node);
+            return symbol ? [symbol] : [];
+        }
+        else if (isObjectBindingPattern(node)) {
+            return flatMap(node.elements, (param) => getSymbolsOfBindingName(param.name));
+        }
+        else {
+            return flatMap(node.elements, (param) => isBindingElement(param) ? getSymbolsOfBindingName(param.name) : undefined);
+        }
+    }
+
+    function checkTailRecNestedFunction(funcNameSymbol: Symbol) {
+        return function (node: Node): VisitResult<Node> {
+            if (isCallExpression(node) && isIdentifier(node.expression)) {
+                const callNameSymbol = getSymbolAtLocation(node.expression);
+                if (callNameSymbol === funcNameSymbol) {
+                    error(node, Diagnostics.A_recursive_call_cannot_cross_a_function_boundary_in_a_tailRec_annotated_function);
+                    return node;
+                }
+            }
+            return visitEachChild(node, checkTailRecNestedFunction(funcNameSymbol), nullTransformationContext);
+        };
+    }
+
+    // TODO(peter): Right now the heuristic for detecting whether a recursive call is in the tail position
+    // is overly simple. It does not, for example, allow for recursive calls in ternery expressions.
+    function checkTailRecReturnStatement(funcNameSymbol: Symbol, parameterSymbols: readonly Symbol[], firstIter = true) {
+        return function (node: Node): VisitResult<Node> {
+            if (isCallExpression(node) && !firstIter) {
+                const symbol = getSymbolAtLocation(node.expression);
+                if (symbol === funcNameSymbol) {
+                    error(node, Diagnostics.A_recursive_call_must_be_in_a_tail_position_of_a_tailRec_annotated_function);
+                }
+            }
+            return visitEachChild(node, checkTailRecReturnStatement(funcNameSymbol, parameterSymbols, false), nullTransformationContext);
+        };
+    }
+
     function checkFunctionDeclaration(node: FunctionDeclaration): void {
         addLazyDiagnostic(checkFunctionDeclarationDiagnostics);
 
         function checkFunctionDeclarationDiagnostics() {
+            if (isTailRec(node)) {
+                checkTailRecFunction(node);
+            }
             checkFunctionOrMethodDeclaration(node);
             checkGrammarForGenerator(node);
             checkCollisionsForDeclarationName(node, node.name);
+            const links = getNodeLinks(node);
+            if (links.tsPlusPipeableExtension) {
+                checkFluentPipeableAgreement(links.tsPlusPipeableExtension);
+            } 
         }
     }
 
@@ -39046,7 +41754,10 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     }
 
                     if (isImportedDeclaration(declaration)) {
-                        addToGroup(unusedImports, importClauseFromImported(declaration), declaration, getNodeId);
+                        const importClause = importClauseFromImported(declaration);
+                        if (!importClause.parent.isTsPlusGlobal) {
+                            addToGroup(unusedImports, importClause, declaration, getNodeId);
+                        }
                     }
                     else if (isBindingElement(declaration) && isObjectBindingPattern(declaration.parent)) {
                         // In `{ a, ...b }, `a` is considered used since it removes a property from `b`. `b` may still be unused though.
@@ -39661,9 +42372,19 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
 
     function checkVariableDeclaration(node: VariableDeclaration) {
         tracing?.push(tracing.Phase.Check, "checkVariableDeclaration", { kind: node.kind, pos: node.pos, end: node.end, path: (node as TracingNode).tracingPath });
+        if (isTailRec(node)) {
+            checkTailRecVariableDeclaration(node);
+        }
         checkGrammarVariableDeclaration(node);
         checkVariableLikeDeclaration(node);
         tracing?.pop();
+        addLazyDiagnostic(checkDeferred)
+        function checkDeferred() {
+            const links = getNodeLinks(node);
+            if (links.tsPlusPipeableExtension) {
+                checkFluentPipeableAgreement(links.tsPlusPipeableExtension);
+            }
+        }
     }
 
     function checkBindingElement(node: BindingElement) {
@@ -42740,6 +45461,12 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             }
         }
         checkAssertClause(node);
+        if (node.isTsPlusGlobal) {
+            const location = (node.moduleSpecifier as StringLiteral).text;
+            if (pathIsRelative(location)) {
+                error(node.moduleSpecifier, Diagnostics.Global_import_path_cannot_be_relative);
+            }
+        }
     }
 
     function checkImportEqualsDeclaration(node: ImportEqualsDeclaration) {
@@ -43682,6 +46409,21 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 // it will not copy symbol with reserved name to the array
                 if (!symbols.has(id)) {
                     symbols.set(id, symbol);
+                }
+            }
+            if (companionSymbolCache.has(symbol)) {
+                const id = symbol.escapedName;
+                if (!symbols.has(id)) {
+                    symbols.set(id, symbol);
+                }
+            }
+            if (symbol.declarations && symbol.declarations[0] && isImportSpecifier(symbol.declarations[0])) {
+                const originalSymbol = getTargetOfImportSpecifier(symbol.declarations[0], false);
+                if (originalSymbol && companionSymbolCache.has(originalSymbol)) {
+                    const id = symbol.escapedName;
+                    if (!symbols.has(id)) {
+                        symbols.set(id, symbol);
+                    }
                 }
             }
         }
@@ -45197,10 +47939,1566 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return getDeclarationOfKind(moduleSymbol, SyntaxKind.SourceFile);
     }
 
+    // TSPLUS EXTENSION START
+    function isTsPlusImplicit(declaration: Declaration): declaration is VariableDeclaration {
+        if (isVariableDeclaration(declaration)) {
+            return declaration.isTsPlusImplicit;
+        }
+        return false;
+    }
+    function collectTsPlusDeriveTags(declaration: Declaration) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+            return declaration.tsPlusDeriveTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusFluentTags(declaration: Declaration) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+            return declaration.tsPlusFluentTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusPipeableTags(declaration: Declaration) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+            return declaration.tsPlusPipeableTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusIndexTags(declaration: Declaration) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+            return declaration.tsPlusIndexTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusPipeableIndexTags(declaration: Declaration) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+            return declaration.tsPlusPipeableIndexTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusTypeTags(declaration: Declaration) {
+        if (isInterfaceDeclaration(declaration) || isTypeAliasDeclaration(declaration) || isClassDeclaration(declaration)) {
+            return declaration.tsPlusTypeTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusCompanionTags(declaration: Declaration) {
+        if (isClassDeclaration(declaration) || isInterfaceDeclaration(declaration) || isTypeAliasDeclaration(declaration)) {
+            return declaration.tsPlusCompanionTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusMacroTags(declaration: Declaration) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration) || isCallSignatureDeclaration(declaration)) {
+            return declaration.tsPlusMacroTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusUnifyTags(declaration: Declaration) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+            return declaration.tsPlusUnifyTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusStaticTags(declaration: Node) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration) || isClassDeclaration(declaration)) {
+            return declaration.tsPlusStaticTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusOperatorTags(declaration: Node) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+            return declaration.tsPlusOperatorTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusPipeableOperatorTags(declaration: Node) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+            return declaration.tsPlusPipeableOperatorTags || [];
+        }
+        return [];
+    }
+    function collectTsPlusGetterTags(declaration: Node) {
+        if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+            return declaration.tsPlusGetterTags || [];
+        }
+        return [];
+    }
+    function createTsPlusSignature(call: Signature, exportName: string, file: SourceFile): TsPlusSignature {
+        const signature = cloneSignature(call) as TsPlusSignature
+        signature.tsPlusTag = "TsPlusSignature";
+        signature.tsPlusFile = file;
+        signature.tsPlusExportName = exportName;
+        signature.tsPlusOriginal = call;
+        return signature
+    }
+    function thisifyTsPlusSignature(declaration: FunctionDeclaration | VariableDeclaration, call: Signature, exportName: string, file: SourceFile, reportDiagnostic: (diagnostic: DiagnosticMessage) => void) {
+        const signature = createTsPlusSignature(call, exportName, file);
+        if (isSelfARestParameter(signature)) {
+            reportDiagnostic(Diagnostics.The_first_parameter_of_a_fluent_function_cannot_be_a_rest_parameter);
+            return undefined;
+        }
+        const target = signature.parameters[0];
+        signature.thisParameter = createSymbolWithType(createSymbol(target.flags, "this" as __String), getTypeOfSymbol(target));
+        const typePredicate = getTypePredicateOfSignature(call);
+        if (typePredicate && typePredicate.parameterIndex === 0) {
+            signature.resolvedTypePredicate = createTypePredicate(
+                typePredicate.kind === TypePredicateKind.Identifier ? TypePredicateKind.This : TypePredicateKind.AssertsThis,
+                "this",
+                0,
+                typePredicate.type
+            );
+        }
+        signature.parameters = signature.parameters.slice(1, signature.parameters.length);
+        signature.minArgumentCount = signature.minArgumentCount - 1;
+        signature.tsPlusDeclaration = declaration;
+        signature.resolvedReturnType = call.resolvedReturnType;
+        return signature;
+    }
+    function createTsPlusFluentSymbol(name: string, signatures: TsPlusSignature[]): TsPlusFluentSymbol {
+        const symbol = createSymbol(SymbolFlags.Function, name as __String) as TsPlusFluentSymbol;
+        symbol.tsPlusTag = TsPlusSymbolTag.Fluent;
+        symbol.tsPlusResolvedSignatures = signatures;
+        symbol.tsPlusName = name;
+        return symbol;
+    }
+    function createTsPlusFluentSymbolWithType(name: string, allSignatures: TsPlusSignature[]): TransientSymbol {
+        const symbol = createTsPlusFluentSymbol(name, allSignatures);
+        const type = createAnonymousType(symbol, emptySymbols, allSignatures, [], []);
+        return createSymbolWithType(symbol, type);
+    }
+    function createTsPlusGetterVariableSymbol(name: string, dataFirst: VariableDeclaration & { name: Identifier }, returnType: Type, selfType: Type) {
+        const symbol = createSymbol(SymbolFlags.Property, name as __String) as TsPlusGetterVariableSymbol;
+        getSymbolLinks(symbol).type = returnType;
+        symbol.tsPlusTag = TsPlusSymbolTag.GetterVariable;
+        symbol.tsPlusDeclaration = dataFirst;
+        symbol.tsPlusSelfType = selfType;
+        symbol.tsPlusName = name;
+        return symbol;
+    }
+    function createTsPlusStaticFunctionSymbol(name: string, declaration: FunctionDeclaration | VariableDeclaration, signatures: Signature[]): TsPlusStaticFunctionSymbol {
+        const symbol = createSymbol(SymbolFlags.Function, name as __String) as TsPlusStaticFunctionSymbol;
+        symbol.tsPlusTag = TsPlusSymbolTag.StaticFunction;
+        symbol.tsPlusDeclaration = declaration;
+        symbol.tsPlusResolvedSignatures = signatures;
+        symbol.tsPlusName = name;
+        return symbol;
+    }
+    function createTsPlusPipeableDeclarationSymbol(name: string, declaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType) {
+        const symbol = createSymbol(SymbolFlags.Function, name as __String) as TsPlusPipeableDeclarationSymbol;
+        symbol.tsPlusTag = TsPlusSymbolTag.PipeableDeclaration;
+        symbol.tsPlusDeclaration = declaration;
+        return symbol;
+    }
+    function createTsPlusStaticValueSymbol(name: string, declaration: VariableDeclaration | ClassDeclaration, originalSymbol: Symbol): Symbol {
+        const symbol = cloneSymbol(originalSymbol) as TsPlusStaticValueSymbol;
+        symbol.tsPlusTag = TsPlusSymbolTag.StaticValue;
+        symbol.tsPlusResolvedSignatures = [];
+        symbol.tsPlusName = name;
+        symbol.tsPlusDeclaration = declaration as (VariableDeclaration | ClassDeclaration) & { name: Identifier };
+        symbol.escapedName = name as __String;
+        let patchedDeclaration: VariableDeclaration | ClassDeclaration
+        if (isVariableDeclaration(declaration)) {
+            patchedDeclaration = factory.updateVariableDeclaration(
+                declaration,
+                factory.createIdentifier(name),
+                declaration.exclamationToken,
+                declaration.type,
+                declaration.initializer
+            );
+        }
+        else {
+            patchedDeclaration = factory.updateClassDeclaration(
+                declaration,
+                declaration.modifiers,
+                factory.createIdentifier(name),
+                declaration.typeParameters,
+                declaration.heritageClauses,
+                declaration.members
+            )
+        }
+        setParent(patchedDeclaration, declaration.parent);
+        setParent(patchedDeclaration.name!, patchedDeclaration)
+        patchedDeclaration.name!.tsPlusName = name;
+        symbol.declarations = [patchedDeclaration];
+        patchedDeclaration.jsDoc = getJSDocCommentsAndTags(declaration) as JSDoc[];
+
+        const originalSymbolLinks = getSymbolLinks(originalSymbol);
+        const symbolLinks = getSymbolLinks(symbol);
+        symbolLinks.uniqueESSymbolType = originalSymbolLinks.uniqueESSymbolType;
+        symbolLinks.declaredType = originalSymbolLinks.declaredType;
+
+        return symbol;
+    }
+    function createTsPlusGetterFunctionSymbol(name: string, dataFirst: FunctionDeclaration, returnType: Type, selfType: Type) {
+        const symbol = createSymbol(SymbolFlags.Property, name as __String) as TsPlusGetterSymbol;
+        getSymbolLinks(symbol).type = returnType;
+        symbol.tsPlusTag = TsPlusSymbolTag.Getter;
+        symbol.tsPlusDeclaration = dataFirst;
+        symbol.tsPlusSelfType = selfType;
+        symbol.tsPlusName = name;
+        return symbol;
+    }
+    function getTsPlusFluentSignaturesForFunctionDeclaration(file: SourceFile, exportName: string, dataFirst: FunctionDeclaration) {
+        function reportDiagnostic(message: DiagnosticMessage) {
+            error(dataFirst, message);
+        }
+        const type = getTypeOfNode(dataFirst);
+        const signatures = getSignaturesOfType(type, SignatureKind.Call);
+        const thisifiedSignatures = signatures.map((signature) => thisifyTsPlusSignature(dataFirst, signature, exportName, file, reportDiagnostic))
+        if (!isEachDefined(thisifiedSignatures)) {
+            return;
+        }
+        const thisifiedType = createAnonymousType(undefined, emptySymbols, thisifiedSignatures as TsPlusSignature[], [], [])
+        return [thisifiedType, thisifiedSignatures] as const;
+    }
+    function getTsPlusFluentSignaturesForVariableDeclaration(file: SourceFile, exportName: string, declaration: VariableDeclaration & { name: Identifier }) {
+        function reportDiagnostic(message: DiagnosticMessage) {
+            error(declaration, message);
+        }
+        const type = getTypeOfNode(declaration);
+        const signatures = getSignaturesOfType(type, SignatureKind.Call);
+        if(signatures.every((sigSymbol) => sigSymbol.parameters.every((paramSymbol) => paramSymbol.valueDeclaration && isVariableLike(paramSymbol.valueDeclaration) && isParameterDeclaration(paramSymbol.valueDeclaration)))) {
+            let thisifiedSignatures = signatures.map((signature) => thisifyTsPlusSignature(declaration, signature, exportName, file, reportDiagnostic))
+            if (!isEachDefined(thisifiedSignatures)) {
+                return;
+            }
+            const thisifiedType = createAnonymousType(undefined, emptySymbols, thisifiedSignatures as TsPlusSignature[], [], []);
+            return [thisifiedType, thisifiedSignatures] as const;
+        }
+    }
+    function getTsPlusGetterSymbolForFunctionDeclaration(_name: string, _dataFirst: FunctionDeclaration) {
+        return (selfNode: Expression) => {
+            const res = checkTsPlusCustomCall(
+                _dataFirst,
+                selfNode,
+                [selfNode],
+                CheckMode.Normal
+            );
+            if (isErrorType(res)) {
+                return void 0;
+            }
+            return createTsPlusGetterFunctionSymbol(_name, _dataFirst, res, getTypeOfNode(selfNode));
+        };
+    }
+    function getTsPlusGetterSymbolForVariableDeclaration(name: string, declaration: VariableDeclaration & { name: Identifier }) {
+        return (selfNode: Expression) => {
+            const res = checkTsPlusCustomCall(
+                declaration,
+                selfNode,
+                [selfNode],
+                CheckMode.Normal
+            );
+            if (isErrorType(res)) {
+                return void 0;
+            }
+            return createTsPlusGetterVariableSymbol(name, declaration, res, getTypeOfNode(selfNode));
+        };
+    }
+    function getTsPlusStaticSymbolForFunctionDeclaration(file: SourceFile, exportName: string, name: string, dataFirst: FunctionDeclaration | VariableDeclarationWithFunction) {
+        const signatures = getSignaturesOfType(getTypeOfNode(dataFirst), SignatureKind.Call);
+        const methods = map(signatures, (s) => createTsPlusSignature(s, exportName, file));
+        const symbol = createTsPlusStaticFunctionSymbol(name, dataFirst, methods);
+        const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
+        return [final, createSymbolWithType(symbol, final)] as const;
+    }
+    function augmentPipeableIdentifierSymbol(identifier: Identifier, target: string, _exportName: string, name: string, dataFirstType: () => Type, declaration: FunctionDeclaration | VariableDeclarationWithFunction) {
+        const identifierType = getTypeOfNode(identifier);
+        if (identifierType.symbol) {
+            (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusTag = TsPlusSymbolTag.PipeableIdentifier;
+            (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusDeclaration = declaration;
+            (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusTypeName = target;
+            (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusName = name;
+            (identifierType.symbol as TsPlusPipeableIdentifierSymbol).getTsPlusDataFirstType = dataFirstType;
+        }
+    }
+    function isPipeableSelfARestParameter(signature: Signature): boolean {
+        return getSignaturesOfType(getReturnTypeOfSignature(signature), SignatureKind.Call).find(isSelfARestParameter) != null;
+    }
+    function getTsPlusFluentSignatureForPipeableFunction(file: SourceFile, exportName: string, name: string, pipeable: FunctionDeclaration, thisify = false): [Type, TsPlusSignature[]] | undefined {
+        function reportDiagnostic(diagnostic: DiagnosticMessage) {
+            error(pipeable, diagnostic);
+        }
+        const type = getTypeOfNode(pipeable);
+        const signatures = getSignaturesOfType(type, SignatureKind.Call);
+        if (pipeable.body) {
+            const returnStatement = find(
+                pipeable.body.statements,
+                (s): s is ReturnStatement & { expression: ArrowFunction } =>
+                    isReturnStatement(s) && !!s.expression && isArrowFunction(s.expression)
+            );
+            if (returnStatement && returnStatement.expression.parameters.length === 1) {
+                if (signatures.find(isPipeableSelfARestParameter)) {
+                    error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
+                    return;
+                }
+                const tsPlusSignatures = flatMap(signatures, (sig) => {
+                    const returnType = getReturnTypeOfSignature(sig);
+                    const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
+                    return flatMap(returnSignatures, (rsig) => {
+                        let newSig = createTsPlusSignature(sig, exportName, file);
+                        newSig.parameters = [...rsig.parameters, ...sig.parameters];
+                        newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                        newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
+                        newSig.minArgumentCount = newSig.minArgumentCount + 1;
+                        const newDecl = factory.updateFunctionDeclaration(
+                            pipeable,
+                            pipeable.modifiers,
+                            pipeable.asteriskToken,
+                            pipeable.name,
+                            [...(returnStatement.expression.typeParameters ?? []), ...(pipeable.typeParameters ?? [])],
+                            [...returnStatement.expression.parameters, ...pipeable.parameters],
+                            returnStatement.expression.type,
+                            undefined
+                        );
+                        newDecl.jsDoc = pipeable.jsDoc;
+                        newDecl.jsDocCache = pipeable.jsDocCache;
+                        newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
+                        newSig.declaration = newDecl;
+                        newSig.tsPlusDeclaration = pipeable;
+                        if (thisify) {
+                            const thisified = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
+                            if (!thisified) {
+                                return;
+                            }
+                            newSig = thisified;
+                        }
+                        newSig.tsPlusPipeable = true;
+                        return newSig;
+                    });
+                }) as TsPlusSignature[];
+                const dataFirstType = createAnonymousType(undefined, emptySymbols, tsPlusSignatures, [], []);
+                return [dataFirstType, tsPlusSignatures];
+            }
+        }
+        if (every(signatures, (sig) => !!sig.declaration && !!sig.declaration.type && isFunctionTypeNode(sig.declaration.type) && sig.declaration.type.parameters.length === 1)) {
+            const tsPlusSignatures = flatMap(signatures, (sig) => {
+                const returnType = getReturnTypeOfSignature(sig);
+                const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
+                if (signatures.find(isPipeableSelfARestParameter)) {
+                    error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
+                    return;
+                }
+                return flatMap(returnSignatures, (rsig) => {
+                    let newSig = createTsPlusSignature(sig, exportName, file);
+                    newSig.parameters = [...rsig.parameters, ...sig.parameters];
+                    newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                    newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
+                    newSig.minArgumentCount = newSig.minArgumentCount + 1;
+                    const newDecl = factory.updateFunctionDeclaration(
+                        pipeable,
+                        pipeable.modifiers,
+                        pipeable.asteriskToken,
+                        pipeable.name,
+                        [...(rsig.declaration?.typeParameters as NodeArray<TypeParameterDeclaration> ?? []), ...(sig.declaration?.typeParameters as NodeArray<TypeParameterDeclaration> ?? [])],
+                        [...(rsig.declaration?.parameters as NodeArray<ParameterDeclaration> ?? []), ...(sig.declaration?.parameters as NodeArray<ParameterDeclaration> ?? [])],
+                        rsig.declaration?.type as TypeNode,
+                        undefined
+                    );
+                    newDecl.jsDoc = pipeable.jsDoc;
+                    newDecl.jsDocCache = pipeable.jsDocCache;
+                    newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
+                    newSig.declaration = newDecl;
+                    newSig.tsPlusDeclaration = pipeable;
+                    if (thisify) {
+                        const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
+                        if (!thisifiedSignature) {
+                            return;
+                        }
+                        newSig = thisifiedSignature;
+                    }
+                    newSig.tsPlusPipeable = true;
+                    return newSig;
+                });
+            }) as TsPlusSignature[];
+            const dataFirstType = createAnonymousType(undefined, emptySymbols, tsPlusSignatures, [], []);
+            return [dataFirstType, tsPlusSignatures];
+        }
+        return undefined;
+    }
+    function isVariableDeclarationWithFunction(node: VariableDeclaration): node is VariableDeclarationWithFunction {
+        return isIdentifier(node.name) && !!node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer));
+    }
+    function isEachDefined<A>(array: (A | undefined)[]): array is A[] {
+        for (const a of array) {
+            if (a === undefined) {
+                return false;
+            }
+        }
+        return true;
+    }
+    function getTsPlusFluentSignatureForPipeableVariableDeclaration(file: SourceFile, exportName: string, name: string, pipeable: VariableDeclarationWithFunction | VariableDeclarationWithFunctionType, thisify = false): [Type, TsPlusSignature[]] | undefined {
+        function reportDiagnostic(diagnostic: DiagnosticMessage) {
+            error(pipeable, diagnostic);
+        }
+        const type = getTypeOfNode(pipeable);
+        const signatures = getSignaturesOfType(type, SignatureKind.Call);
+        if (isVariableDeclarationWithFunction(pipeable)) {
+            const initializer = pipeable.initializer;
+            const body = initializer.body;
+            let returnFn: ArrowFunction | FunctionTypeNode | undefined;
+            if (isBlock(body)) {
+                const candidate = find(
+                    body.statements,
+                    (s): s is ReturnStatement & { expression: ArrowFunction } =>
+                    isReturnStatement(s) && !!s.expression && isArrowFunction(s.expression)
+                );
+                if (candidate) {
+                    returnFn = candidate.expression;
+                }
+            }
+            else if (isArrowFunction(body)) {
+                returnFn = body;
+            }
+            if (returnFn && returnFn.parameters.length === 1) {
+                if (signatures.find(isPipeableSelfARestParameter)) {
+                    error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
+                    return;
+                }
+                const tsPlusSignatures = flatMap(signatures, (sig) => {
+                    const returnType = getReturnTypeOfSignature(sig);
+                    const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
+                    return flatMap(returnSignatures, (rsig) => {
+                        let newSig = createTsPlusSignature(sig, exportName, file);
+                        newSig.parameters = [...rsig.parameters, ...sig.parameters];
+                        newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                        newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
+                        newSig.minArgumentCount = newSig.minArgumentCount + 1;
+                        let newDecl: ArrowFunction | FunctionExpression | FunctionTypeNode;
+                        if (isArrowFunction(initializer)) {
+                            newDecl = factory.updateArrowFunction(
+                                initializer,
+                                initializer.modifiers,
+                                [...(returnFn!.typeParameters ?? []), ...(initializer.typeParameters ?? [])],
+                                [...returnFn!.parameters, ...initializer.parameters],
+                                returnFn!.type,
+                                initializer.equalsGreaterThanToken,
+                                factory.createBlock([])
+                            );
+                        }
+                        else {
+                            newDecl = factory.updateFunctionExpression(
+                                initializer,
+                                initializer.modifiers,
+                                initializer.asteriskToken,
+                                initializer.name,
+                                [...(returnFn!.typeParameters ?? []), ...(initializer.typeParameters ?? [])],
+                                [...returnFn!.parameters, ...initializer.parameters],
+                                returnFn!.type,
+                                factory.createBlock([])
+                            );
+                        }
+                        newDecl.jsDoc = pipeable.jsDoc;
+                        newDecl.jsDocCache = pipeable.jsDocCache;
+                        newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
+                        newSig.declaration = newDecl;
+                        newSig.tsPlusDeclaration = pipeable;
+                        if (thisify) {
+                            const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
+                            if (!thisifiedSignature) {
+                                return;
+                            }
+                            newSig = thisifiedSignature;
+                        }
+                        newSig.tsPlusPipeable = true;
+                        return newSig;
+                    });
+                }) as TsPlusSignature[];
+                const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
+                return [dataFirstType, tsPlusSignatures];
+            }
+        }
+        if (pipeable.type &&
+            every(signatures, (sig) =>
+                !!sig.declaration &&
+                !!sig.declaration.type &&
+                isFunctionTypeNode(sig.declaration.type) &&
+                sig.declaration.type.parameters.length === 1)
+            ) {
+            if (signatures.find(isPipeableSelfARestParameter)) {
+                error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
+                return;
+            }
+            const tsPlusSignatures = flatMap(signatures, (sig) => {
+                const returnFn = sig.declaration!.type! as FunctionTypeNode
+                const returnType = getReturnTypeOfSignature(sig);
+                const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
+                return flatMap(returnSignatures, (rsig) => {
+                    let newSig = createTsPlusSignature(sig, exportName, file);
+                    newSig.parameters = [...rsig.parameters, ...sig.parameters];
+                    newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                    newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
+                    newSig.minArgumentCount = newSig.minArgumentCount + 1;
+                    const newDecl = factory.createFunctionTypeNode(
+                        factory.createNodeArray([...(returnFn.typeParameters ?? []), ...(sig.declaration?.typeParameters as NodeArray<TypeParameterDeclaration> ?? [])]),
+                        factory.createNodeArray([...returnFn.parameters, ...(sig.declaration?.parameters as NodeArray<ParameterDeclaration> ?? [])]),
+                        returnFn.type
+                    );
+                    newDecl.jsDoc = pipeable.jsDoc;
+                    newDecl.jsDocCache = pipeable.jsDocCache;
+                    newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
+                    newSig.declaration = newDecl;
+                    newSig.tsPlusDeclaration = pipeable;
+                    if (thisify) {
+                        const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
+                        if (!thisifiedSignature) {
+                            return;
+                        }
+                        newSig = thisifiedSignature;
+                    }
+                    newSig.tsPlusPipeable = true;
+                    return newSig;
+                });
+            }) as TsPlusSignature[];
+            const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
+            return [dataFirstType, tsPlusSignatures];
+        }
+        return undefined;
+    }
+    function isSelfARestParameter(signature: Signature): boolean {
+        if (
+            signature.parameters[0] &&
+            signature.parameters[0].declarations &&
+            signature.parameters[0].declarations.find((decl) => isVariableLike(decl) && isParameterDeclaration(decl) && isRestParameter(decl as ParameterDeclaration))
+        ) { 
+            return true
+        }
+        return false;
+    }
+    function addToTypeSymbolCache(symbol: Symbol, tag: string, priority: "before" | "after") {
+        if (!typeSymbolCache.has(symbol)) {
+            typeSymbolCache.set(symbol, []);
+        }
+        const tags = typeSymbolCache.get(symbol)!
+        if (!tags.includes(tag)) {
+            if (priority === "before") {
+                typeSymbolCache.set(symbol, [tag, ...tags])
+            } else {
+                tags.push(tag)
+            }
+        }
+    }
+    function addToCompanionSymbolCache(symbol: Symbol, tag: string) {
+        if (!companionSymbolCache.has(symbol)) {
+            companionSymbolCache.set(symbol, [])
+        }
+        const tags = companionSymbolCache.get(symbol)!
+        if (!tags.includes(tag)) {
+            tags.push(tag)
+        }
+    }
+    function tryCacheTsPlusGlobalSymbol(declaration: ImportDeclaration): void {
+        if (declaration.isTsPlusGlobal) {
+            (declaration.importClause!.namedBindings as NamedImports).elements.forEach((importSpecifier) => {
+                tsPlusGlobalImportCache.set(importSpecifier.name.escapedText as string, { declaration, importSpecifier, moduleSpecifier: declaration.moduleSpecifier as StringLiteral });
+            })
+        }
+    }
+    function cacheTsPlusType(declaration: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration): void {
+        const type = getTypeOfNode(declaration);
+        for (const typeTag of collectTsPlusTypeTags(declaration)) {
+            if (type === globalStringType) {
+                addToTypeSymbolCache(tsplusStringPrimitiveSymbol, typeTag, "after");
+            }
+            if (type === globalNumberType) {
+                addToTypeSymbolCache(tsplusNumberPrimitiveSymbol, typeTag, "after");
+            }
+            if (type === globalBooleanType) {
+                addToTypeSymbolCache(tsplusBooleanPrimitiveSymbol, typeTag, "after");
+            }
+            if (type === getGlobalBigIntType()) {
+                addToTypeSymbolCache(tsplusBigIntPrimitiveSymbol, typeTag, "after");
+            }
+            if (type === globalFunctionType) {
+                addToTypeSymbolCache(tsplusFunctionPrimitiveSymbol, typeTag, "after");
+            }
+            if (type === globalObjectType) {
+                addToTypeSymbolCache(tsplusObjectPrimitiveSymbol, typeTag, "after");
+            }
+            if (type === globalArrayType) {
+                addToTypeSymbolCache(tsplusArraySymbol, typeTag, "after");
+            }
+            if (type === globalReadonlyArrayType) {
+                addToTypeSymbolCache(tsplusReadonlyArraySymbol, typeTag, "after");
+            }
+            if (type.symbol) {
+                addToTypeSymbolCache(type.symbol, typeTag, "after");
+                if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.heritageClauses) {
+                    tryCacheTsPlusInheritance(type.symbol, declaration.heritageClauses);
+                }
+            }
+            if (type.aliasSymbol) {
+                addToTypeSymbolCache(type.aliasSymbol, typeTag, "after");
+            }
+            if (type.flags & TypeFlags.Union) {
+                tryCacheUnionInheritance((type as UnionType).types, type);
+            }
+            if (type.flags & TypeFlags.UnionOrIntersection) {
+                const types = (type as UnionOrIntersectionType).types;
+                for (const member of types) {
+                    if (member.symbol) {
+                        addToTypeSymbolCache(member.symbol, typeTag, "before");
+                    }
+                    if (member.aliasSymbol) {
+                        addToTypeSymbolCache(member.aliasSymbol, typeTag, "before");
+                    }
+                }
+            }
+        }
+    }
+    function tryCacheTsPlusInheritance(typeSymbol: Symbol, heritage: readonly HeritageClause[]): void {
+        if (!inheritanceSymbolCache.has(typeSymbol)) {
+            inheritanceSymbolCache.set(typeSymbol, new Set());
+        }
+        const heritageExtensions = inheritanceSymbolCache.get(typeSymbol)!;
+        forEach(heritage, (clause) => {
+            forEach(clause.types, (node) => {
+                const type = getTypeOfNode(node);
+                if (type.symbol) {
+                    heritageExtensions.add(type.symbol)
+                }
+            })
+        })
+    }
+    function tryCacheUnionInheritance(members: Type[], parent: Type): void {
+        const parentSymbol = parent.symbol ?? parent.aliasSymbol;
+        if (parentSymbol) {
+            for (const member of members) {
+                const memberSymbol = member.symbol ?? member.aliasSymbol;
+                if (memberSymbol) {
+                    if (!inheritanceSymbolCache.has(memberSymbol)) {
+                        inheritanceSymbolCache.set(memberSymbol, new Set());
+                    }
+                    inheritanceSymbolCache.get(memberSymbol)!.add(parentSymbol);
+                    if (memberSymbol.declarations) {
+                        for (const declaration of memberSymbol.declarations) {
+                            if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.heritageClauses) {
+                                tryCacheTsPlusInheritance(memberSymbol, declaration.heritageClauses);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    function getTsPlusSourceFileCache(tag: string) {
+        return tsPlusFiles.has(tag) ? tsPlusFiles.get(tag)! : (tsPlusFiles.set(tag, new Set()), tsPlusFiles.get(tag)!);
+    }
+    function cacheTsPlusCompanion(declaration: ClassDeclaration | InterfaceDeclaration | TypeAliasDeclaration): void {
+        const tags = collectTsPlusCompanionTags(declaration);
+        const type = getTypeOfNode(declaration)
+        if (type.symbol) {
+            for (const companionTag of tags) {
+                getTsPlusSourceFileCache(companionTag).add(getSourceFileOfNode(declaration));
+                addToCompanionSymbolCache(type.symbol, companionTag);
+            }
+        }
+        if (type.aliasSymbol) {
+            for (const companionTag of tags) {
+                getTsPlusSourceFileCache(companionTag).add(getSourceFileOfNode(declaration));
+                addToCompanionSymbolCache(type.aliasSymbol, companionTag);
+            }
+        }
+    }
+    function cacheTsPlusStaticVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier | ClassDeclarationWithIdentifier) {
+        const staticTags = collectTsPlusStaticTags(declaration);
+        if (staticTags.length > 0) {
+            const symbol = getSymbolAtLocation(declaration.name);
+            if (symbol) {
+                for (const { target, name } of staticTags) {
+                    getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+                    if (!unresolvedStaticCache.get(target)) {
+                        unresolvedStaticCache.set(target, new Map());
+                    }
+                    const map = unresolvedStaticCache.get(target)!
+                    map.set(name, {
+                        target,
+                        name,
+                        symbol,
+                        declaration,
+                        exportName: symbol.escapedName.toString(),
+                        definition: file
+                    })
+                }
+            }
+        }
+    }
+    function cacheTsPlusFluentVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+        const fluentTags = collectTsPlusFluentTags(declaration);
+        for (const tag of fluentTags) {
+            getTsPlusSourceFileCache(tag.target).add(getSourceFileOfNode(declaration));
+            if (!unresolvedFluentCache.has(tag.target)) {
+                unresolvedFluentCache.set(tag.target, new Map());
+            }
+            const map = unresolvedFluentCache.get(tag.target)!;
+            if (!map.has(tag.name)) {
+                map.set(tag.name, {
+                    target: tag.target,
+                    name: tag.name,
+                    definition: new Set([{
+                        definition: file,
+                        declaration: declaration as VariableDeclaration & { name: Identifier },
+                        exportName: declaration.name.escapedText.toString(),
+                        priority: tag.priority,
+                    }])
+                });
+            }
+            else {
+                const extension = map.get(tag.name)!;
+                extension.definition.add({
+                    definition: file,
+                    declaration: declaration as VariableDeclaration & { name: Identifier },
+                    exportName: declaration.name.escapedText.toString(),
+                    priority: tag.priority,
+                });
+            }
+        }        
+    }
+    function cacheTsPlusGetterVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+        for (const { target, name } of collectTsPlusGetterTags(declaration)) {
+            getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+            if (!getterCache.has(target)) {
+                getterCache.set(target, new Map());
+            }
+            const map = getterCache.get(target)!;
+            map.set(name, {
+                patched: getTsPlusGetterSymbolForVariableDeclaration(
+                    name,
+                    (declaration as VariableDeclaration & { name: Identifier })
+                ),
+                exportName: declaration.name.escapedText.toString(),
+                definition: file,
+                declaration,
+            });
+        }
+    }
+    function cacheTsPlusOperatorFunction(file: SourceFile, declaration: FunctionDeclaration) {
+        if(declaration.name && isIdentifier(declaration.name)) {
+            const operatorTags = collectTsPlusOperatorTags(declaration);
+            if (operatorTags.length > 0) {
+                const symbol = getSymbolAtLocation(declaration.name);
+                if (symbol) {
+                    for (const tag of operatorTags) {
+                        getTsPlusSourceFileCache(tag.target).add(getSourceFileOfNode(declaration));
+                        if (!operatorCache.has(tag.target)) {
+                            operatorCache.set(tag.target, new Map());
+                        }
+                        const map = operatorCache.get(tag.target)!;
+                        if (!map.has(tag.name)) {
+                            map.set(tag.name, []);
+                        }
+                        map.get(tag.name)!.push({
+                            patched: symbol,
+                            exportName: declaration.name.escapedText.toString(),
+                            definition: file,
+                            priority: tag.priority,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    function cacheTsPlusOperatorVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+        const operatorTags = collectTsPlusOperatorTags(declaration);
+        if (operatorTags.length > 0) {
+            const symbol = getSymbolAtLocation(declaration.name);
+            if (symbol) {
+                for (const tag of operatorTags) {
+                    getTsPlusSourceFileCache(tag.target).add(getSourceFileOfNode(declaration));
+                    if (!operatorCache.has(tag.target)) {
+                        operatorCache.set(tag.target, new Map());
+                    }
+                    const map = operatorCache.get(tag.target)!;
+                    if (!map.has(tag.name)) {
+                        map.set(tag.name, []);
+                    }
+                    map.get(tag.name)!.push({
+                        patched: symbol,
+                        exportName: declaration.name.escapedText.toString(),
+                        definition: file,
+                        priority: tag.priority,
+                    });
+                }
+            }
+        }
+    }
+    function cacheTsPlusFluentFunction(file: SourceFile, declaration: FunctionDeclaration) {
+        const fluentTags = collectTsPlusFluentTags(declaration);
+        for (const tag of fluentTags) {
+            getTsPlusSourceFileCache(tag.target).add(getSourceFileOfNode(declaration));
+            if (!unresolvedFluentCache.has(tag.target)) {
+                unresolvedFluentCache.set(tag.target, new Map());
+            }
+            const map = unresolvedFluentCache.get(tag.target)!;
+            if (!map.has(tag.name)) {
+                map.set(tag.name, {
+                    target: tag.target,
+                    name: tag.name,
+                    definition: new Set([{
+                        definition: file,
+                        declaration,
+                        exportName: declaration.name!.escapedText.toString(),
+                        priority: tag.priority,
+                    }]),
+                });
+            }
+            else {
+                const extension = map.get(tag.name)!;
+                extension.definition.add({
+                    definition: file,
+                    declaration,
+                    exportName: declaration.name!.escapedText.toString(),
+                    priority: tag.priority,
+                });
+            }
+        }
+    }
+    function cacheTsPlusPipeableOperatorFunction(file: SourceFile, declaration: FunctionDeclaration) {
+        if (declaration.name && isIdentifier(declaration.name)) {
+            const pipeableOperatorTags = collectTsPlusPipeableOperatorTags(declaration);
+            if (pipeableOperatorTags.length > 0) {
+                for (const { target, name, priority } of pipeableOperatorTags) {
+                    getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+                    if (!unresolvedPipeableOperatorCache.has(target)) {
+                        unresolvedPipeableOperatorCache.set(target, new Map())
+                    }
+                    const exportName = declaration.name.escapedText.toString();
+                    let cached: [Type, TsPlusSignature[]] | false = false
+                    const getTypeAndSignatures = (): [Type, TsPlusSignature[]] => {
+                        if (cached === false) {
+                            const resolved = getTsPlusFluentSignatureForPipeableFunction(file, exportName, name, declaration);
+                            if (resolved) {
+                                cached = resolved;
+                            }
+                            else {
+                                error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
+                                cached = [errorType, []];
+                            }
+                        }
+                        return [cached[0], [...cached[1]]];
+                    }
+                    const map = unresolvedPipeableOperatorCache.get(target)!;
+                    if (!map.has(name)) {
+                        map.set(name, {
+                            target,
+                            name,
+                            definition: new Set()
+                        })
+                    }
+                    map.get(name)!.definition.add({
+                        definition: file,
+                        declaration,
+                        exportName,
+                        priority,
+                        getTypeAndSignatures
+                    })
+                    augmentPipeableIdentifierSymbol(
+                        declaration.name,
+                        target,
+                        declaration.name.escapedText.toString(),
+                        name,
+                        () => getTypeAndSignatures()[0],
+                        declaration
+                    );
+                }
+            }
+        }
+    }
+    function cacheTsPlusPipeableOperatorVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+        if((declaration.initializer && isFunctionLikeDeclaration(declaration.initializer)) ||
+            (declaration.type && isFunctionTypeNode(declaration.type))) {
+            const pipeableOperatorTags = collectTsPlusPipeableOperatorTags(declaration);
+            if (pipeableOperatorTags.length > 0) {
+                for (const { target, name, priority } of pipeableOperatorTags) {
+                    getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+                    if (!unresolvedPipeableOperatorCache.has(target)) {
+                        unresolvedPipeableOperatorCache.set(target, new Map())
+                    }
+                    const exportName = declaration.name.escapedText.toString();
+                    let cached: [Type, TsPlusSignature[]] | false = false
+                    const getTypeAndSignatures = (): [Type, TsPlusSignature[]] => {
+                        if (cached === false) {
+                            const resolved = getTsPlusFluentSignatureForPipeableVariableDeclaration(file, exportName, name, declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType);
+                            if (resolved) {
+                                cached = resolved;
+                            }
+                            else {
+                                error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
+                                cached = [errorType, []];
+                            }
+                        }
+                        return [cached[0], [...cached[1]]];
+                    }
+                    const map = unresolvedPipeableOperatorCache.get(target)!;
+                    if (!map.has(name)) {
+                        map.set(name, {
+                            target,
+                            name,
+                            definition: new Set()
+                        })
+                    }
+                    map.get(name)!.definition.add({
+                        definition: file,
+                        declaration,
+                        exportName,
+                        priority,
+                        getTypeAndSignatures
+                    })
+                    augmentPipeableIdentifierSymbol(
+                        declaration.name,
+                        target,
+                        declaration.name.escapedText.toString(),
+                        name,
+                        () => getTypeAndSignatures()[0],
+                        declaration as VariableDeclarationWithFunction
+                    );
+                }
+            }
+        }
+    }
+    function cacheTsPlusPipeableFunction(file: SourceFile, declaration: FunctionDeclaration) {
+        if (declaration.name && isIdentifier(declaration.name)) {
+            const pipeableTags = collectTsPlusPipeableTags(declaration);
+            for (const { target, name, priority } of pipeableTags) {
+                getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+                if (!unresolvedPipeableCache.has(target)) {
+                    unresolvedPipeableCache.set(target, new Map());
+                }
+                const exportName = declaration.name.escapedText.toString()
+                let cached : [Type, TsPlusSignature[]] | false = false
+                const getTypeAndSignatures = (): [Type, TsPlusSignature[]] => {
+                    if (cached === false) {
+                        const resolved = getTsPlusFluentSignatureForPipeableFunction(file, exportName, name, declaration, /** thisify */ true);
+                        if (resolved) {
+                            cached = resolved;
+                        }
+                        else {
+                            error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
+                            cached = [errorType, []];
+                        }
+                    }
+                    return [cached[0], [...cached[1]]];
+                }
+                const map = unresolvedPipeableCache.get(target)!;
+                if (!map.has(name)) {
+                    map.set(name, { target, name, definition: new Set() })
+                }
+                const extension = map.get(name)!
+                extension.definition.add({
+                    definition: file,
+                    declaration,
+                    exportName,
+                    priority,
+                    getTypeAndSignatures
+                })
+                augmentPipeableIdentifierSymbol(
+                    declaration.name,
+                    target,
+                    declaration.name.escapedText.toString(),
+                    name,
+                    () => getTypeAndSignatures()[0],
+                    declaration
+                );
+                getNodeLinks(declaration).tsPlusPipeableExtension = {
+                    declaration,
+                    definition: file,
+                    exportName,
+                    typeName: target,
+                    funcName: name,
+                    getTypeAndSignatures
+                }
+            }
+        }
+    }
+    function cacheTsPlusPipeableVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+        if(
+            (declaration.initializer && isFunctionLikeDeclaration(declaration.initializer)) ||
+            (declaration.type && isFunctionTypeNode(declaration.type)) ||
+            ((declaration.type) && isTypeLiteralNode(declaration.type) && every(declaration.type.members, isCallSignatureDeclaration))
+        ) {
+            for (const { target, name, priority } of collectTsPlusPipeableTags(declaration)) {
+                getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+                if (!unresolvedPipeableCache.has(target)) {
+                    unresolvedPipeableCache.set(target, new Map());
+                }
+                const map = unresolvedPipeableCache.get(target)!;
+                const exportName = declaration.name.escapedText.toString();
+                let cached : [Type, TsPlusSignature[]] | false = false
+                const getTypeAndSignatures = () => {
+                    if (cached === false) {
+                        const resolved = getTsPlusFluentSignatureForPipeableVariableDeclaration(
+                            file,
+                            exportName,
+                            name,
+                            declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType,
+                            /** thisify */ true
+                        )
+                        if (resolved) {
+                            cached = resolved;
+                        }
+                        else {
+                            error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
+                            cached = [errorType, []];
+                        }
+                    }
+                    return cached;
+                }
+                if (!map.has(name)) {
+                    map.set(name, { target, name, definition: new Set() })
+                }
+                const extension = map.get(name)!
+                extension.definition.add({
+                    definition: file,
+                    declaration,
+                    exportName,
+                    priority,
+                    getTypeAndSignatures
+                })
+                augmentPipeableIdentifierSymbol(
+                    declaration.name,
+                    target,
+                    declaration.name.escapedText.toString(),
+                    name,
+                    () => getTypeAndSignatures()[0],
+                    declaration as VariableDeclarationWithFunction
+                );
+                getNodeLinks(declaration).tsPlusPipeableExtension = {
+                    declaration: declaration as VariableDeclarationWithFunction,
+                    definition: file,
+                    exportName,
+                    typeName: target,
+                    funcName: name,
+                    getTypeAndSignatures
+                }
+            }
+        }
+    }
+    function cacheTsPlusGetterFunction(file: SourceFile, declaration: FunctionDeclaration) {
+        if(declaration.name && isIdentifier(declaration.name)) {
+            for (const { target, name } of collectTsPlusGetterTags(declaration)) {
+                getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+                if (!getterCache.has(target)) {
+                    getterCache.set(target, new Map());
+                }
+                const map = getterCache.get(target)!;
+                map.set(name, {
+                    patched: getTsPlusGetterSymbolForFunctionDeclaration(name, declaration),
+                    exportName: declaration.name.escapedText.toString(),
+                    definition: file,
+                    declaration
+                });
+            }
+        }
+    }
+    function cacheTsPlusStaticFunction(file: SourceFile, declaration: FunctionDeclaration) {
+        if(declaration.name && isIdentifier(declaration.name)) {
+            for (const { target, name } of collectTsPlusStaticTags(declaration)) {
+                getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+                if (!staticCache.has(target)) {
+                    staticCache.set(target, new Map());
+                }
+                const map = staticCache.get(target)!;
+                map.set(name, () => {
+                    if (staticFunctionCache.has(target)) {
+                        const resolvedMap = staticFunctionCache.get(target)!;
+                        if (resolvedMap.has(name)) {
+                            return resolvedMap.get(name)!;
+                        }
+                    }
+                    else {
+                        staticFunctionCache.set(target, new Map());
+                    }
+                    const resolvedMap = staticFunctionCache.get(target)!;
+                    const [type, patched] = getTsPlusStaticSymbolForFunctionDeclaration(
+                        file,
+                        declaration.name!.escapedText.toString(),
+                        name,
+                        declaration
+                    );
+                    const extension = {
+                        patched,
+                        exportName: declaration.name!.escapedText.toString(),
+                        definition: file,
+                        type
+                    };
+                    resolvedMap.set(name, extension);
+                    return extension;
+                });
+            }
+        }
+    }
+    function cacheTsPlusUnifyFunction(declaration: FunctionDeclaration) {
+        if(declaration.name && isIdentifier(declaration.name)) {
+            for (const target of collectTsPlusUnifyTags(declaration)) {
+                getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+                identityCache.set(target, declaration);
+            }
+        }
+    }
+    function cacheTsPlusIndexFunction(declaration: FunctionDeclaration) {
+        if(declaration.name && isIdentifier(declaration.name)) {
+            for (const target of collectTsPlusIndexTags(declaration)) {
+                getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+                indexCache.set(target, () => {
+                    if (resolvedIndexCache.has(target)) {
+                        return resolvedIndexCache.get(target);
+                    }
+                    const definition = getSourceFileOfNode(declaration);
+                    const signatures = getSignaturesOfType(getTypeOfNode(declaration), SignatureKind.Call) as Signature[];
+                    if (signatures[0]) {
+                        resolvedIndexCache.set(target, { declaration, signature: signatures[0], definition, exportName: declaration.name!.escapedText.toString() });
+                    }
+                    return resolvedIndexCache.get(target)!;
+                });
+            }
+        }
+    }
+    function cacheTsPlusIndexVariable(declaration: VariableDeclarationWithIdentifier) {
+        for (const target of collectTsPlusIndexTags(declaration)) {
+            getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+            indexCache.set(target, () => {
+                if (resolvedIndexCache.has(target)) {
+                    return resolvedIndexCache.get(target);
+                }
+                const definition = getSourceFileOfNode(declaration);
+                const signatures = getSignaturesOfType(getTypeOfNode(declaration), SignatureKind.Call) as Signature[];
+                if (signatures[0]) {
+                    resolvedIndexCache.set(target, { declaration, signature: signatures[0], definition, exportName: declaration.name!.escapedText.toString() });
+                }
+                return resolvedIndexCache.get(target)!;
+            });
+        }
+    }
+    function cacheTsPlusPipeableIndexFunction(declaration: FunctionDeclaration) {
+        if(declaration.name && isIdentifier(declaration.name)) {
+            for (const target of collectTsPlusPipeableIndexTags(declaration)) {
+                getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+                indexCache.set(target, () => {
+                    if (resolvedIndexCache.has(target)) {
+                        return resolvedIndexCache.get(target);
+                    }
+                    const definition = getSourceFileOfNode(declaration);
+                    const exportName = declaration.name!.escapedText.toString();
+                    const typeAndSignatures = getTsPlusFluentSignatureForPipeableFunction(definition, exportName, exportName, declaration);
+                    if (typeAndSignatures && typeAndSignatures[1][0]) {
+                        resolvedIndexCache.set(target, { declaration, signature: typeAndSignatures[1][0], definition, exportName });
+                        return resolvedIndexCache.get(target);
+                    }
+                })
+            }
+        }
+    }
+    function cacheTsPlusPipeableIndexVariable(declaration: VariableDeclarationWithIdentifier) {
+        for (const target of collectTsPlusPipeableIndexTags(declaration)) {
+            getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
+            indexCache.set(target, () => {
+                if (resolvedIndexCache.has(target)) {
+                    return resolvedIndexCache.get(target);
+                }
+                const definition = getSourceFileOfNode(declaration);
+                const exportName = declaration.name!.escapedText.toString();
+                const typeAndSignatures = getTsPlusFluentSignatureForPipeableVariableDeclaration(definition, exportName, exportName, declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType);
+                if (typeAndSignatures && typeAndSignatures[1][0]) {
+                    resolvedIndexCache.set(target, { declaration, signature: typeAndSignatures[1][0], definition, exportName });
+                    return resolvedIndexCache.get(target);
+                }
+            })
+        }
+    }
+    function collectTsPlusSymbols(file: SourceFile): void {
+        for (const declaration of file.tsPlusContext.type) {
+            cacheTsPlusType(declaration);
+        }
+        for (const declaration of file.tsPlusContext.companion) {
+            cacheTsPlusCompanion(declaration);
+        }
+        for (const declaration of file.tsPlusContext.fluent) {
+            if (isFunctionDeclaration(declaration)) {
+                cacheTsPlusFluentFunction(file, declaration);
+            }
+            else {
+                cacheTsPlusFluentVariable(file, declaration);
+            }
+        }
+        for (const declaration of file.tsPlusContext.pipeable) {
+            if (isFunctionDeclaration(declaration)) {
+                cacheTsPlusPipeableFunction(file, declaration);
+            }
+            else {
+                cacheTsPlusPipeableVariable(file, declaration);
+            }
+        }
+        for (const declaration of file.tsPlusContext.operator) {
+            if (isFunctionDeclaration(declaration)) {
+                cacheTsPlusOperatorFunction(file, declaration);
+            }
+            else {
+                cacheTsPlusOperatorVariable(file, declaration);
+            }
+        }
+        for (const declaration of file.tsPlusContext.pipeableOperator) {
+            if (isFunctionDeclaration(declaration)) {
+                cacheTsPlusPipeableOperatorFunction(file, declaration);
+            }
+            else {
+                cacheTsPlusPipeableOperatorVariable(file, declaration);
+            }
+        }
+        for (const declaration of file.tsPlusContext.static) {
+            if (isFunctionDeclaration(declaration)) {
+                cacheTsPlusStaticFunction(file, declaration);
+            }
+            else {
+                cacheTsPlusStaticVariable(file, declaration);
+            }
+        }
+        for (const declaration of file.tsPlusContext.getter) {
+            if (isFunctionDeclaration(declaration)) {
+                cacheTsPlusGetterFunction(file, declaration);
+            }
+            else {
+                cacheTsPlusGetterVariable(file, declaration);
+            }
+        }
+        for (const declaration of file.tsPlusContext.unify) {
+            cacheTsPlusUnifyFunction(declaration);
+        }
+        for (const declaration of file.tsPlusContext.index) {
+            if (isFunctionDeclaration(declaration)) {
+                cacheTsPlusIndexFunction(declaration);
+            }
+            else {
+                cacheTsPlusIndexVariable(declaration);                        
+            }
+        }
+        for (const declaration of file.tsPlusContext.pipeableIndex) {
+            if (isFunctionDeclaration(declaration)) {
+                cacheTsPlusPipeableIndexFunction(declaration);
+            }
+            else {
+                cacheTsPlusPipeableIndexVariable(declaration);                        
+            }
+        }
+    }
+    function fillTsPlusLocalScope(file: SourceFile) {
+        const derivationRules = tsPlusWorldScope.rules;
+        if (file.symbol) {
+            const exports = file.symbol.exports;
+            if (exports) {
+                exports.forEach((exportSymbol) => {
+                    if (exportSymbol.valueDeclaration) {
+                        const declaration = exportSymbol.valueDeclaration;
+                        if (isTsPlusImplicit(declaration)) {
+                            indexInScope(exportSymbol);
+                        }
+                        else if((isFunctionDeclaration(declaration) || isVariableDeclaration(declaration)) && declaration.tsPlusDeriveTags) {
+                            for (const tag of declaration.tsPlusDeriveTags) {
+                                const match = tag.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
+                                if (match) {
+                                    const [, typeTag, paramActions, rest] = match;
+                                    const [priority, ...options] = rest.split(" ");
+                                    if (!derivationRules.has(typeTag)) {
+                                        derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
+                                    }
+                                    derivationRules.get(typeTag)?.rules.push([
+                                        { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) },
+                                        Number.parseFloat(priority),
+                                        declaration,
+                                        new Set(options)
+                                    ]);
+                                } else {
+                                    const match = tag.match(/^derive ([^<]*) lazy$/);
+                                    if (match) {
+                                        const [, typeTag] = match;
+                                        if (!derivationRules.has(typeTag)) {
+                                            derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
+                                        }
+                                        derivationRules.get(typeTag)!.lazyRule = declaration;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+    function initTsPlusTypeCheckerImplicits() {
+        for (const file of host.getSourceFiles()) {
+            fillTsPlusLocalScope(file);
+        }
+    }
+    function postInitTsPlusTypeChecker() {
+        tsPlusDebug && console.time("initTsPlusTypeChecker build dependency tree")
+        typeSymbolCache.forEach((tags, symbol) => {
+            forEach(symbol.declarations, (declaration) => {
+                const source = getSourceFileOfNode(declaration);
+                const set = tsPlusFilesFinal.has(source) ? tsPlusFilesFinal.get(source)! : (tsPlusFilesFinal.set(source, new Set()), tsPlusFilesFinal.get(source)!);
+                forEach(tags, (tag) => {
+                    tsPlusFiles.get(tag)?.forEach((dep) => {
+                        set.add(dep);
+                    })
+                })
+            })
+        })
+        tsPlusDebug && console.timeEnd("initTsPlusTypeChecker build dependency tree")
+    }
+    function initTsPlusTypeChecker() {
+        if (compilerOptions.tsPlusEnabled === false) {
+            return;
+        }
+        tsPlusDebug && console.time("initTsPlusTypeChecker caches")
+        fileMap.map = getFileMap(host.getCompilerOptions(), host);
+        fluentCache.clear();
+        unresolvedFluentCache.clear();
+        unresolvedPipeableCache.clear();
+        unresolvedPipeableOperatorCache.clear();
+        operatorCache.clear();
+        typeSymbolCache.clear();
+        typeHashCache.clear();
+        staticFunctionCache.clear();
+        staticValueCache.clear();
+        unresolvedStaticCache.clear();
+        identityCache.clear();
+        tsPlusFiles.clear();
+        tsPlusFilesFinal.clear();
+        getterCache.clear();
+        callCache.clear();
+        indexCache.clear();
+        resolvedIndexCache.clear();
+        indexAccessExpressionCache.clear();
+        inheritanceSymbolCache.clear();
+        tsPlusWorldScope.implicits.clear();
+        tsPlusWorldScope.rules.clear();
+        tsPlusDebug && console.timeEnd("initTsPlusTypeChecker caches")
+        tsPlusDebug && console.time("initTsPlusTypeChecker collect")
+        for (const file of host.getSourceFiles()) {
+            collectTsPlusSymbols(file);
+        }
+        tsPlusDebug && console.timeEnd("initTsPlusTypeChecker collect")
+        tsPlusDebug && console.time("initTsPlusTypeChecker joinining signatures")
+        unresolvedStaticCache.forEach((map, typeName) => {
+            if (!staticCache.has(typeName)) {
+                staticCache.set(typeName, new Map());
+            }
+            const staticMap = staticCache.get(typeName)!;
+            map.forEach(({ target, declaration, name, definition, exportName }) => {
+                staticMap.set(name, () => {
+                    if (staticValueCache.has(target)) {
+                        const resolvedMap = staticValueCache.get(target)!;
+                        if (resolvedMap.has(name)) {
+                            return resolvedMap.get(name)!;
+                        }
+                    }
+                    else {
+                        staticValueCache.set(target, new Map());
+                    }
+                    const resolvedMap = staticValueCache.get(typeName)!;
+                    const nameSymbol = getSymbolAtLocation(declaration.name!);
+                    if (nameSymbol) {
+                        const patched = createTsPlusStaticValueSymbol(name, declaration, nameSymbol);
+                        if (isClassDeclaration(declaration)) {
+                            const companionTags = collectTsPlusCompanionTags(declaration);
+                            for (const companionTag of companionTags) {
+                                getTsPlusSourceFileCache(companionTag).add(getSourceFileOfNode(declaration));
+                                addToCompanionSymbolCache(patched, companionTag);
+                            }
+                        }
+                        const type = getTypeOfSymbol(patched);
+                        // @ts-expect-error
+                        type.tsPlusSymbol = patched;
+                        const extension = {
+                            patched,
+                            definition,
+                            exportName,
+                            type
+                        }
+                        resolvedMap.set(name, extension);
+                        return extension;
+                    }
+                })
+            })
+        })
+        unresolvedFluentCache.forEach((map, typeName) => {
+            if (!fluentCache.has(typeName)) {
+                fluentCache.set(typeName, new Map());
+            }
+            const fluentMap = fluentCache.get(typeName)!;
+            map.forEach(({ name, definition }) => {
+                fluentMap.set(name, () => {
+                    if (resolvedFluentCache.has(typeName)) {
+                        const resolvedMap = resolvedFluentCache.get(typeName)!;
+                        if (resolvedMap.has(name)) {
+                            return resolvedMap.get(name)!;
+                        }
+                    }
+                    const allTypes: { type: Type, signatures: readonly TsPlusSignature[] }[] = [];
+                    const prioritizedSignaturesMap = new Map<number, TsPlusSignature[]> ()
+
+                    definition.forEach(({ declaration, definition, exportName, priority }) => {
+                        if (isFunctionDeclaration(declaration)) {
+                            const typeAndSignatures = getTsPlusFluentSignaturesForFunctionDeclaration(definition, exportName, declaration);
+                            if (typeAndSignatures) {
+                                const [type, signatures] = typeAndSignatures;
+                                if (prioritizedSignaturesMap.has(priority)) {
+                                    prioritizedSignaturesMap.get(priority)!.push(...signatures)
+                                }
+                                else {
+                                    prioritizedSignaturesMap.set(priority, signatures);
+                                }
+                                allTypes.push({ type, signatures });
+                            }
+                        }
+                        else {
+                            const typeAndSignatures = getTsPlusFluentSignaturesForVariableDeclaration(definition, exportName, declaration);
+                            if (typeAndSignatures) {
+                                const [type, signatures] = typeAndSignatures;
+                                if (prioritizedSignaturesMap.has(priority)) {
+                                    prioritizedSignaturesMap.get(priority)!.push(...signatures)
+                                }
+                                else {
+                                    prioritizedSignaturesMap.set(priority, signatures);
+                                }
+                                allTypes.push({ type, signatures });
+                            }
+                        }
+                    });
+
+                    const prioritizedSignatures: [number, TsPlusSignature[]][] = []
+                    prioritizedSignaturesMap.forEach((signatures, priority) => {
+                        prioritizedSignatures.push([priority, signatures])
+                    })
+                    prioritizedSignatures.sort((x, y) => x[0] > y[0] ? 1 : x[0] < y[0] ? -1 : 0)
+
+                    const allSignatures = prioritizedSignatures.flatMap((signatures) => signatures[1])
+
+                    if (allSignatures.length === 0) {
+                        return undefined;
+                    }
+                    const symbol = createTsPlusFluentSymbol(name, allSignatures);
+                    const type = createAnonymousType(symbol, emptySymbols, allSignatures, [], []);
+                    const extension: TsPlusFluentExtension = {
+                        patched: createSymbolWithType(symbol, type),
+                        signatures: allSignatures,
+                        types: allTypes
+                    };
+                    if (!resolvedFluentCache.has(typeName)) {
+                        resolvedFluentCache.set(typeName, new Map());
+                    }
+                    const resolvedMap = resolvedFluentCache.get(typeName)!;
+                    resolvedMap.set(name, extension);
+                    return extension;
+                });
+            });
+        });
+        unresolvedFluentCache.clear();
+        unresolvedPipeableCache.forEach((map, typeName) => {
+            if (!fluentCache.has(typeName)) {
+                fluentCache.set(typeName, new Map());
+            }
+            const fluentMap = fluentCache.get(typeName)!;
+            map.forEach(({ name, definition }) => {
+                if (!fluentMap.has(name)) {
+                    fluentMap.set(name, () => {
+                        if (resolvedFluentCache.has(typeName)) {
+                            const resolvedMap = resolvedFluentCache.get(typeName)!;
+                            if (resolvedMap.has(name)) {
+                                return resolvedMap.get(name)!;
+                            }
+                        }
+                        const allTypes: { type: Type, signatures: readonly TsPlusSignature[] }[] = [];
+                        const prioritizedSignaturesMap = new Map<number, TsPlusSignature[]> ()
+
+                        definition.forEach(({ priority, getTypeAndSignatures }) => {
+                            const typeAndSignatures = getTypeAndSignatures();
+                            if (typeAndSignatures) {
+                                const [type, signatures] = typeAndSignatures;
+                                if (prioritizedSignaturesMap.has(priority)) {
+                                    prioritizedSignaturesMap.get(priority)!.push(...signatures)
+                                }
+                                else {
+                                    prioritizedSignaturesMap.set(priority, signatures);
+                                }
+                                allTypes.push({ type, signatures });
+                            }
+                        });
+
+                        const prioritizedSignatures: [number, TsPlusSignature[]][] = []
+                        prioritizedSignaturesMap.forEach((signatures, priority) => {
+                            prioritizedSignatures.push([priority, signatures])
+                        })
+                        prioritizedSignatures.sort((x, y) => x[0] > y[0] ? 1 : x[0] < y[0] ? -1 : 0)
+
+                        const allSignatures = prioritizedSignatures.flatMap((signatures) => signatures[1])
+
+                        if (allSignatures.length === 0) {
+                            return undefined;
+                        }
+                        const symbol = createTsPlusFluentSymbol(name, allSignatures);
+                        const type = createAnonymousType(symbol, emptySymbols, allSignatures, [], []);
+                        const extension: TsPlusFluentExtension = {
+                            patched: createSymbolWithType(symbol, type),
+                            signatures: allSignatures,
+                            types: allTypes
+                        };
+                        if (!resolvedFluentCache.has(typeName)) {
+                            resolvedFluentCache.set(typeName, new Map());
+                        }
+                        const resolvedMap = resolvedFluentCache.get(typeName)!;
+                        resolvedMap.set(name, extension);
+                        return extension;
+                    });
+                }
+            });
+        });
+        unresolvedPipeableCache.clear();
+        unresolvedPipeableOperatorCache.forEach((map, typeName) => {
+            if (!operatorCache.has(typeName)) {
+                operatorCache.set(typeName, new Map());
+            }
+            const cache = operatorCache.get(typeName)!;
+            map.forEach((member, funcName) => {
+                if (!cache.has(funcName)) {
+                    cache.set(funcName, []);
+                }
+                member.definition.forEach(({ priority, getTypeAndSignatures, exportName, definition }) => {
+                    const [memberType, memberSignatures] = getTypeAndSignatures();
+                    const symbol = createSymbol(SymbolFlags.Function, funcName as __String);
+                    symbol.declarations = memberSignatures.map((sig) => sig.declaration!);
+                    getSymbolLinks(symbol).type = memberType;
+                    cache.get(funcName)!.push({
+                        patched: symbol,
+                        exportName,
+                        definition,
+                        priority
+                    })
+                })
+            })
+        })
+        unresolvedPipeableOperatorCache.clear();
+        operatorCache.forEach((map) => {
+            map.forEach((extensions) => {
+                extensions.sort(({ priority: x }, { priority: y }) => x > y ? 1 : x < y ? -1 : 0)
+            })
+        })
+        tsPlusDebug && console.timeEnd("initTsPlusTypeChecker joinining signatures")
+        tsPlusDebug && console.time("initTsPlusTypeChecker implicits")
+        initTsPlusTypeCheckerImplicits();
+        tsPlusDebug && console.timeEnd("initTsPlusTypeChecker implicits")
+        postInitTsPlusTypeChecker();
+    }
+    // TSPLUS EXTENSION END
+
     function initializeTypeChecker() {
+        tsPlusGlobalImportCache.clear();
         // Bind all source files and propagate errors
         for (const file of host.getSourceFiles()) {
             bindSourceFile(file, compilerOptions);
+            for (const statement of file.imports) {
+                if (isImportDeclaration(statement.parent)) {
+                    tryCacheTsPlusGlobalSymbol(statement.parent);
+                }
+            }
         }
 
         amalgamatedDuplicates = new Map();
@@ -45327,6 +49625,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             }
         });
         amalgamatedDuplicates = undefined;
+        tsPlusDebug && console.time("initTsPlusTypeChecker")
+        initTsPlusTypeChecker();
+        tsPlusDebug && console.timeEnd("initTsPlusTypeChecker")
     }
 
     function checkExternalEmitHelpers(location: Node, helpers: ExternalEmitHelpers) {
@@ -47412,3 +51713,132 @@ class SymbolTrackerImpl implements SymbolTracker {
         this.context.reportedDiagnostic = true;
     }
 }
+
+// TSPLUS EXTENSION BEGIN
+export function isTsPlusSymbol(symbol: Symbol): symbol is TsPlusSymbol {
+    return 'tsPlusTag' in symbol;
+}
+export function isTsPlusSignature(signature: Signature): signature is TsPlusSignature {
+    return 'tsPlusTag' in signature;
+}
+export function getNameForType(type: Type | undefined): string | undefined {
+    if(!type) {
+        return;
+    }
+    if (type.symbol && type.symbol.escapedName) {
+        return type.symbol.escapedName as string;
+    }
+    if (type.aliasSymbol && type.aliasSymbol.escapedName) {
+        return type.aliasSymbol.escapedName as string;
+    }
+}
+export function getThisTypeNameForCallLikeExpression(checker: TypeChecker, node: Node): string | undefined {
+    if(isCallLikeExpression(node)) {
+        const signature = checker.getResolvedSignature(node);
+        if (signature && signature.thisParameter) {
+            const resolvedThisType = checker.getTypeOfSymbol(signature.thisParameter)
+            if (resolvedThisType.symbol) {
+                const typeName = unescapeLeadingUnderscores(resolvedThisType.symbol.escapedName)
+                if (typeName === "__type") {
+                    return "Function";
+                }
+                return typeName;
+            } else if (resolvedThisType.aliasSymbol) {
+                return unescapeLeadingUnderscores(resolvedThisType.aliasSymbol.escapedName)
+            }
+        }
+    }
+}
+export function getThisTypeNameForTsPlusSymbol(checker: TypeChecker, symbol: TsPlusSymbol): string {
+    switch(symbol.tsPlusTag) {
+        case TsPlusSymbolTag.Fluent: {
+            if(symbol.tsPlusResolvedSignatures[0] && symbol.tsPlusResolvedSignatures[0].thisParameter) {
+                const type = checker.getSymbolLinks(symbol.tsPlusResolvedSignatures[0].thisParameter).type;
+                if (type) {
+                    const typeName = getNameForType(type)
+                    if (typeName) {
+                        return typeName;
+                    }
+                    const primitiveName = checker.getPrimitiveTypeName(type)
+                    if (primitiveName) {
+                        return primitiveName;
+                    }
+                }
+            }
+            break;
+        }
+        case TsPlusSymbolTag.GetterVariable:
+        case TsPlusSymbolTag.Getter: {
+            const typeName = getNameForType(symbol.tsPlusSelfType)
+            if (typeName) {
+                if (typeName === "__type" && (symbol.tsPlusSelfType as ObjectType).callSignatures?.length) {
+                    return "Function";
+                }
+                return typeName
+            }
+            const primitiveName = checker.getPrimitiveTypeName(symbol.tsPlusSelfType)
+            if (primitiveName) {
+                return primitiveName;
+            }
+            break;
+        }
+    }
+    return anon;
+}
+
+export function isSymbolParameterDeclaration(symbol: Symbol): symbol is Symbol & { valueDeclaration: ParameterDeclaration } {
+    return !!symbol.valueDeclaration && isVariableLike(symbol.valueDeclaration) && isParameterDeclaration(symbol.valueDeclaration);
+}
+
+export function isTsPlusType(type: Type): type is TsPlusType {
+    return "tsPlusSymbol" in type;
+}
+
+type TsPlusSymbolWithDeclaration = Omit<TsPlusType, "tsPlusSymbol"> & {
+    tsPlusSymbol: TsPlusGetterSymbol | TsPlusGetterVariableSymbol | TsPlusStaticValueSymbol
+}
+
+export function isTsPlusTypeWithDeclaration(type: Type): type is TsPlusSymbolWithDeclaration {
+    return isTsPlusType(type) && (
+        type.tsPlusSymbol.tsPlusTag === TsPlusSymbolTag.Getter ||
+        type.tsPlusSymbol.tsPlusTag === TsPlusSymbolTag.GetterVariable ||
+        type.tsPlusSymbol.tsPlusTag === TsPlusSymbolTag.StaticValue
+    )
+}
+
+export function getDeclarationForTsPlus(checker: TypeChecker, node: Node, symbol: TsPlusSymbol): Declaration | undefined {
+    switch (symbol.tsPlusTag) {
+        case TsPlusSymbolTag.StaticFunction:
+        case TsPlusSymbolTag.Fluent: {
+            if (isCallLikeExpression(node)) {
+                const signature = checker.getResolvedSignature(node)
+                if (signature && signature.declaration && signature.declaration.symbol) {
+                    if (
+                        isTsPlusSymbol(signature.declaration.symbol) &&
+                        (
+                            signature.declaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro ||
+                            signature.declaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableDeclaration
+                        )
+                    ) {
+                        return signature.declaration.symbol.tsPlusDeclaration;
+                    }
+                    if (isFunctionLikeDeclaration(signature.declaration)) {
+                        return signature.declaration;
+                    }
+                    if (isTsPlusSignature(signature) && signature.tsPlusDeclaration) {
+                        return signature.tsPlusDeclaration;
+                    }
+                    return signature.declaration
+                }
+            }
+            break;
+        }
+        case TsPlusSymbolTag.StaticValue:
+        case TsPlusSymbolTag.Getter:
+        case TsPlusSymbolTag.GetterVariable: {
+            return symbol.tsPlusDeclaration
+        }
+    }
+}
+
+// TSPLUS EXTENSION END

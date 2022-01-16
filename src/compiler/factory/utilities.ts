@@ -38,6 +38,7 @@ import {
     first,
     firstOrUndefined,
     ForInitializer,
+    FunctionDeclaration,
     GeneratedIdentifier,
     GeneratedIdentifierFlags,
     GeneratedNamePart,
@@ -67,6 +68,7 @@ import {
     ImportCall,
     ImportDeclaration,
     ImportEqualsDeclaration,
+    isArrowFunction,
     isAssignmentExpression,
     isAssignmentOperator,
     isBlock,
@@ -77,6 +79,8 @@ import {
     isExclamationToken,
     isExportNamespaceAsDefaultDeclaration,
     isFileLevelUniqueName,
+    isFunctionDeclaration,
+    isFunctionExpression,
     isGeneratedIdentifier,
     isGeneratedPrivateIdentifier,
     isIdentifier,
@@ -135,6 +139,7 @@ import {
     OuterExpression,
     OuterExpressionKinds,
     outFile,
+    ParameterDeclaration,
     parseNodeFactory,
     PlusToken,
     PostfixUnaryExpression,
@@ -166,6 +171,7 @@ import {
     Token,
     TypeNode,
     TypeParameterDeclaration,
+    VariableDeclaration,
 } from "../_namespaces/ts";
 
 // Compound nodes
@@ -1637,4 +1643,13 @@ export function createAccessorPropertySetRedirector(factory: NodeFactory, node: 
             )
         ])
     );
+}
+
+export function getParametersOfFunctionOrVariableDeclaration(node: FunctionDeclaration | VariableDeclaration): readonly ParameterDeclaration[] | undefined {
+    if (isFunctionDeclaration(node)) {
+        return node.parameters;
+    }
+    if (node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer))) {
+        return node.initializer.parameters
+    }
 }
