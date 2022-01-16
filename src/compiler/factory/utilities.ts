@@ -44,6 +44,7 @@ import {
     first,
     firstOrUndefined,
     ForInitializer,
+    FunctionDeclaration,
     GeneratedIdentifier,
     GeneratedIdentifierFlags,
     GeneratedNamePart,
@@ -74,6 +75,7 @@ import {
     ImportDeclaration,
     ImportEqualsDeclaration,
     InternalEmitFlags,
+    isArrowFunction,
     isAssignmentExpression,
     isAssignmentOperator,
     isBlock,
@@ -85,6 +87,8 @@ import {
     isExclamationToken,
     isExportNamespaceAsDefaultDeclaration,
     isFileLevelUniqueName,
+    isFunctionDeclaration,
+    isFunctionExpression,
     isGeneratedIdentifier,
     isGeneratedPrivateIdentifier,
     isIdentifier,
@@ -145,6 +149,7 @@ import {
     OuterExpressionKinds,
     outFile,
     ParenthesizedExpression,
+    ParameterDeclaration,
     parseNodeFactory,
     PlusToken,
     PostfixUnaryExpression,
@@ -175,6 +180,7 @@ import {
     ThisTypeNode,
     Token,
     TypeNode,
+    VariableDeclaration,
 } from "../_namespaces/ts";
 
 // Compound nodes
@@ -1742,4 +1748,13 @@ export function flattenCommaList(node: Expression) {
     const expressions: Expression[] = [];
     flattenCommaListWorker(node, expressions);
     return expressions;
+}
+
+export function getParametersOfFunctionOrVariableDeclaration(node: FunctionDeclaration | VariableDeclaration): readonly ParameterDeclaration[] | undefined {
+    if (isFunctionDeclaration(node)) {
+        return node.parameters;
+    }
+    if (node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer))) {
+        return node.initializer.parameters
+    }
 }
