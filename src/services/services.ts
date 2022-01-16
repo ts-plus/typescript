@@ -1678,6 +1678,62 @@ namespace ts {
             return Completions.getCompletionEntrySymbol(program, log, getValidSourceFile(fileName), position, { name, source }, host, preferences);
         }
 
+        // TSPLUS EXTENSION BEGIN
+        function getUntracedDisplayParts(typeChecker: TypeChecker, node: Node, declaration: FunctionDeclaration | VariableDeclaration & { name: Identifier }, resolvedSignature: Signature): SymbolDisplayPart[] {
+            const paramLength = resolvedSignature.parameters.length;
+            const lastParam = resolvedSignature.parameters[paramLength - 1];
+            if (resolvedSignature.parameters.every(isSymbolParameterDeclaration) && lastParam && lastParam.name === "__tsplusTrace") {
+                let untracedDeclaration: FunctionDeclaration;
+                if(isVariableDeclaration(declaration)) {
+                    untracedDeclaration = factory.createFunctionDeclaration(
+                        declaration.decorators,
+                        declaration.modifiers,
+                        undefined,
+                        declaration.name,
+                        undefined,
+                        map(resolvedSignature.parameters, (param) => param.valueDeclaration).slice(0, paramLength - 1),
+                        declaration.type,
+                        undefined
+                    );
+                }
+                else {
+                    untracedDeclaration = factory.createFunctionDeclaration(
+                        declaration.decorators,
+                        declaration.modifiers,
+                        declaration.asteriskToken,
+                        declaration.name,
+                        declaration.typeParameters,
+                        declaration.parameters.slice(0, declaration.parameters.length - 1),
+                        declaration.type,
+                        undefined
+                    );
+                }
+                setParent(untracedDeclaration, declaration.parent);
+                untracedDeclaration.jsDoc = declaration.jsDoc;
+                const untracedSignature = typeChecker.createSignature(
+                    untracedDeclaration,
+                    resolvedSignature.typeParameters,
+                    resolvedSignature.thisParameter,
+                    filterLazyArgument(typeChecker, resolvedSignature.parameters.slice(0, resolvedSignature.parameters.length - 1)),
+                    resolvedSignature.getReturnType(),
+                    resolvedSignature.resolvedTypePredicate,
+                    resolvedSignature.minArgumentCount - 1,
+                    resolvedSignature.flags
+                );
+                return typeChecker.runWithCancellationToken(
+                    cancellationToken,
+                    typeChecker => signatureToDisplayParts(typeChecker, untracedSignature, getContainerNode(node))
+                );
+            }
+            else {
+                return typeChecker.runWithCancellationToken(
+                    cancellationToken,
+                    typeChecker => signatureToDisplayParts(typeChecker, resolvedSignature, getContainerNode(node))
+                );
+            }
+        }
+        // TSPLUS EXTENSION END
+
         function getQuickInfoAtPosition(fileName: string, position: number): QuickInfo | undefined {
             synchronizeHostData();
 
@@ -1692,8 +1748,178 @@ namespace ts {
             const nodeForQuickInfo = getNodeForQuickInfo(node);
             const symbol = getSymbolAtLocationForQuickInfo(nodeForQuickInfo, typeChecker);
 
+            // TSPLUS EXTENSION BEGIN
+            const call = typeChecker.getCallExtension(nodeForQuickInfo);
+            if(call) {
+                const symbol = typeChecker.getTypeOfSymbol(call.patched).symbol;
+                if(isTsPlusSymbol(symbol) && symbol.tsPlusTag === TsPlusSymbolTag.Static) {
+                    let displayParts: SymbolDisplayPart[] = [];
+                    displayParts.push(textPart("("));
+                    displayParts.push(textPart("call"));
+                    displayParts.push(textPart(")"));
+                    displayParts.push(spacePart());
+                    displayParts = displayParts.concat(getUntracedDisplayParts(typeChecker, nodeForQuickInfo, symbol.tsPlusDeclaration, symbol.tsPlusResolvedSignatures[0]));
+                    const declaration = symbol.tsPlusDeclaration;
+                    return {
+                        kind: ScriptElementKind.memberFunctionElement,
+                        kindModifiers: ScriptElementKindModifier.none,
+                        textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                        displayParts,
+                        documentation: getDocumentationComment([declaration], typeChecker),
+                        tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
+                    };
+                }
+            }
+            // TSPLUS EXTENSION END
+
             if (!symbol || typeChecker.isUnknownSymbol(symbol)) {
                 const type = shouldGetType(sourceFile, nodeForQuickInfo, position) ? typeChecker.getTypeAtLocation(nodeForQuickInfo) : undefined;
+                // TSPLUS EXTENSION BEGIN
+                if (type) {
+                    let tsPlusSymbol: TsPlusSymbol | undefined;
+                    if (type.symbol && isTsPlusSymbol(type.symbol)) {
+                        tsPlusSymbol = type.symbol;
+                    }
+                    else if (type && isTsPlusType(type)) {
+                        tsPlusSymbol = type.tsPlusSymbol;
+                    }
+                    if(tsPlusSymbol) {
+                        let displayParts: SymbolDisplayPart[] = [];
+                        switch(tsPlusSymbol.tsPlusTag) {
+                            case TsPlusSymbolTag.FluentVariable:
+                            case TsPlusSymbolTag.Fluent: {
+                                displayParts.push(textPart("("));
+                                displayParts.push(textPart("fluent"));
+                                displayParts.push(textPart(")"));
+                                displayParts.push(spacePart());
+                                displayParts.push(displayPart(getThisTypeNameForTsPlusSymbol(tsPlusSymbol), SymbolDisplayPartKind.className));
+                                displayParts.push(punctuationPart(SyntaxKind.DotToken));
+                                displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.methodName));
+                                break;
+                            }
+                            case TsPlusSymbolTag.Static: {
+                                displayParts.push(textPart("("));
+                                displayParts.push(textPart("static"));
+                                displayParts.push(textPart(")"));
+                                displayParts.push(spacePart());
+                                displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.methodName));
+                                break;
+                            }
+                            case TsPlusSymbolTag.GetterVariable:
+                            case TsPlusSymbolTag.Getter: {
+                                displayParts.push(textPart("("));
+                                displayParts.push(textPart("getter"));
+                                displayParts.push(textPart(")"));
+                                displayParts.push(spacePart());
+                                displayParts.push(displayPart(getThisTypeNameForTsPlusSymbol(tsPlusSymbol), SymbolDisplayPartKind.className));
+                                displayParts.push(punctuationPart(SyntaxKind.DotToken));
+                                displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.fieldName));
+                                displayParts.push(punctuationPart(SyntaxKind.ColonToken));
+                                displayParts.push(spacePart());
+                                break;
+                            }
+                        }
+                        switch(tsPlusSymbol.tsPlusTag) {
+                            case TsPlusSymbolTag.FluentVariable:
+                            case TsPlusSymbolTag.Fluent:
+                            case TsPlusSymbolTag.Static: {
+                                const declaration = tsPlusSymbol.tsPlusDeclaration;
+                                displayParts = displayParts.concat(getUntracedDisplayParts(typeChecker, nodeForQuickInfo, declaration, tsPlusSymbol.tsPlusResolvedSignatures[0]));
+                                return {
+                                    kind: ScriptElementKind.memberFunctionElement,
+                                    kindModifiers: ScriptElementKindModifier.staticModifier,
+                                    textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                                    displayParts,
+                                    documentation: getDocumentationComment([declaration], typeChecker),
+                                    tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
+                                };
+                            }
+                            case TsPlusSymbolTag.GetterVariable:
+                            case TsPlusSymbolTag.Getter: {
+                                displayParts = displayParts.concat(typeChecker.runWithCancellationToken(cancellationToken, typeChecker => typeToDisplayParts(typeChecker, type, getContainerNode(nodeForQuickInfo))));
+                                return {
+                                    kind: ScriptElementKind.memberGetAccessorElement,
+                                    kindModifiers: ScriptElementKindModifier.none,
+                                    textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                                    displayParts,
+                                    documentation: getDocumentationComment([tsPlusSymbol.tsPlusDeclaration], typeChecker),
+                                    tags: getJsDocTagsOfDeclarations([tsPlusSymbol.tsPlusDeclaration], typeChecker)
+                                };
+                            }
+                        }
+                    }
+                }
+                if (isToken(node) && isBinaryExpression(node.parent)) {
+                    const leftType = typeChecker.getTypeAtLocation(node.parent.left);
+                    const operator = typeChecker.getTextOfBinaryOp(node.kind);
+                    if (operator) {
+                        const overload = typeChecker.getOperatorExtension(leftType, operator);
+                        if (overload) {
+                            const declaration = find(overload.patched.declarations || [], isFunctionDeclaration);
+                            const declarationSignature = declaration ? typeChecker.getSignatureFromDeclaration(declaration) : undefined;
+                            if (declaration && declarationSignature) {
+                                let displayParts: SymbolDisplayPart[] = [];
+                                displayParts.push(textPart("("));
+                                displayParts.push(textPart("operator"));
+                                displayParts.push(textPart(")"));
+                                displayParts.push(spacePart());
+                                displayParts.push(displayPart(operator, SymbolDisplayPartKind.operator));
+                                displayParts.push(spacePart());
+                                displayParts = displayParts.concat(
+                                    typeChecker.runWithCancellationToken(
+                                        cancellationToken,
+                                        (typeChecker) => getUntracedDisplayParts(typeChecker, node, declaration, declarationSignature)
+                                    )
+                                );
+                                return {
+                                    kind: ScriptElementKind.functionElement,
+                                    kindModifiers: ScriptElementKindModifier.none,
+                                    textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                                    displayParts,
+                                    documentation: getDocumentationComment([declaration], typeChecker),
+                                    tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
+                                };
+                            }
+                        }
+                    }
+                }
+                if(isPropertyAccessExpression(node.parent)) {
+                    const targetType = typeChecker.getTypeAtLocation(node.parent.expression);
+                    const extensions = typeChecker.getExtensions(node.parent.expression);
+                    if(extensions) {
+                        const type = typeChecker.getTypeAtLocation(node);
+                        const name = node.parent.name.escapedText as string;
+                        const staticSymbol = typeChecker.getStaticExtension(targetType, name);
+                        if(type && staticSymbol) {
+                            const declaration = staticSymbol.patched.valueDeclaration;
+                            if (declaration) {
+                                let displayParts: SymbolDisplayPart[] = [];
+                                displayParts.push(textPart("("));
+                                displayParts.push(textPart("static"));
+                                displayParts.push(textPart(")"));
+                                displayParts.push(spacePart());
+                                displayParts.push(displayPart(name, SymbolDisplayPartKind.fieldName));
+                                displayParts.push(punctuationPart(SyntaxKind.ColonToken));
+                                displayParts.push(spacePart());
+                                displayParts = displayParts.concat(
+                                    typeChecker.runWithCancellationToken(
+                                        cancellationToken,
+                                        (typeChecker) => typeToDisplayParts(typeChecker, type, getContainerNode(nodeForQuickInfo))
+                                    )
+                                );
+                                return {
+                                    kind: ScriptElementKind.memberVariableElement,
+                                    kindModifiers: ScriptElementKindModifier.staticModifier,
+                                    textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                                    displayParts,
+                                    documentation: getDocumentationComment([declaration], typeChecker),
+                                    tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
+                                };
+                            }
+                        }
+                    }
+                }
+                // TSPLUS EXTENSION END
                 return type && {
                     kind: ScriptElementKind.unknown,
                     kindModifiers: ScriptElementKindModifier.none,
