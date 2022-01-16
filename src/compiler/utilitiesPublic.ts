@@ -2014,4 +2014,10 @@ namespace ts {
         return node.kind === SyntaxKind.JSDocLink || node.kind === SyntaxKind.JSDocLinkCode || node.kind === SyntaxKind.JSDocLinkPlain;
     }
     // #endregion
+
+    // TSPLUS EXTENSION START
+    export function isTsPlusUniqueIdentifier(node: Identifier): node is TsPlusUniqueIdentifier {
+        return !!(node as TsPlusUniqueIdentifier).tsPlusUniqueIdentifier;
+    }
+    // TSPLUS EXTENSION END
 }
