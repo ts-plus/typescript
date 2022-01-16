@@ -964,6 +964,11 @@ namespace ts {
     // Computed property names will just be emitted as "[<expr>]", where <expr> is the source
     // text of the expression in the computed property.
     export function declarationNameToString(name: DeclarationName | QualifiedName | undefined) {
+        // @ts-expect-error
+        if (name.ets_name) {
+            // @ts-expect-error
+            return name.ets_name as string;
+        }
         return !name || getFullWidth(name) === 0 ? "(Missing)" : getTextOfNode(name);
     }
 

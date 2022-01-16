@@ -2172,6 +2172,13 @@ namespace ts.Completions {
                 }
             }
 
+            const extensions = typeChecker.getExtensions(type);
+            if (extensions) {
+                extensions.forEach((extension) => {
+                    addPropertySymbol(extension, /* insertAwait */ false, /* insertQuestionDot */ false);
+                });
+            }
+
             if (insertAwait && preferences.includeCompletionsWithInsertText) {
                 const promiseType = typeChecker.getPromisedTypeOfPromise(type);
                 if (promiseType) {

@@ -198,6 +198,14 @@ namespace ts {
             defaultValueDescription: false,
         },
         {
+            name: "etsModuleDiscoveryLocalSuffix",
+            type: "string"
+        },
+        {
+            name: "etsTracingPackageName",
+            type: "string"
+        },
+        {
             name: "watch",
             shortName: "w",
             type: "boolean",
