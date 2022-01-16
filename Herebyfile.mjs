@@ -920,7 +920,7 @@ export const produceLKG = task({
             "built/local/watchGuard.js",
         ].concat(libs().map(lib => lib.target));
         const missingFiles = expectedFiles
-            .concat(localizationTargets)
+            // .concat(localizationTargets)
             .filter(f => !fs.existsSync(f));
         if (missingFiles.length > 0) {
             throw new Error("Cannot replace the LKG unless all built targets are present in directory 'built/local/'. The following files are missing:\n" + missingFiles.join("\n"));
@@ -964,6 +964,12 @@ export const configureExperimental = task({
     name: "configure-experimental",
     description: "Runs scripts/configurePrerelease.mjs to prepare a build for experimental publishing",
     run: () => exec(process.execPath, ["scripts/configurePrerelease.mjs", "experimental", "package.json", "src/compiler/corePublic.ts"]),
+});
+
+export const configureTsPlus = task({
+    name: "configure-tsplus",
+    description: "Runs scripts/configurePrerelease.mjs to prepare a build for tsplus publishing",
+    run: () => exec(process.execPath, ["scripts/configurePrerelease.mjs", "tsplus", "package.json", "src/compiler/corePublic.ts"]),
 });
 
 export const help = task({

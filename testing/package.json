@@ -1,0 +1,15 @@
+{
+    "name": "org",
+    "scripts": {
+        "postinstall": "npm run build",
+        "clean": "cd packages/demo && rm -rf build",
+        "build": "cd packages/demo && npm run build:esm"
+    },
+    "workspaces": [
+        "packages/*"
+    ],
+    "dependencies": {
+        "@tsplus/stdlib": "0.1.8",
+        "@effect/core": "0.0.5"
+    }
+}

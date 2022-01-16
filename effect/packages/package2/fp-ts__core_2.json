@@ -1,0 +1,40 @@
+{
+  "@fp-ts/core/Sync": [
+    {
+      "definitionName": "Sync",
+      "definitionKind": "interface",
+      "extensions": [
+        {
+          "kind": "type",
+          "typeName": "fp-ts/Sync"
+        },
+        {
+          "kind": "companion",
+          "typeName": "fp-ts/SyncOps"
+        }
+      ]
+    },
+    {
+      "definitionName": "map",
+      "definitionKind": "const",
+      "extensions": [
+        {
+          "kind": "pipeable",
+          "typeName": "fp-ts/Sync",
+          "name": "map"
+        }
+      ]
+    },
+    {
+      "definitionName": "of",
+      "definitionKind": "const",
+      "extensions": [
+        {
+          "kind": "static",
+          "typeName": "fp-ts/SyncOps",
+          "name": "of"
+        }
+      ]
+    }
+  ]
+}

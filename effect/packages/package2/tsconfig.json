@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "build/esm",
+    "declarationDir": "build/dts",
+    "tsPlusConfig": "../../tsplus.config.json",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "tsPlusTypes": [
+      "./fp-ts__core.json",
+      "./fp-ts__core_2.json"
+    ]
+  },
+  "include": ["src/**/*.ts"]
+}
