@@ -37,3 +37,6 @@ Dockerfile
 .eslintrc.json
 .yarnrc
 tmp
+effect/
+dev/
+testing/
