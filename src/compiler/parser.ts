@@ -36,6 +36,7 @@ import {
     CatchClause,
     CharacterCodes,
     ClassDeclaration,
+    ClassDeclarationWithIdentifier,
     ClassElement,
     ClassExpression,
     ClassLikeDeclaration,
@@ -44,6 +45,7 @@ import {
     CommentDirective,
     commentPragmas,
     CommentRange,
+    CompilerOptions,
     ComputedPropertyName,
     concatenate,
     ConditionalExpression,
@@ -67,6 +69,7 @@ import {
     DiagnosticMessage,
     Diagnostics,
     DiagnosticWithDetachedLocation,
+    directorySeparator,
     DoStatement,
     DotDotDotToken,
     ElementAccessExpression,
@@ -88,8 +91,12 @@ import {
     ExternalModuleReference,
     fileExtensionIs,
     fileExtensionIsOneOf,
+    filter,
+    find,
     findIndex,
     firstOrUndefined,
+    flatMap,
+    flatMapToMutable,
     forEach,
     ForEachChildNodes,
     ForInOrOfStatement,
@@ -132,16 +139,19 @@ import {
     isArray,
     isAssignmentOperator,
     isAsyncModifier,
+    isClassDeclaration,
     isClassMemberModifier,
     isExportAssignment,
     isExportDeclaration,
     isExportModifier,
     isExpressionWithTypeArguments,
     isExternalModuleReference,
+    isFunctionDeclaration,
     isFunctionTypeNode,
     isIdentifierText,
     isImportDeclaration,
     isImportEqualsDeclaration,
+    isInterfaceDeclaration,
     isJSDocFunctionType,
     isJSDocNullableType,
     isJSDocReturnTag,
@@ -153,13 +163,20 @@ import {
     isLiteralKind,
     isMetaProperty,
     isModifierKind,
+    isModuleBlock,
+    isModuleDeclaration,
+    isNamedImports,
     isNonNullExpression,
     isPrivateIdentifier,
     isSetAccessorDeclaration,
+    isStringLiteral,
     isStringOrNumericLiteralLike,
     isTaggedTemplateExpression,
     isTemplateLiteralKind,
+    isTypeAliasDeclaration,
     isTypeReferenceNode,
+    isVariableDeclaration,
+    isVariableStatement,
     IterationStatement,
     JSDoc,
     JSDocAllType,
@@ -235,6 +252,7 @@ import {
     LiteralExpression,
     LiteralLikeNode,
     LiteralTypeNode,
+    mangleScopedPackageName,
     map,
     mapDefined,
     MappedTypeNode,
@@ -285,6 +303,7 @@ import {
     ParenthesizedExpression,
     ParenthesizedTypeNode,
     PartiallyEmittedExpression,
+    pathIsRelative,
     perfLogger,
     PlusToken,
     PostfixUnaryExpression,
@@ -311,7 +330,11 @@ import {
     ReadonlyKeyword,
     ReadonlyPragmaMap,
     ReadonlyTextRange,
+    removeExtension,
     ResolutionMode,
+    resolveModuleName,
+    resolvePackageNameToPackageJson,
+    resolvePath,
     RestTypeNode,
     ReturnStatement,
     SatisfiesExpression,
@@ -337,6 +360,7 @@ import {
     supportedDeclarationExtensions,
     SwitchStatement,
     SyntaxKind,
+    sys,
     TaggedTemplateExpression,
     TemplateExpression,
     TemplateHead,
@@ -365,6 +389,8 @@ import {
     TransformFlags,
     trimString,
     TryStatement,
+    TsPlusExtensionTag,
+    TsPlusPrioritizedExtensionTag,
     TupleTypeNode,
     TypeAliasDeclaration,
     TypeAssertion,
@@ -383,13 +409,17 @@ import {
     UpdateExpression,
     VariableDeclaration,
     VariableDeclarationList,
+    VariableDeclarationWithIdentifier,
     VariableStatement,
     VoidExpression,
     WhileStatement,
     WithStatement,
     YieldExpression,
+    __String,
 } from "./_namespaces/ts";
 import * as performance from "./_namespaces/ts.performance";
+
+const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/;
 
 const enum SignatureFlags {
     None = 0,
@@ -411,6 +441,19 @@ let TokenConstructor: new (kind: SyntaxKind, pos: number, end: number) => Node;
 let IdentifierConstructor: new (kind: SyntaxKind.Identifier, pos: number, end: number) => Node;
 let PrivateIdentifierConstructor: new (kind: SyntaxKind.PrivateIdentifier, pos: number, end: number) => Node;
 let SourceFileConstructor: new (kind: SyntaxKind.SourceFile, pos: number, end: number) => Node;
+
+interface TsPlusTypeDefinition {
+    definitionName: string
+    definitionKind: string
+    extensions: Array<TsPlusExtensionDefinition>
+}
+
+interface TsPlusExtensionDefinition {
+    kind: string
+    typeName: string
+    name?: string
+    priority?: string
+}
 
 /**
  * NOTE: You should not use this, it is only exported to support `createNode` in `~/src/deprecatedCompat/deprecations.ts`.
@@ -1315,7 +1358,7 @@ function setExternalModuleIndicator(sourceFile: SourceFile) {
     sourceFile.externalModuleIndicator = isFileProbablyExternalModule(sourceFile);
 }
 
-export function createSourceFile(fileName: string, sourceText: string, languageVersionOrOptions: ScriptTarget | CreateSourceFileOptions, setParentNodes = false, scriptKind?: ScriptKind): SourceFile {
+export function createSourceFile(fileName: string, sourceText: string, languageVersionOrOptions: ScriptTarget | CreateSourceFileOptions, setParentNodes = false, scriptKind?: ScriptKind, options?: CompilerOptions): SourceFile {
     tracing?.push(tracing.Phase.Parse, "createSourceFile", { path: fileName }, /*separateBeginAndEnd*/ true);
     performance.mark("beforeParse");
     let result: SourceFile;
@@ -1327,14 +1370,14 @@ export function createSourceFile(fileName: string, sourceText: string, languageV
         impliedNodeFormat: format
     } = typeof languageVersionOrOptions === "object" ? languageVersionOrOptions : ({ languageVersion: languageVersionOrOptions } as CreateSourceFileOptions);
     if (languageVersion === ScriptTarget.JSON) {
-        result = Parser.parseSourceFile(fileName, sourceText, languageVersion, /*syntaxCursor*/ undefined, setParentNodes, ScriptKind.JSON, noop);
+        result = Parser.parseSourceFile(fileName, sourceText, languageVersion, /*syntaxCursor*/ undefined, setParentNodes, ScriptKind.JSON, noop, options);
     }
     else {
         const setIndicator = format === undefined ? overrideSetExternalModuleIndicator : (file: SourceFile) => {
             file.impliedNodeFormat = format;
             return (overrideSetExternalModuleIndicator || setExternalModuleIndicator)(file);
         };
-        result = Parser.parseSourceFile(fileName, sourceText, languageVersion, /*syntaxCursor*/ undefined, setParentNodes, scriptKind, setIndicator);
+        result = Parser.parseSourceFile(fileName, sourceText, languageVersion, /*syntaxCursor*/ undefined, setParentNodes, scriptKind, setIndicator, options);
     }
     perfLogger.logStopParseSourceFile();
 
@@ -1371,8 +1414,8 @@ export function isExternalModule(file: SourceFile): boolean {
 // from this SourceFile that are being held onto may change as a result (including
 // becoming detached from any SourceFile).  It is recommended that this SourceFile not
 // be used once 'update' is called on it.
-export function updateSourceFile(sourceFile: SourceFile, newText: string, textChangeRange: TextChangeRange, aggressiveChecks = false): SourceFile {
-    const newSourceFile = IncrementalParser.updateSourceFile(sourceFile, newText, textChangeRange, aggressiveChecks);
+export function updateSourceFile(sourceFile: SourceFile, newText: string, textChangeRange: TextChangeRange, aggressiveChecks = false, compilerOptions?: CompilerOptions): SourceFile {
+    const newSourceFile = IncrementalParser.updateSourceFile(sourceFile, newText, textChangeRange, aggressiveChecks, compilerOptions);
     // Because new source file node is created, it may not have the flag PossiblyContainDynamicImport. This is the case if there is no new edit to add dynamic import.
     // We will manually port the flag to the new source file.
     (newSourceFile as Mutable<SourceFile>).flags |= (sourceFile.flags & NodeFlags.PermanentlySetIncrementalFlags);
@@ -1529,8 +1572,14 @@ namespace Parser {
     // Note: any errors at the end of the file that do not precede a regular node, should get
     // attached to the EOF token.
     let parseErrorBeforeNextFinishedNode = false;
+    
+    const tsPlusExternalTypeCache = new Map<string, Record<string, TsPlusTypeDefinition[]>>()
+    const tsPlusResolvedPathsCache = new Map<string, string[]>()
+    const tsPlusResolvedModuleCache = new Map<string, any>()
+    let currentTsPlusTypes: TsPlusTypeDefinition[] | null = null;
+    let currentTsPlusFile: string | null = null;
 
-    export function parseSourceFile(fileName: string, sourceText: string, languageVersion: ScriptTarget, syntaxCursor: IncrementalParser.SyntaxCursor | undefined, setParentNodes = false, scriptKind?: ScriptKind, setExternalModuleIndicatorOverride?: (file: SourceFile) => void): SourceFile {
+    export function parseSourceFile(fileName: string, sourceText: string, languageVersion: ScriptTarget, syntaxCursor: IncrementalParser.SyntaxCursor | undefined, setParentNodes = false, scriptKind?: ScriptKind, setExternalModuleIndicatorOverride?: (file: SourceFile) => void, options?: CompilerOptions): SourceFile {
         scriptKind = ensureScriptKind(fileName, scriptKind);
         if (scriptKind === ScriptKind.JSON) {
             const result = parseJsonText(fileName, sourceText, languageVersion, syntaxCursor, setParentNodes);
@@ -1544,9 +1593,13 @@ namespace Parser {
             return result;
         }
 
+        options && parseTsPlusExternalTypes(fileName, options);
+
         initializeState(fileName, sourceText, languageVersion, syntaxCursor, scriptKind);
 
         const result = parseSourceFileWorker(languageVersion, setParentNodes, scriptKind, setExternalModuleIndicatorOverride || setExternalModuleIndicator);
+
+        currentTsPlusTypes = null;
 
         clearState();
 
@@ -1715,6 +1768,8 @@ namespace Parser {
         identifiers = undefined!;
         notParenthesizedArrow = undefined;
         topLevel = true;
+        currentTsPlusTypes = null;
+        currentTsPlusFile = null;
     }
 
     function parseSourceFileWorker(languageVersion: ScriptTarget, setParentNodes: boolean, scriptKind: ScriptKind, setExternalModuleIndicator: (file: SourceFile) => void): SourceFile {
@@ -1742,6 +1797,7 @@ namespace Parser {
         sourceFile.nodeCount = nodeCount;
         sourceFile.identifierCount = identifierCount;
         sourceFile.identifiers = identifiers;
+        collectTsPlusFileSymbols(sourceFile, sourceFile.statements);
         sourceFile.parseDiagnostics = attachFileToDiagnostics(parseDiagnostics, sourceFile);
         if (jsDocDiagnostics) {
             sourceFile.jsDocDiagnostics = attachFileToDiagnostics(jsDocDiagnostics, sourceFile);
@@ -1755,6 +1811,305 @@ namespace Parser {
 
         function reportPragmaDiagnostic(pos: number, end: number, diagnostic: DiagnosticMessage) {
             parseDiagnostics.push(createDetachedDiagnostic(fileName, pos, end, diagnostic));
+        }
+    }
+
+    function getTsPlusExternalTypesPaths(fileName: string, options: CompilerOptions) {
+        if (!options.configFilePath) {
+            return [];
+        }
+
+        let tsconfigPaths: string[] = [];
+
+        if (tsPlusResolvedPathsCache.has(options.configFilePath)) {
+            tsconfigPaths = tsPlusResolvedPathsCache.get(
+                options.configFilePath
+            )!;
+        } else if (options.tsPlusTypes) {
+            for (const path of options.tsPlusTypes) {
+                if (pathIsRelative(path)) {
+                    tsconfigPaths.push(resolvePath(options.configFilePath.split("/").slice(0, -1).join("/"), path));
+                } else {
+                    const resolvedModule = resolveModuleName(path, options.configFilePath, options, sys).resolvedModule ?? resolveModuleName(path, fileName, options, sys).resolvedModule;
+                    if (resolvedModule) {
+                        tsconfigPaths.push(resolvedModule.resolvedFileName);
+                        break;
+                    }
+                }
+            }
+            tsPlusResolvedPathsCache.set(options.configFilePath, tsconfigPaths);
+        }
+
+        let packagePaths: string[] = [];
+        const packagePath: string = removeExtension(
+            fileName.split("node_modules").slice(-1)[0].substring(1),
+            ".d.ts"
+        );
+        if (packagePath) {
+            let packageName: string;
+            if (packagePath.startsWith("@")) {
+                packageName = packagePath
+                    .split(directorySeparator)
+                    .slice(0, 2)
+                    .join(directorySeparator);
+            } else {
+                packageName = packagePath
+                    .split(directorySeparator)
+                    .slice(0, 1)[0];
+            }
+
+            const packageCacheKey = packageName;
+
+            if (tsPlusResolvedPathsCache.has(packageCacheKey)) {
+                packagePaths = tsPlusResolvedPathsCache.get(packageCacheKey)!;
+            } else {
+                const resolvedPackageJson = resolvePackageNameToPackageJson(packageName, options.configFilePath, options, sys, undefined);
+                if (resolvedPackageJson) {
+                    const packageJsonText = sys.readFile(resolvePath(resolvedPackageJson.packageDirectory, "package.json"));
+                    if (packageJsonText) {
+                        const packageJson = JSON.parse(packageJsonText);
+                        if (packageJson.tsPlusTypes) {
+                            for (const path of toArray(packageJson.tsPlusTypes)) {
+                                packagePaths.push(resolvePath(resolvedPackageJson.packageDirectory, path));
+                            }
+                        }
+                    }
+                }
+
+                if (packagePath.startsWith("@")) {
+                    packageName = mangleScopedPackageName(
+                        packagePath
+                            .split(directorySeparator)
+                            .slice(0, 2)
+                            .join(directorySeparator)
+                    );
+                } else {
+                    packageName = packagePath
+                        .split(directorySeparator)
+                        .slice(0, 1)[0];
+                }
+                const { resolvedModule } = resolveModuleName(
+                    `@tsplus-types/${packageName}`,
+                    options.configFilePath,
+                    { ...options, resolveJsonModule: true },
+                    sys
+                );
+                if (resolvedModule) {
+                    packagePaths.push(resolvedModule.resolvedFileName);
+                }
+
+                tsPlusResolvedPathsCache.set(packageCacheKey, packagePaths);
+            }
+        }
+
+        return tsconfigPaths.concat(packagePaths);
+    }
+
+    function parseTsPlusExternalTypes(fileName: string, options: CompilerOptions) {
+        const resolvedPaths = getTsPlusExternalTypesPaths(fileName, options);
+        if (!resolvedPaths || resolvedPaths.length === 0) {
+            return
+        }
+        for (const resolvedPath of resolvedPaths) {
+            let json = tsPlusExternalTypeCache.get(resolvedPath);
+            if (!json) {
+                const text = sys.readFile(resolvedPath);
+                if (text) {
+                    json = JSON.parse(text);
+                }
+            }
+            if (!json) return;
+            for (const moduleName in json) {
+                const key = `${options.configFilePath ?? fileName}+${moduleName}`;
+                let resolvedModule = tsPlusResolvedModuleCache.get(key);
+                if (!resolvedModule) {
+                    resolvedModule = resolveModuleName(moduleName, resolvedPath, options, sys).resolvedModule ?? resolveModuleName(moduleName, fileName, options, sys).resolvedModule;
+                    tsPlusResolvedModuleCache.set(key, resolvedModule);
+                }
+                if (resolvedModule && resolvedModule.resolvedFileName === fileName) {
+                    currentTsPlusTypes = json[moduleName];
+                    currentTsPlusFile = moduleName;
+                    return;
+                }
+            }
+        }
+    }
+
+    function addTsPlusTagsFromExternalTypes(declaration: VariableDeclaration | FunctionDeclaration | InterfaceDeclaration | ClassDeclaration | TypeAliasDeclaration, jsDocNode?: HasJSDoc): void {
+        if (currentTsPlusTypes !== null) {
+            if (declaration.name && declaration.name.kind === SyntaxKind.Identifier) {
+                if (!jsDocNode) {
+                    jsDocNode = declaration;
+                }
+                if (jsDocNode.jsDoc &&
+                    jsDocNode.jsDoc[0] &&
+                    jsDocNode.jsDoc[0].tags &&
+                    jsDocNode.jsDoc[0].tags.find((tag) => tag.tagName.escapedText === 'tsplus')) {
+                    return;
+                }
+                const extensions = currentTsPlusTypes.filter(
+                    (type) =>
+                        (declaration.kind === SyntaxKind.VariableDeclaration ? (type.definitionKind === "const")
+                            : declaration.kind === SyntaxKind.FunctionDeclaration ? (type.definitionKind === "function")
+                            : declaration.kind === SyntaxKind.InterfaceDeclaration ? (type.definitionKind === "interface")
+                            : declaration.kind === SyntaxKind.ClassDeclaration ? (type.definitionKind === "class")
+                            : declaration.kind === SyntaxKind.TypeAliasDeclaration ? (type.definitionKind === "type")
+                            : false) &&
+                        type.definitionName === (declaration.name as Identifier).escapedText.toString()
+                ).flatMap((definition) => definition.extensions);
+                const newTags: JSDocTag[] = []
+                for (const extension of extensions) {
+                    let comment = "";
+                    extension.kind && (comment += extension.kind);
+                    extension.typeName && (comment += ` ${extension.typeName}`);
+                    extension.name && (comment += ` ${extension.name}`);
+                    extension.priority && (comment += ` ${extension.priority}`);
+                    newTags.push(factory.createJSDocUnknownTag(factory.createIdentifier("tsplus"), comment));
+                }
+                newTags.push(factory.createJSDocUnknownTag(factory.createIdentifier("tsplus"), `location "${currentTsPlusFile}"`))
+                if (jsDocNode.jsDoc && jsDocNode.jsDoc[0]) {
+                    const jsDocTags = Array.from(jsDocNode.jsDoc[0].tags ?? []).concat(newTags);
+                    // @ts-expect-error
+                    jsDocNode.jsDoc[0].tags = factory.createNodeArray(jsDocTags);
+                    // @ts-expect-error
+                    jsDocNode.jsDocCache = jsDocTags;
+                }
+                else {
+                    jsDocNode.jsDoc = [factory.createJSDocComment(undefined, newTags)];
+                    // @ts-expect-error
+                    jsDocNode.jsDocCache = newTags;
+                }
+            }
+        }
+    }
+
+    function collectTsPlusFileSymbols(file: SourceFile, statements: NodeArray<Statement>, collectTypesIfNotExported = false) {
+        for (const statement of statements) {
+            if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
+                if (statement.name.kind === SyntaxKind.Identifier && (statement.name as Identifier).escapedText === "global" as __String) {
+                    collectTsPlusFileSymbols(file, statement.body.statements, true);
+                }
+                else if (statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
+                    collectTsPlusFileSymbols(file, statement.body.statements, true)
+                }
+                else {
+                    collectTsPlusFileSymbols(file, statement.body.statements, collectTypesIfNotExported);
+                }
+            }
+            if (
+                (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement) || isClassDeclaration(statement)) &&
+                (collectTypesIfNotExported || hasModifierOfKind(statement, SyntaxKind.ExportKeyword))
+            ) {
+                if (statement.tsPlusTypeTags && statement.tsPlusTypeTags.length > 0) {
+                    file.tsPlusContext.type.push(statement);                        
+                }
+                if (statement.tsPlusNoInheritTags && statement.tsPlusNoInheritTags.length > 0) {
+                    file.tsPlusContext.noInherit.push(statement);
+                }
+                if (statement.tsPlusCompanionTags && statement.tsPlusCompanionTags.length > 0) {
+                    file.tsPlusContext.companion.push(statement);
+                }
+                if (isClassDeclaration(statement) && statement.name && statement.tsPlusStaticTags && statement.tsPlusStaticTags.length > 0) {
+                    file.tsPlusContext.static.push(statement as ClassDeclarationWithIdentifier);
+                }
+            }
+            if(
+                (isVariableStatement(statement) || isFunctionDeclaration(statement) || isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement) || isClassDeclaration(statement)) &&
+                hasModifierOfKind(statement, SyntaxKind.ExportKeyword)
+            ) {
+                if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                    const declaration = statement.declarationList.declarations[0];
+                    if (declaration.name && declaration.name.kind === SyntaxKind.Identifier) {
+                        if (declaration.tsPlusFluentTags && declaration.tsPlusFluentTags.length > 0) {
+                            file.tsPlusContext.fluent.push(declaration as VariableDeclarationWithIdentifier);
+                        }
+                        if (declaration.tsPlusPipeableTags && declaration.tsPlusPipeableTags.length > 0) {
+                            file.tsPlusContext.pipeable.push(declaration as VariableDeclarationWithIdentifier);
+                        }
+                        if (declaration.tsPlusOperatorTags && declaration.tsPlusOperatorTags.length > 0) {
+                            file.tsPlusContext.operator.push(declaration as VariableDeclarationWithIdentifier);
+                        }
+                        if (declaration.tsPlusPipeableOperatorTags && declaration.tsPlusPipeableOperatorTags.length > 0) {
+                            file.tsPlusContext.pipeableOperator.push(declaration as VariableDeclarationWithIdentifier);
+                        }
+                        if (declaration.tsPlusStaticTags && declaration.tsPlusStaticTags.length > 0) {
+                            file.tsPlusContext.static.push(declaration as VariableDeclarationWithIdentifier);
+                        }
+                        if (declaration.tsPlusGetterTags && declaration.tsPlusGetterTags.length > 0) {
+                            file.tsPlusContext.getter.push(declaration as VariableDeclarationWithIdentifier);
+                        }
+                        if (declaration.tsPlusIndexTags && declaration.tsPlusIndexTags.length > 0) {
+                            file.tsPlusContext.index.push(declaration as VariableDeclarationWithIdentifier);
+                        }
+                        if (declaration.tsPlusPipeableIndexTags && declaration.tsPlusPipeableIndexTags.length > 0) {
+                            file.tsPlusContext.pipeableIndex.push(declaration as VariableDeclarationWithIdentifier);
+                        }
+                    }
+                }
+                if (isFunctionDeclaration(statement) && statement.name) {
+                    if (statement.tsPlusFluentTags && statement.tsPlusFluentTags.length > 0) {
+                        file.tsPlusContext.fluent.push(statement);
+                    }
+                    if (statement.tsPlusPipeableTags && statement.tsPlusPipeableTags.length > 0) {
+                        file.tsPlusContext.pipeable.push(statement);
+                    }
+                    if (statement.tsPlusOperatorTags && statement.tsPlusOperatorTags.length > 0) {
+                        file.tsPlusContext.operator.push(statement);
+                    }
+                    if (statement.tsPlusPipeableOperatorTags && statement.tsPlusPipeableOperatorTags.length > 0) {
+                        file.tsPlusContext.pipeableOperator.push(statement);
+                    }
+                    if (statement.tsPlusStaticTags && statement.tsPlusStaticTags.length > 0) {
+                        file.tsPlusContext.static.push(statement);
+                    }
+                    if (statement.tsPlusGetterTags && statement.tsPlusGetterTags.length > 0) {
+                        file.tsPlusContext.getter.push(statement);
+                    }
+                    if (statement.tsPlusUnifyTags && statement.tsPlusUnifyTags.length > 0) {
+                        file.tsPlusContext.unify.push(statement);
+                    }
+                    if (statement.tsPlusIndexTags && statement.tsPlusIndexTags.length > 0) {
+                        file.tsPlusContext.index.push(statement);
+                    }
+                    if (statement.tsPlusPipeableIndexTags && statement.tsPlusPipeableIndexTags.length > 0) {
+                        file.tsPlusContext.pipeableIndex.push(statement);
+                    }
+                }
+            }
+            else {
+                if (!collectTypesIfNotExported) {
+                    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
+                        checkTsPlusNonExportedExtension(statement)
+                    }
+                    if (isClassDeclaration(statement)) {
+                        checkTsPlusNonExportedExtension(statement)
+                    }
+                }
+                if (isFunctionDeclaration(statement)) {
+                    checkTsPlusNonExportedExtension(statement)
+                }
+                if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                    checkTsPlusNonExportedVariableExtension(statement, statement.declarationList.declarations[0]);
+                }
+            }
+        }
+    }
+    function hasTsPlusExportedExtensionTags(statement: InterfaceDeclaration | ClassDeclaration | TypeAliasDeclaration | FunctionDeclaration | VariableStatement) {
+        for (const tag of flatMap(statement.jsDoc, (doc) => doc.tags)) {
+            if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tsPlusExportedExtensionRegex.test(tag.comment)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    function checkTsPlusNonExportedExtension(declaration: InterfaceDeclaration | ClassDeclaration | TypeAliasDeclaration | FunctionDeclaration): void {
+        if (hasTsPlusExportedExtensionTags(declaration)) {
+            parseErrorAt(declaration.name!.pos + 1, declaration.name!.end, Diagnostics.Declaration_of_an_extension_must_be_exported);
+        }
+    }
+    function checkTsPlusNonExportedVariableExtension(statement: VariableStatement, declaration: VariableDeclaration): void {
+        if (hasTsPlusExportedExtensionTags(statement)) {
+            parseErrorAt(declaration.name!.pos + 1, declaration.name!.end, Diagnostics.Declaration_of_an_extension_must_be_exported);
         }
     }
 
@@ -3939,6 +4294,9 @@ namespace Parser {
             hasJSDoc
         );
         topLevel = savedTopLevel;
+        if (node.jsDoc && find(node.jsDoc, (doc) => !!doc.tags && !!find(doc.tags, (tag) => tag.tagName.escapedText === "tsplus" && tag.comment === "auto"))) {
+            node.isAuto = true;
+        }
         return node;
     }
 
@@ -3996,6 +4354,19 @@ namespace Parser {
         setYieldContext(savedYieldContext);
         setAwaitContext(savedAwaitContext);
 
+        if (parameters) {
+            let seenAutoParameter = false
+            for (let i = 0; i < parameters.length; i++) {
+                const param = parameters[i];
+                if (param.isAuto) {
+                    seenAutoParameter = true;
+                }
+                if (!param.isAuto && seenAutoParameter) {
+                    parseErrorAt(param.pos, param.end, Diagnostics.A_non_derived_parameter_cannot_follow_a_derived_parameter);
+                }
+            }
+        }
+
         return parameters;
     }
 
@@ -4047,7 +4418,21 @@ namespace Parser {
         const node = kind === SyntaxKind.CallSignature
             ? factory.createCallSignature(typeParameters, parameters, type)
             : factory.createConstructSignature(typeParameters, parameters, type);
-        return withJSDoc(finishNode(node, pos), hasJSDoc);
+        const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+        if (kind === SyntaxKind.CallSignature && finished.jsDoc) {
+            (finished as CallSignatureDeclaration).tsPlusMacroTags = undefinedIfZeroLength(flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
+                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("macro")) {
+                    const [_, target] = tag.comment.split(" ");
+                    if (!target) {
+                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
+                        return [];
+                    }
+                    return [target];
+                }
+                return [];
+            })))
+        }
+        return finished;
     }
 
     function isIndexSignature(): boolean {
@@ -7417,7 +7802,172 @@ namespace Parser {
         const declarationList = parseVariableDeclarationList(/*inForStatementInitializer*/ false);
         parseSemicolon();
         const node = factory.createVariableStatement(modifiers, declarationList);
-        return withJSDoc(finishNode(node, pos), hasJSDoc);
+        const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+        if (finished.declarationList.declarations.length === 1) {
+            addTsPlusTagsFromExternalTypes(finished.declarationList.declarations[0], finished);
+            addTsPlusValueTags(finished.declarationList.declarations[0], finished.jsDoc);
+        }
+        return finished;
+    }
+
+    function parseTsPlusExtensionTag(tagType: string, typeName: string | undefined, functionName: string | undefined, priority: string | undefined): TsPlusPrioritizedExtensionTag | undefined {
+        if (!typeName || !functionName) {
+            return undefined;
+        }
+        let parsedPriority: number;
+        if (priority) {
+            const n = Number.parseFloat(priority);
+            if (Number.isNaN(n)) {
+                return undefined;
+            }
+            if (n >= 0) {
+                parsedPriority = n;
+            }
+        }
+        parsedPriority ||= 0;
+        return { tagType, target: typeName, name: functionName, priority: parsedPriority };
+    }
+
+    function undefinedIfZeroLength<A>(as: A[]): A[] | undefined {
+        if (as.length > 0) {
+            return as;
+        }
+        return undefined;
+    }
+    function addTsPlusValueTags(declaration: FunctionDeclaration | VariableDeclaration, jsDoc: JSDoc[] | undefined): void {
+        const deriveTags: string[] = [];
+        const fluentTags: TsPlusPrioritizedExtensionTag[] = [];
+        const staticTags: TsPlusExtensionTag[] = [];
+        const pipeableTags: TsPlusPrioritizedExtensionTag[] = [];
+        const pipeableOperatorTags: TsPlusPrioritizedExtensionTag[] = [];
+        const getterTags: TsPlusExtensionTag[] = [];
+        const operatorTags: TsPlusPrioritizedExtensionTag[] = [];
+        const unifyTags: string[] = [];
+        const macroTags: string[] = [];
+        const indexTags: string[] = [];
+        const pipeableIndexTags: string[] = [];
+        let isImplicit = false;
+
+        for (const doc of jsDoc ?? []) {
+            if (doc.tags) {
+                for (const tag of doc.tags) {
+                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                        const [tagType, target, name, priority] = tag.comment.split(" ")
+                        switch(tagType) {
+                            case "derive": {
+                                deriveTags.push(tag.comment);
+                                break;
+                            }
+                            case "fluent": {
+                                const parsedTag = parseTsPlusExtensionTag(tagType, target, name, priority);
+                                if (!parsedTag) {
+                                    parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
+                                    break;
+                                }
+                                fluentTags.push(parsedTag);
+                                break;
+                            }
+                            case "static": {
+                                if (!target || !name) {
+                                    parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
+                                    break;
+                                }
+                                staticTags.push({ tagType, target, name });
+                                break;
+                            }
+                            case "pipeable": {
+                                const parsedTag = parseTsPlusExtensionTag(tagType, target, name, priority);
+                                if(!parsedTag) {
+                                    parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
+                                    break;
+                                }
+                                pipeableTags.push(parsedTag);
+                                break;
+                            }
+                            case "getter": {
+                                if (!target || !name) {
+                                    parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_getter_extension_must_have_the_form_tsplus_getter_typename_name);
+                                    break;
+                                }
+                                getterTags.push({ tagType, target, name });
+                                break;
+                            }
+                            case "operator": {
+                                const parsedTag = parseTsPlusExtensionTag(tagType, target, name, priority);
+                                if (!parsedTag) {
+                                    parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
+                                    break;
+                                }
+                                operatorTags.push(parsedTag);
+                                break;
+                            }
+                            case "pipeable-operator": {
+                                const parsedTag = parseTsPlusExtensionTag(tagType, target, name, priority);
+                                if (!parsedTag) {
+                                    parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
+                                    break;
+                                }
+                                pipeableOperatorTags.push(parsedTag);
+                                break;
+                            }
+                            case "implicit": {
+                                if (!tag.comment.includes("local")) {
+                                    isImplicit = true;
+                                }
+                                break;
+                            }
+                            case "macro": {
+                                if (!target) {
+                                    parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
+                                    break;
+                                }
+                                macroTags.push(target);
+                                break;
+                            }
+                            case "unify": {
+                                if (!target) {
+                                    parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_unify_extension_must_have_the_form_tsplus_unify_typename);
+                                    break;
+                                }
+                                unifyTags.push(target);
+                                break;
+                            }
+                            case "index": {
+                                if (!target) {
+                                    parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_an_index_extension_must_have_the_form_tsplus_index_typename);
+                                    break;
+                                }
+                                indexTags.push(target);
+                                break;
+                            }
+                            case "pipeable-index": {
+                                if (!target) {
+                                    parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_an_index_extension_must_have_the_form_tsplus_index_typename);
+                                    break;
+                                }
+                                pipeableIndexTags.push(target);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusFluentTags = undefinedIfZeroLength(fluentTags);
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusStaticTags = undefinedIfZeroLength(staticTags);
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusPipeableTags = undefinedIfZeroLength(pipeableTags);
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusGetterTags = undefinedIfZeroLength(getterTags);
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusOperatorTags = undefinedIfZeroLength(operatorTags);
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusPipeableOperatorTags = undefinedIfZeroLength(pipeableOperatorTags);
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusMacroTags = undefinedIfZeroLength(macroTags);
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusUnifyTags = undefinedIfZeroLength(unifyTags);
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusIndexTags = undefinedIfZeroLength(indexTags);
+        (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusPipeableIndexTags = undefinedIfZeroLength(pipeableIndexTags);
+        if (isVariableDeclaration(declaration)) {
+            declaration.isTsPlusImplicit = isImplicit;
+        }
     }
 
     function parseFunctionDeclaration(pos: number, hasJSDoc: boolean, modifiers: NodeArray<ModifierLike> | undefined): FunctionDeclaration {
@@ -7436,7 +7986,10 @@ namespace Parser {
         const body = parseFunctionBlockOrSemicolon(isGenerator | isAsync, Diagnostics.or_expected);
         setAwaitContext(savedAwaitContext);
         const node = factory.createFunctionDeclaration(modifiers, asteriskToken, name, typeParameters, parameters, type, body);
-        return withJSDoc(finishNode(node, pos), hasJSDoc);
+        const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+        addTsPlusTagsFromExternalTypes(finished);
+        addTsPlusValueTags(finished, finished.jsDoc);
+        return finished;
     }
 
     function parseConstructorName() {
@@ -7844,7 +8397,74 @@ namespace Parser {
         const node = kind === SyntaxKind.ClassDeclaration
             ? factory.createClassDeclaration(modifiers, name, typeParameters, heritageClauses, members)
             : factory.createClassExpression(modifiers, name, typeParameters, heritageClauses, members);
-        return withJSDoc(finishNode(node, pos), hasJSDoc);
+        const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+        if (isClassDeclaration(finished)) {
+            addTsPlusTagsFromExternalTypes(finished);
+            if (finished.jsDoc) {
+                const typeTags: string[] = [];
+                const companionTags: string[] = [];
+                const staticTags: TsPlusExtensionTag[] = [];
+                const deriveTags: string[] = [];
+                const noInheritTags: string[] = [];
+                for (const doc of finished.jsDoc) {
+                    if (doc.tags) {
+                        for (const tag of doc.tags) {
+                            if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                                const [tagName, target, name] = tag.comment.split(" ");
+                                switch (tagName) {
+                                    case "type": {
+                                        if (!target) {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                            break;
+                                        }
+                                        typeTags.push(target);
+                                        break;
+                                    }
+                                    case "companion": {
+                                        if (!target) {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
+                                            break;
+                                        }
+                                        companionTags.push(target);
+                                        break;
+                                    }
+                                    case "static": {
+                                        if (!target || !name) {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
+                                            break;
+                                        }
+                                        staticTags.push({ tagType: tagName, target, name });
+                                        break
+                                    }
+                                    case "derive": {
+                                        if (!target || target !== "nominal") {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_derive_extension_on_a_type_must_have_the_form_tsplus_derive_nominal);
+                                            break;
+                                        }
+                                        deriveTags.push(target);
+                                        break
+                                    }
+                                    case "no-inherit": {
+                                        if (!target) {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_no_inherit_extension_must_have_the_form_tsplus_no_inherit_typename);
+                                            break;
+                                        }
+                                        noInheritTags.push(target);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                (finished as Mutable<ClassDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+                (finished as Mutable<ClassDeclaration>).tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
+                (finished as Mutable<ClassDeclaration>).tsPlusStaticTags = undefinedIfZeroLength(staticTags);
+                (finished as Mutable<ClassDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
+                (finished as Mutable<ClassDeclaration>).tsPlusNoInheritTags = undefinedIfZeroLength(noInheritTags);
+            }
+        }
+        return finished;
     }
 
     function parseNameOfClassDeclarationOrExpression(): Identifier | undefined {
@@ -7912,7 +8532,62 @@ namespace Parser {
         const heritageClauses = parseHeritageClauses();
         const members = parseObjectTypeMembers();
         const node = factory.createInterfaceDeclaration(modifiers, name, typeParameters, heritageClauses, members);
-        return withJSDoc(finishNode(node, pos), hasJSDoc);
+        const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+        addTsPlusTagsFromExternalTypes(finished);
+        if (finished.jsDoc) {
+            const typeTags: string[] = [];
+            const companionTags: string[] = [];
+            const deriveTags: string[] = [];
+            const noInheritTags: string[] = [];
+            for (const doc of finished.jsDoc) {
+                if (doc.tags) {
+                    for (const tag of doc.tags) {
+                        if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                            const [tagName, target] = tag.comment.split(" ");
+                            switch (tagName) {
+                                case "type": {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                        break;
+                                    }
+                                    typeTags.push(target);
+                                    break;
+                                }
+                                case "companion": {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
+                                        break;
+                                    }
+                                    companionTags.push(target);
+                                    break;
+                                }
+                                case "derive": {
+                                    if (!target || target !== "nominal") {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_derive_extension_on_a_type_must_have_the_form_tsplus_derive_nominal);
+                                        break;
+                                    }
+                                    deriveTags.push(target);
+                                    break;
+                                }
+                                case "no-inherit": {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_no_inherit_extension_must_have_the_form_tsplus_no_inherit_typename);
+                                        break;
+                                    }
+                                    noInheritTags.push(target);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            (finished as Mutable<InterfaceDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+            (finished as Mutable<InterfaceDeclaration>).tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
+            (finished as Mutable<InterfaceDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
+            (finished as Mutable<InterfaceDeclaration>).tsPlusNoInheritTags = undefinedIfZeroLength(noInheritTags);
+        }
+        return finished;
     }
 
     function parseTypeAliasDeclaration(pos: number, hasJSDoc: boolean, modifiers: NodeArray<ModifierLike> | undefined): TypeAliasDeclaration {
@@ -7923,7 +8598,52 @@ namespace Parser {
         const type = token() === SyntaxKind.IntrinsicKeyword && tryParse(parseKeywordAndNoDot) || parseType();
         parseSemicolon();
         const node = factory.createTypeAliasDeclaration(modifiers, name, typeParameters, type);
-        return withJSDoc(finishNode(node, pos), hasJSDoc);
+        const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+        addTsPlusTagsFromExternalTypes(finished);
+        if (finished.jsDoc) {
+            const typeTags: string[] = [];
+            const companionTags: string[] = [];
+            const noInheritTags: string[] = [];
+            for (const doc of finished.jsDoc) {
+                if (doc.tags) {
+                    for (const tag of doc.tags) {
+                        if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                            const [tagName, target] = tag.comment.split(" ");
+                            switch (tagName) {
+                                case "type": {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                        break;
+                                    }
+                                    typeTags.push(target);
+                                    break;
+                                }
+                                case "companion": {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
+                                        break;
+                                    }
+                                    companionTags.push(target);
+                                    break;
+                                }
+                                case "no-inherit": {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_no_inherit_extension_must_have_the_form_tsplus_no_inherit_typename);
+                                        break;
+                                    }
+                                    noInheritTags.push(target)
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            (finished as Mutable<TypeAliasDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+            (finished as Mutable<TypeAliasDeclaration>).tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
+            (finished as Mutable<TypeAliasDeclaration>).tsPlusNoInheritTags = undefinedIfZeroLength(noInheritTags);
+        }
+        return finished;
     }
 
     // In an ambient declaration, the grammar only allows integer literals as initializers.
@@ -8091,7 +8811,12 @@ namespace Parser {
 
         parseSemicolon();
         const node = factory.createImportDeclaration(modifiers, importClause, moduleSpecifier, assertClause);
-        return withJSDoc(finishNode(node, pos), hasJSDoc);
+        const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+        if (finished.jsDoc && finished.importClause && finished.importClause.namedBindings && isNamedImports(finished.importClause.namedBindings) && isStringLiteral(finished.moduleSpecifier)) {
+            const tags = flatMap(finished.jsDoc, (doc) => filter(doc.tags, (tag) => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("global")));
+            (finished as Mutable<ImportDeclaration>).isTsPlusGlobal = tags.length > 0;
+        }
+        return finished;
     }
 
     function parseAssertEntry() {
@@ -9480,7 +10205,7 @@ namespace Parser {
 }
 
 namespace IncrementalParser {
-    export function updateSourceFile(sourceFile: SourceFile, newText: string, textChangeRange: TextChangeRange, aggressiveChecks: boolean): SourceFile {
+    export function updateSourceFile(sourceFile: SourceFile, newText: string, textChangeRange: TextChangeRange, aggressiveChecks: boolean, compilerOptions?: CompilerOptions): SourceFile {
         aggressiveChecks = aggressiveChecks || Debug.shouldAssert(AssertionLevel.Aggressive);
 
         checkChangeRange(sourceFile, newText, textChangeRange, aggressiveChecks);
@@ -9556,7 +10281,7 @@ namespace IncrementalParser {
         // inconsistent tree.  Setting the parents on the new tree should be very fast.  We
         // will immediately bail out of walking any subtrees when we can see that their parents
         // are already correct.
-        const result = Parser.parseSourceFile(sourceFile.fileName, newText, sourceFile.languageVersion, syntaxCursor, /*setParentNodes*/ true, sourceFile.scriptKind, sourceFile.setExternalModuleIndicator);
+        const result = Parser.parseSourceFile(sourceFile.fileName, newText, sourceFile.languageVersion, syntaxCursor, /*setParentNodes*/ true, sourceFile.scriptKind, sourceFile.setExternalModuleIndicator, compilerOptions);
         result.commentDirectives = getNewCommentDirectives(
             sourceFile.commentDirectives,
             result.commentDirectives,
