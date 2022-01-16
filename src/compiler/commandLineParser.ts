@@ -93,7 +93,8 @@ namespace ts {
         ["esnext.bigint", "lib.es2020.bigint.d.ts"],
         ["esnext.string", "lib.es2022.string.d.ts"],
         ["esnext.promise", "lib.es2021.promise.d.ts"],
-        ["esnext.weakref", "lib.es2021.weakref.d.ts"]
+        ["esnext.weakref", "lib.es2021.weakref.d.ts"],
+        ["tsplus", "lib.tsplus.d.ts"],
     ];
 
     /**
@@ -204,6 +205,32 @@ namespace ts {
             isCommandLineOnly: true,
             category: Diagnostics.Command_line_Options,
             defaultValueDescription: false,
+        },
+        {
+            name: "tsPlusConfig",
+            type: "string",
+        },
+        {
+            name: "tsPlusTypes",
+            type: "list",
+            element: {
+                name: "tsPlusTypes",
+                type: "string"
+            },
+        },
+        {
+            name: "transformers",
+            type: "list",
+            isTSConfigOnly: true,
+            element: {
+                name: "transformer",
+                type: "object"
+            },
+        },
+        {
+            name: "tsPlusEnabled",
+            type: "boolean",
+            defaultValueDescription: true,
         },
         {
             name: "watch",
@@ -2959,6 +2986,37 @@ namespace ts {
      * It does *not* resolve the included files.
      */
     function parseConfig(
+        json: any,
+        sourceFile: TsConfigSourceFile | undefined,
+        host: ParseConfigHost,
+        basePath: string,
+        configFileName: string | undefined,
+        resolutionStack: string[],
+        errors: Push<Diagnostic>,
+        extendedConfigCache?: ESMap<string, ExtendedConfigCacheEntry>
+    ): ParsedTsconfig {
+        const config = parseConfigOriginal(
+            json,
+            sourceFile,
+            host,
+            basePath,
+            configFileName,
+            resolutionStack,
+            errors,
+            extendedConfigCache
+        )
+        if (!config.options) {
+            config.options = {}
+        }
+        config.options.lib = [...(config.options.lib ?? []), "lib.tsplus.d.ts"]
+        return config
+    }
+
+    /**
+     * This *just* extracts options/include/exclude/files out of a config file.
+     * It does *not* resolve the included files.
+     */
+    function parseConfigOriginal(
         json: any,
         sourceFile: TsConfigSourceFile | undefined,
         host: ParseConfigHost,
