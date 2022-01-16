@@ -596,6 +596,10 @@ const configureExperimental = () => exec(process.execPath, ["scripts/configurePr
 task("configure-experimental", series(buildScripts, configureExperimental));
 task("configure-experimental").description = "Runs scripts/configurePrerelease.ts to prepare a build for experimental publishing";
 
+const configureEts = () => exec(process.execPath, ["scripts/configurePrerelease.js", "ets", "package.json", "src/compiler/corePublic.ts"]);
+task("configure-ets", series(buildScripts, configureEts));
+task("configure-ets").description = "Runs scripts/configurePrerelease.ts to prepare a build for ets publishing";
+
 const createLanguageServicesBuild = () => exec(process.execPath, ["scripts/createLanguageServicesBuild.js"]);
 task("create-language-services-build", series(buildScripts, createLanguageServicesBuild));
 task("create-language-services-build").description = "Runs scripts/createLanguageServicesBuild.ts to prepare a build which only has the require('typescript') JS.";
