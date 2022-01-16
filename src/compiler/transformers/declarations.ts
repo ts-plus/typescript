@@ -561,7 +561,7 @@ export function transformDeclarations(context: TransformationContext) {
         }
         else {
             const statements = visitNodes(node.statements, visitDeclarationStatements);
-            combinedStatements = setTextRange(factory.createNodeArray(transformAndReplaceLatePaintedStatements(statements)), node.statements);
+            combinedStatements = setTextRange(factory.createNodeArray([...node.tsPlusGlobalImports ?? [], ...transformAndReplaceLatePaintedStatements(statements)]), node.statements);
             refs.forEach(referenceVisitor);
             emittedImports = filter(combinedStatements, isAnyImportSyntax);
             if (isExternalModule(node) && (!resultHasExternalModuleIndicator || (needsScopeFixMarker && !resultHasScopeMarker))) {
