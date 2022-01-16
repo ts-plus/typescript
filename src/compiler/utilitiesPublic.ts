@@ -291,7 +291,8 @@ import {
     TypeReferenceType,
     UnaryExpression,
     VariableDeclaration,
-} from "./_namespaces/ts.js";
+    TsPlusUniqueIdentifier,
+} from "./_namespaces/ts";
 
 export function isExternalModuleNameRelative(moduleName: string): boolean {
     // TypeScript 1.0 spec (April 2014): 11.2.1
@@ -2659,3 +2660,8 @@ export function isInternalDeclaration(node: Node, sourceFile?: SourceFile): bool
         return hasInternalAnnotation(range, sourceFile);
     });
 }
+// TSPLUS EXTENSION START
+export function isTsPlusUniqueIdentifier(node: Identifier): node is TsPlusUniqueIdentifier {
+    return !!(node as TsPlusUniqueIdentifier).tsPlusUniqueIdentifier;
+}
+// TSPLUS EXTENSION END

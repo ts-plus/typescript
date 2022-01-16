@@ -529,7 +529,7 @@ export function transformDeclarations(context: TransformationContext): Transform
         }
         else {
             const statements = visitNodes(node.statements, visitDeclarationStatements, isStatement);
-            combinedStatements = setTextRange(factory.createNodeArray(transformAndReplaceLatePaintedStatements(statements)), node.statements);
+            combinedStatements = setTextRange(factory.createNodeArray([...node.tsPlusGlobalImports ?? [], ...transformAndReplaceLatePaintedStatements(statements)]), node.statements);
             if (isExternalModule(node) && (!resultHasExternalModuleIndicator || (needsScopeFixMarker && !resultHasScopeMarker))) {
                 combinedStatements = setTextRange(factory.createNodeArray([...combinedStatements, createEmptyExports(factory)]), combinedStatements);
             }
