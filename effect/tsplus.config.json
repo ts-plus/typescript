@@ -1,0 +1,12 @@
+{
+    "importMap": {
+        "^(.*)/packages/([^/]*)/src(.*)/index\\.ts$": "@tsplus-test/$2$3",
+        "^(.*)/packages/([^/]*)/src(.*)\\.ts$": "@tsplus-test/$2$3"
+    },
+    "relativeMap": {
+        "^(.*)/packages/([^/]*)/(.*)$": "$2"
+    },
+    "traceMap": {
+        "^(.*)/packages/([^/]*)/(.*)$": "(@tsplus-test/$2) $3"
+    }
+}
