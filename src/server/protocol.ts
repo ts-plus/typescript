@@ -16,6 +16,7 @@ import {
     TextInsertion,
     TodoComment,
     TodoCommentDescriptor,
+    TransformerImport,
     TypeAcquisition,
 } from "./_namespaces/ts";
 
@@ -3595,6 +3596,7 @@ export interface CompilerOptions {
     /** Paths used to used to compute primary types search locations */
     typeRoots?: string[];
     [option: string]: CompilerOptionsValue | undefined;
+    transformers?: TransformerImport[];
 }
 
 export const enum JsxEmit {
