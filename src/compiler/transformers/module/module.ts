@@ -1619,12 +1619,27 @@ namespace ts {
          */
         function appendExportsOfDeclaration(statements: Statement[] | undefined, decl: Declaration, liveBinding?: boolean): Statement[] | undefined {
             const name = factory.getDeclarationName(decl);
-            const exportSpecifiers = currentModuleInfo.exportSpecifiers.get(idText(name));
-            if (exportSpecifiers) {
-                for (const exportSpecifier of exportSpecifiers) {
-                    statements = appendExportStatement(statements, exportSpecifier.name, name, /*location*/ exportSpecifier.name, /* allowComments */ undefined, liveBinding);
+            // TSPLUS EXTENSION START
+            let exportSpecifiers = currentModuleInfo.exportSpecifiers.get(idText(name));
+            exportSpecifiers ||= [];
+            if (currentModuleInfo.generatedExportSpecifiers) {
+                if (currentModuleInfo.generatedExportSpecifiers.has(name)) {
+                    exportSpecifiers = concatenate(exportSpecifiers, currentModuleInfo.generatedExportSpecifiers.get(name)!)
                 }
             }
+            // TSPLUS EXTENSION END
+            for (const exportSpecifier of exportSpecifiers) {
+                statements = appendExportStatement(statements, exportSpecifier.name, name, /*location*/ exportSpecifier.name, /* allowComments */ undefined, liveBinding);
+            }
+            // TSPLUS EXTENSION START
+            if (isNamedDeclaration(decl) && isIdentifier(decl.name) && isTsPlusUniqueIdentifier(decl.name) && currentModuleInfo.generatedExportSpecifiers) {
+                if (currentModuleInfo.generatedExportSpecifiers.has(decl.name)) {
+                    for (const exportSpecifier of currentModuleInfo.generatedExportSpecifiers.get(decl.name)!) {
+                        statements = appendExportStatement(statements, exportSpecifier.name, decl.name, exportSpecifier.name, undefined, liveBinding);
+                    }
+                }
+            }
+            // TSPLUS EXTENSION END
             return statements;
         }
 
