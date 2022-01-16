@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "build/esm",
+    "declarationDir": "build/dts",
+    "declarationMap": true,
+    "tsPlusModuleDiscoveryLocalSuffix": "js",
+    "tsPlusTracingPackageName": "@package1",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"]
+}
