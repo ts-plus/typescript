@@ -224,6 +224,12 @@ namespace ts {
                 }
             }
 
+            // TSPLUS START
+            for (const file of arrayFrom(program.getTypeChecker().getTsPlusFiles().values())) {
+                addReferencedFile(file.resolvedPath);
+            }
+            // TSPLUS END
+
             // From ambient modules
             for (const ambientModule of program.getTypeChecker().getAmbientModules()) {
                 if (ambientModule.declarations && ambientModule.declarations.length > 1) {
