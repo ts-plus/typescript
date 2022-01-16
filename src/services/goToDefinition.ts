@@ -39,7 +39,63 @@ namespace ts.GoToDefinition {
             });
         }
 
-        const symbol = getSymbol(node, typeChecker);
+        // TSPLUS EXTENSION BEGIN
+        let symbol: Symbol | undefined;
+
+        if(isPropertyAccessExpression(parent)) {
+            const nodeType = typeChecker.getTypeAtLocation(node);
+            if(nodeType.symbol && isTsPlusSymbol(nodeType.symbol)) {
+                if (parent.parent && isCallLikeExpression(parent.parent)) {
+                    const declaration = getDeclarationForTsPlus(typeChecker, parent.parent, nodeType.symbol)
+                    if (declaration) {
+                        symbol = declaration.symbol
+                    }
+                }
+                if (!symbol && nodeType.symbol.tsPlusTag !== TsPlusSymbolTag.Fluent) {
+                    symbol = nodeType.symbol.tsPlusDeclaration.symbol;
+                }
+            }
+            else if (isTsPlusTypeWithDeclaration(nodeType)) {
+                symbol = nodeType.tsPlusSymbol.tsPlusDeclaration.symbol;
+            }
+            else {
+                const type = typeChecker.getTypeAtLocation(parent.expression);
+                const extensions = typeChecker.getExtensions(parent.expression);
+
+                if(extensions) {
+                    const name = parent.name.escapedText.toString();
+                    const staticValueSymbol = typeChecker.getStaticValueExtension(type, name);
+                    if(staticValueSymbol) {
+                        // If execution gets here, it means we have a static variable extension,
+                        // which needs to be treated a little differently
+                        const declaration = staticValueSymbol.patched.valueDeclaration;
+                        if(declaration && declaration.original) {
+                            symbol = declaration.original.symbol;
+                        }
+                    } else {
+                        symbol = extensions.get(name);
+                    }
+                }
+            }
+        }
+        else if (isToken(node) && isBinaryExpression(parent)) {
+            const leftType = typeChecker.getTypeAtLocation(parent.left);
+            const operator = typeChecker.getTextOfBinaryOp(node.kind);
+            if (operator) {
+                const extension = typeChecker.getOperatorExtension(leftType, operator);
+                if (extension) {
+                    const declaration = extension.patched.valueDeclaration;
+                    if(declaration) {
+                        symbol = declaration.symbol;
+                    }
+                }
+            }
+        }
+
+        if(!symbol) {
+            symbol = getSymbol(node, typeChecker);
+        }
+        // TSPLUS EXTENSION END
 
         // Could not find a symbol e.g. node is string or number keyword,
         // or the symbol was an internal symbol and does not have a declaration e.g. undefined symbol
