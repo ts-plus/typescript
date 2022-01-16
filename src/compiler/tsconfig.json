@@ -9,6 +9,8 @@
     ],
 
     "files": [
+        "hashing.ts",
+        
         "corePublic.ts",
         "core.ts",
         "debug.ts",
@@ -60,6 +62,9 @@
         "transformers/es2016.ts",
         "transformers/es2015.ts",
         "transformers/es5.ts",
+        "transformers/tsplus.ts",
+        "transformers/tsplusDeclaration.ts",
+        "transformers/tailRec.ts",
         "transformers/generators.ts",
         "transformers/module/module.ts",
         "transformers/module/system.ts",

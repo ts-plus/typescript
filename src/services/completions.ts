@@ -1496,6 +1496,17 @@ namespace ts.Completions {
                 // module imports then the global keywords will be filtered out so auto
                 // import suggestions will win in the completion
                 const symbolOrigin = skipAlias(symbol, typeChecker);
+
+                // TSPLUS EXTENSION START
+                const isCompanion = !!find(
+                    [...symbol.declarations ?? [], ...symbolOrigin.declarations ?? []],
+                    (decl) => (isInterfaceDeclaration(decl) || isTypeAliasDeclaration(decl) || isClassDeclaration(decl)) && !!decl.tsPlusCompanionTags && decl.tsPlusCompanionTags.length > 0
+                )
+                if (isCompanion) {
+                    return true;
+                }
+                // TSPLUS EXTENSION END
+
                 // We only want to filter out the global keywords
                 // Auto Imports are not available for scripts so this conditional is always false
                 if (!!sourceFile.externalModuleIndicator
@@ -2185,7 +2196,18 @@ namespace ts.Completions {
         const getModuleSpecifierResolutionHost = memoizeOne((isFromPackageJson: boolean) => {
             return createModuleSpecifierResolutionHost(isFromPackageJson ? host.getPackageJsonAutoImportProvider!()! : program, host);
         });
-
+        // TSPLUS EXTENSION START
+        typeChecker.findAndCheckDoAncestor(node);
+        let currentBinaryAncestor: BinaryExpression | undefined = findAncestor(node, isBinaryExpression);
+        let binaryExpressionParent = currentBinaryAncestor;
+        while (currentBinaryAncestor) {
+            binaryExpressionParent = currentBinaryAncestor;
+            currentBinaryAncestor = findAncestor(currentBinaryAncestor.parent, isBinaryExpression);
+        }
+        if (binaryExpressionParent) {
+            typeChecker.getTypeAtLocation(binaryExpressionParent);
+        }
+        // TSPLUS EXTENSION END
         if (isRightOfDot || isRightOfQuestionDot) {
             getTypeScriptMemberSymbols();
         }
@@ -2386,6 +2408,17 @@ namespace ts.Completions {
                 symbols.push(...filter(getPropertiesForCompletion(type, typeChecker), s => typeChecker.isValidPropertyAccessForCompletions(propertyAccess, type, s)));
             }
 
+            // TSPLUS EXTENSION START
+            if (isExpression(node)) {
+                const extensions = typeChecker.getExtensions(node);
+                if (extensions) {
+                    extensions.forEach((extension) => {
+                        addPropertySymbol(extension, /* insertAwait */ false, /* insertQuestionDot */ false);
+                    });
+                }
+            }
+            // TSPLUS EXTENSION END
+
             if (insertAwait && preferences.includeCompletionsWithInsertText) {
                 const promiseType = typeChecker.getPromisedTypeOfPromise(type);
                 if (promiseType) {
@@ -2572,6 +2605,7 @@ namespace ts.Completions {
             const typeOnlyAliasNeedsPromotion = previousToken && !isValidTypeOnlyAliasUseSite(previousToken);
 
             symbols = concatenate(symbols, typeChecker.getSymbolsInScope(scopeNode, symbolMeanings));
+
             Debug.assertEachIsDefined(symbols, "getSymbolsInScope() should all be defined");
             for (let i = 0; i < symbols.length; i++) {
                 const symbol = symbols[i];
@@ -2605,6 +2639,9 @@ namespace ts.Completions {
                     ? KeywordCompletionFilters.TypeAssertionKeywords
                     : KeywordCompletionFilters.TypeKeywords;
             }
+            // TSPLUS EXTENSION START
+            symbols = concatenate(symbols, typeChecker.getTsPlusGlobals());
+            // TSPLUS EXTENSION END
         }
 
         function shouldOfferImportCompletions(): boolean {
