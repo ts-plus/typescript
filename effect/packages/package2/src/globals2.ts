@@ -1,0 +1,1 @@
+Effect.succeed(() => 1)
