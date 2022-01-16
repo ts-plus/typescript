@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "build/esm",
+    "declarationDir": "build/dts",
+    "tsPlusConfig": "../../tsplus.config.json",
+  },
+  "include": ["src/**/*.ts"]
+}
