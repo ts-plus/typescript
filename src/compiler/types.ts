@@ -868,6 +868,7 @@ namespace ts {
         /* @internal */ emitNode?: EmitNode;                  // Associated EmitNode (initialized by transforms)
         /* @internal */ contextualType?: Type;                // Used to temporarily assign a contextual type during overload resolution
         /* @internal */ inferenceContext?: InferenceContext;  // Inference context for contextual type
+        /* @internal */ etsName?: string;
     }
 
     export interface JSDocContainer {
@@ -3258,6 +3259,96 @@ namespace ts {
         readonly comment?: string | NodeArray<JSDocComment>;
     }
 
+    export interface JSDocEtsTypeTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `type ${string}`
+    }
+
+    export interface JSDocEtsUnifyTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `unify ${string}`
+    }
+
+    export interface JSDocEtsExtensionTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `fluent ${string} ${string}`
+    }
+    
+    export interface JSDocEtsGetterTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `getter ${string} ${string}`
+    }
+
+    export interface JSDocEtsStaticTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `static ${string} ${string}`
+    }
+
+    export interface JSDocEtsOperatorTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `operator ${string} ${string}`
+    }
+
+    export interface JSDocEtsMacroTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `macro ${string}`
+    }
+
+    export const enum EtsSymbolTag {
+        Fluent = "EtsFluentSymbol",
+        FluentVariable = "EtsFluentVariableSymbol",
+        Static = "EtsStaticSymbol",
+        Getter = "EtsGetterSymbol",
+        GetterVariable = "EtsGetterVariableSymbol"
+    }
+
+    export interface EtsFluentSymbol extends TransientSymbol {
+        etsTag: EtsSymbolTag.Fluent
+        etsDeclaration: FunctionDeclaration;
+        etsResolvedSignatures: Signature[];
+    }
+
+    export type SignatureWithParameters = Omit<Signature, "parameters"> & { parameters: ReadonlyArray<Symbol & { valueDeclaration: ParameterDeclaration }> }
+
+    export interface EtsFluentVariableSymbol extends TransientSymbol {
+        etsTag: EtsSymbolTag.FluentVariable;
+        etsDeclaration: VariableDeclaration & { name: Identifier };
+        etsParameters: ReadonlyArray<ParameterDeclaration>;
+        etsResolvedSignatures: SignatureWithParameters[];
+    }
+
+    export interface EtsStaticSymbol extends TransientSymbol {
+        etsTag: EtsSymbolTag.Static;
+        etsDeclaration: FunctionDeclaration;
+        etsResolvedSignatures: Signature[];
+    }
+
+    export interface EtsGetterSymbol extends TransientSymbol {
+        etsTag: EtsSymbolTag.Getter;
+        etsSelfType: Type;
+        etsDeclaration: FunctionDeclaration;
+    }
+
+    export interface EtsGetterVariableSymbol extends TransientSymbol {
+        etsTag: EtsSymbolTag.GetterVariable;
+        etsDeclaration: VariableDeclaration & { name: Identifier };
+        etsSelfType: Type;
+    }
+
+    export type EtsSymbol =
+        | EtsFluentSymbol
+        | EtsStaticSymbol
+        | EtsGetterSymbol
+        | EtsFluentVariableSymbol
+        | EtsGetterVariableSymbol;
+
     export interface JSDocLink extends Node {
         readonly kind: SyntaxKind.JSDocLink;
         readonly name?: EntityName | JSDocMemberName;
@@ -3661,6 +3752,8 @@ namespace ts {
 
         /* @internal */ exportedModulesFromDeclarationEmit?: ExportedModulesFromDeclarationEmit;
         /* @internal */ endFlowNode?: FlowNode;
+
+        etsImportAs?: () => string | undefined
     }
 
     /* @internal */
@@ -4418,6 +4511,17 @@ namespace ts {
         /* @internal */ isPropertyAccessible(node: Node, isSuper: boolean, isWrite: boolean, containingType: Type, property: Symbol): boolean;
         /* @internal */ getTypeOnlyAliasDeclaration(symbol: Symbol): TypeOnlyAliasDeclaration | undefined;
         /* @internal */ getMemberOverrideModifierStatus(node: ClassLikeDeclaration, member: ClassElement): MemberOverrideStatus;
+
+        getGlobalImport(file: SourceFile): string
+        getLocalImport(from: SourceFile, file: SourceFile): string
+        getExtensions(targetType: Type): ESMap<string, Symbol>
+        getFluentExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
+        getGetterExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
+        getStaticExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
+        getOperatorExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
+        shouldMakeLazy(signatureParam: Symbol, callArg: Type): boolean
+        isPipeCall(node: CallExpression): boolean
+        getCallExtension(node: Node): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
     }
 
     /* @internal */
@@ -6171,6 +6275,9 @@ namespace ts {
         useDefineForClassFields?: boolean;
 
         [option: string]: CompilerOptionsValue | TsConfigSourceFile | undefined;
+
+        etsModuleDiscoveryLocalSuffix?: "js"
+        etsTracingPackageName?: string
     }
 
     export interface WatchOptions {

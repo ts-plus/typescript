@@ -39,7 +39,38 @@ namespace ts.GoToDefinition {
             });
         }
 
-        const symbol = getSymbol(node, typeChecker);
+        // BEGIN ETS EXTENSION
+        let symbol: Symbol | undefined;
+
+        if(isPropertyAccessExpression(parent)) {
+            const nodeType = typeChecker.getTypeAtLocation(node);
+            if(nodeType.symbol && isEtsSymbol(nodeType.symbol)) {
+                symbol = nodeType.symbol.etsDeclaration.symbol;
+            } else {
+                const type = typeChecker.getTypeAtLocation(parent.expression);
+                const extensions = typeChecker.getExtensions(type);
+
+                if(extensions) {
+                    const name = parent.name.escapedText.toString();
+                    const staticSymbol = typeChecker.getStaticExtension(type, name);
+                    if(staticSymbol) {
+                        // If execution gets here, it means we have a const static extension,
+                        // which needs to be treated a little differently
+                        const declaration = staticSymbol.patched.valueDeclaration;
+                        if(declaration && declaration.original) {
+                            symbol = declaration.original.symbol;
+                        }
+                    } else {
+                        symbol = extensions.get(name);
+                    }
+                }
+            }
+        }
+
+        if(!symbol) {
+            symbol = getSymbol(node, typeChecker);
+        }
+        // END ETS EXTENSION
 
         // Could not find a symbol e.g. node is string or number keyword,
         // or the symbol was an internal symbol and does not have a declaration e.g. undefined symbol
