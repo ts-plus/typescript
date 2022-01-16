@@ -560,7 +560,7 @@ export const resolvingEmptyArray: never[] = [];
 export const externalHelpersModuleNameText = "tslib";
 
 /** @internal */
-export const defaultMaximumTruncationLength = 160;
+export const defaultMaximumTruncationLength = 1_000;
 /** @internal */
 export const noTruncationMaximumTruncationLength = 1_000_000;
 
@@ -2010,6 +2010,9 @@ export function forEachEnclosingBlockScopeContainer(node: Node, cb: (container: 
 // text of the expression in the computed property.
 /** @internal */
 export function declarationNameToString(name: DeclarationName | QualifiedName | undefined) {
+    if (name?.tsPlusName) {
+        return name.tsPlusName;
+    }
     return !name || getFullWidth(name) === 0 ? "(Missing)" : getTextOfNode(name);
 }
 
