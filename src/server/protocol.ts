@@ -19,6 +19,7 @@ import type {
     TextInsertion,
     TodoComment,
     TodoCommentDescriptor,
+    TransformerImport,
     TypeAcquisition,
     UserPreferences,
 } from "./_namespaces/ts";

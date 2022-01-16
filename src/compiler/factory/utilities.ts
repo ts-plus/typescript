@@ -45,6 +45,7 @@ import {
     first,
     firstOrUndefined,
     ForInitializer,
+    FunctionDeclaration,
     GeneratedIdentifier,
     GeneratedIdentifierFlags,
     GeneratedNamePart,
@@ -75,6 +76,7 @@ import {
     ImportDeclaration,
     ImportEqualsDeclaration,
     InternalEmitFlags,
+    isArrowFunction,
     isAssignmentExpression,
     isAssignmentOperator,
     isAssignmentPattern,
@@ -87,6 +89,8 @@ import {
     isExclamationToken,
     isExportNamespaceAsDefaultDeclaration,
     isFileLevelUniqueName,
+    isFunctionDeclaration,
+    isFunctionExpression,
     isGeneratedIdentifier,
     isGeneratedPrivateIdentifier,
     isIdentifier,
@@ -146,6 +150,7 @@ import {
     OuterExpression,
     OuterExpressionKinds,
     ParenthesizedExpression,
+    ParameterDeclaration,
     parseNodeFactory,
     PlusToken,
     PostfixUnaryExpression,
@@ -178,6 +183,7 @@ import {
     TransformFlags,
     TypeNode,
     WrappedExpression,
+    VariableDeclaration
 } from "../_namespaces/ts";
 
 // Compound nodes
@@ -1782,4 +1788,13 @@ export function containsObjectRestOrSpread(node: AssignmentPattern): boolean {
         }
     }
     return false;
+}
+
+export function getParametersOfFunctionOrVariableDeclaration(node: FunctionDeclaration | VariableDeclaration): readonly ParameterDeclaration[] | undefined {
+    if (isFunctionDeclaration(node)) {
+        return node.parameters;
+    }
+    if (node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer))) {
+        return node.initializer.parameters
+    }
 }

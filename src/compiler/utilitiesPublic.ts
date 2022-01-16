@@ -294,6 +294,7 @@ import {
     TypeReferenceType,
     UnaryExpression,
     VariableDeclaration,
+    TsPlusUniqueIdentifier,
 } from "./_namespaces/ts";
 
 export function isExternalModuleNameRelative(moduleName: string): boolean {
@@ -2624,3 +2625,8 @@ export function isInternalDeclaration(node: Node, sourceFile?: SourceFile) {
         return hasInternalAnnotation(range, sourceFile);
     });
 }
+// TSPLUS EXTENSION START
+export function isTsPlusUniqueIdentifier(node: Identifier): node is TsPlusUniqueIdentifier {
+    return !!(node as TsPlusUniqueIdentifier).tsPlusUniqueIdentifier;
+}
+// TSPLUS EXTENSION END
