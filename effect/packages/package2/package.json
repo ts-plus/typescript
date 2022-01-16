@@ -1,0 +1,10 @@
+{
+  "name": "@tsplus-test/package2",
+  "type": "module",
+  "scripts": {
+    "build:esm": "node ../../../built/local/tsc.js -p ./tsconfig.json"
+  },
+  "dependencies": {
+    "@tsplus-test/package1": "*"
+  }
+}

@@ -1381,4 +1381,12 @@ namespace ts {
             ])
         );
     }
+    export function getParametersOfFunctionOrVariableDeclaration(node: FunctionDeclaration | VariableDeclaration): readonly ParameterDeclaration[] | undefined {
+        if (isFunctionDeclaration(node)) {
+            return node.parameters;
+        }
+        if (node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer))) {
+            return node.initializer.parameters
+        }
+    }
 }

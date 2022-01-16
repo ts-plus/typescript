@@ -12,6 +12,9 @@
     },
     "references": [
         { "path": "../compiler/tsconfig.release.json", "prepend": true },
+        { "path": "../jsTyping", "prepend": true },
+        { "path": "../services", "prepend": true },
+        { "path": "../deprecatedCompat", "prepend": true },
         { "path": "../executeCommandLine/tsconfig.release.json", "prepend": true }
     ]
 }
