@@ -64,8 +64,7 @@ namespace ts {
     export function isFileProbablyExternalModule(sourceFile: SourceFile) {
         // Try to use the first top-level import/export when available, then
         // fall back to looking for an 'import.meta' somewhere in the tree if necessary.
-        return forEach(sourceFile.statements, isAnExternalModuleIndicatorNode) ||
-            getImportMetaIfNecessary(sourceFile);
+        return forEach(sourceFile.statements, isAnExternalModuleIndicatorNode) || getImportMetaIfNecessary(sourceFile);
     }
 
     function isAnExternalModuleIndicatorNode(node: Node) {
@@ -6784,7 +6783,22 @@ namespace ts {
             const node = factory.createVariableStatement(modifiers, declarationList);
             // Decorators are not allowed on a variable statement, so we keep track of them to report them in the grammar checker.
             node.decorators = decorators;
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (finished.jsDoc && finished.declarationList.declarations.length === 1) {
+                const isTsPlusImplicit = flatMap(finished.jsDoc, (doc) => filter(
+                    doc.tags,
+                    (tag): tag is TsPlusJSDocImplicitTag => 
+                        tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("implicit") && !tag.comment.includes("local")
+                )).length > 0;
+                const deriveTags = flatMap(finished.jsDoc, (doc) => filter(doc.tags, (tag): tag is TsPlusJSDocDeriveTag => 
+                    tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("derive")
+                ))
+                if (deriveTags.length > 0) {
+                    finished.declarationList.declarations[0].tsPlusDeriveTags = deriveTags.map((_) => _.comment);
+                }
+                finished.declarationList.declarations[0].isTsPlusImplicit = isTsPlusImplicit;
+            }
+            return finished;
         }
 
         function parseFunctionDeclaration(pos: number, hasJSDoc: boolean, decorators: NodeArray<Decorator> | undefined, modifiers: NodeArray<Modifier> | undefined): FunctionDeclaration {
@@ -6804,7 +6818,16 @@ namespace ts {
             const body = parseFunctionBlockOrSemicolon(isGenerator | isAsync, Diagnostics.or_expected);
             setAwaitContext(savedAwaitContext);
             const node = factory.createFunctionDeclaration(decorators, modifiers, asteriskToken, name, typeParameters, parameters, type, body);
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (finished.jsDoc) {
+                const deriveTags = flatMap(finished.jsDoc, (doc) => filter(doc.tags, (tag): tag is TsPlusJSDocDeriveTag => 
+                    tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("derive")
+                ))
+                if (deriveTags.length > 0) {
+                    finished.tsPlusDeriveTags = deriveTags.map((_) => _.comment);
+                }
+            }
+            return finished;
         }
 
         function parseConstructorName() {
@@ -7433,7 +7456,12 @@ namespace ts {
 
             parseSemicolon();
             const node = factory.createImportDeclaration(decorators, modifiers, importClause, moduleSpecifier, assertClause);
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (finished.jsDoc && finished.importClause && finished.importClause.namedBindings && isNamedImports(finished.importClause.namedBindings) && isStringLiteral(finished.moduleSpecifier)) {
+                const tags = flatMap(finished.jsDoc, (doc) => filter(doc.tags, (tag) => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("global")));
+                finished.isTsPlusGlobal = tags.length > 0;
+            }
+            return finished;
         }
 
         function parseAssertEntry() {
