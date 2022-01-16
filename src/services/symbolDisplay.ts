@@ -176,6 +176,10 @@ namespace ts.SymbolDisplay {
                 }
             }
 
+            // TSPLUS EXTENSION START
+            typeChecker.findAndCheckDoAncestor(location);
+            // TSPLUS EXTENSION END
+
             let signature: Signature | undefined;
             type = isThisExpression ? typeChecker.getTypeAtLocation(location) : typeChecker.getTypeOfSymbolAtLocation(symbol, location);
 

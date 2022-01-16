@@ -1774,8 +1774,8 @@ namespace ts {
     function hasSameBuildInfo(state: SolutionBuilderState, buildInfoCacheEntry: BuildInfoCacheEntry, seenRefs: Set<ResolvedConfigFilePath>, resolvedConfig: ParsedCommandLine, resolvedRefPath: ResolvedConfigFilePath) {
         if (seenRefs.has(resolvedRefPath)) return false;
         seenRefs.add(resolvedRefPath);
-        const refBuildInfo = state.buildInfoCache.get(resolvedRefPath)!;
-        if (refBuildInfo.path === buildInfoCacheEntry.path) return true;
+        const refBuildInfo = state.buildInfoCache.get(resolvedRefPath);
+        if (refBuildInfo && refBuildInfo.path === buildInfoCacheEntry.path) return true;
 
         if (resolvedConfig.projectReferences) {
             // Check references
