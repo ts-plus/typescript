@@ -373,6 +373,8 @@ import {
     UserPreferences,
     VariableDeclaration,
     walkUpParenthesizedExpressions,
+    isClassDeclaration,
+    isTypeAliasDeclaration,
 } from "./_namespaces/ts";
 import { StringCompletions } from "./_namespaces/ts.Completions";
 
@@ -2495,6 +2497,15 @@ export function getCompletionEntriesFromSymbols(
             // module imports then the global keywords will be filtered out so auto
             // import suggestions will win in the completion
             const symbolOrigin = skipAlias(symbol, typeChecker);
+            // TSPLUS EXTENSION START
+            const isCompanion = !!find(
+                [...symbol.declarations ?? [], ...symbolOrigin.declarations ?? []],
+                (decl) => (isInterfaceDeclaration(decl) || isTypeAliasDeclaration(decl) || isClassDeclaration(decl)) && !!decl.tsPlusCompanionTags && decl.tsPlusCompanionTags.length > 0
+            )
+            if (isCompanion) {
+                return true;
+            }
+            // TSPLUS EXTENSION END
             // We only want to filter out the global keywords
             // Auto Imports are not available for scripts so this conditional is always false
             if (!!sourceFile.externalModuleIndicator
@@ -3238,6 +3249,19 @@ function getCompletionData(
         return createModuleSpecifierResolutionHost(isFromPackageJson ? host.getPackageJsonAutoImportProvider!()! : program, host);
     });
 
+    // TSPLUS EXTENSION START
+    typeChecker.findAndCheckDoAncestor(node);
+    let currentBinaryAncestor: BinaryExpression | undefined = findAncestor(node, isBinaryExpression);
+    let binaryExpressionParent = currentBinaryAncestor;
+    while (currentBinaryAncestor) {
+        binaryExpressionParent = currentBinaryAncestor;
+        currentBinaryAncestor = findAncestor(currentBinaryAncestor.parent, isBinaryExpression);
+    }
+    if (binaryExpressionParent) {
+        typeChecker.getTypeAtLocation(binaryExpressionParent);
+    }
+    // TSPLUS EXTENSION END
+
     if (isRightOfDot || isRightOfQuestionDot) {
         getTypeScriptMemberSymbols();
     }
@@ -3454,6 +3478,17 @@ function getCompletionData(
             // of the individual types to a higher status since we know what they are.
             symbols.push(...filter(getPropertiesForCompletion(type, typeChecker), s => typeChecker.isValidPropertyAccessForCompletions(propertyAccess, type, s)));
         }
+
+        // TSPLUS EXTENSION START
+        if (isExpression(node)) {
+            const extensions = typeChecker.getExtensions(node);
+            if (extensions) {
+                extensions.forEach((extension) => {
+                    addPropertySymbol(extension, /* insertAwait */ false, /* insertQuestionDot */ false);
+                });
+            }
+        }
+        // TSPLUS EXTENSION END
 
         if (insertAwait && preferences.includeCompletionsWithInsertText) {
             const promiseType = typeChecker.getPromisedTypeOfPromise(type);
@@ -3674,6 +3709,9 @@ function getCompletionData(
                 ? KeywordCompletionFilters.TypeAssertionKeywords
                 : KeywordCompletionFilters.TypeKeywords;
         }
+        // TSPLUS EXTENSION START
+        symbols = concatenate(symbols, typeChecker.getTsPlusGlobals());
+        // TSPLUS EXTENSION END
     }
 
     function shouldOfferImportCompletions(): boolean {

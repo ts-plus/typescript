@@ -1,0 +1,20 @@
+// Rename this file 'settings.json' or merge its
+// contents into your existing settings.
+{
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "eslint.validate": [
+        {
+            "language": "typescript",
+            "autoFix": false
+        }
+    ],
+    "eslint.options": {
+        "rulePaths": ["./scripts/eslint/built/rules/"],
+        "extensions": [".ts"]
+    },
+    // To use the last-known-good (LKG) compiler version:
+    // "typescript.tsdk": "lib"
+
+    // To use the locally built compiler, after 'npm run build':
+    "typescript.tsdk": "node_modules/typescript/lib"
+}
