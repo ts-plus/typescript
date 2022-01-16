@@ -756,6 +756,7 @@ export function createCompilerHostFromProgramHost(host: ProgramHost<any>, getCom
         getSourceFile: createGetSourceFile(
             (fileName, encoding) => !encoding ? compilerHost.readFile(fileName) : host.readFile(fileName, encoding),
             /*setParentNodes*/ undefined,
+            getCompilerOptions
         ),
         getDefaultLibLocation: maybeBind(host, host.getDefaultLibLocation),
         getDefaultLibFileName: options => host.getDefaultLibFileName(options),

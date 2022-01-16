@@ -1,3 +1,6 @@
+import { transformTailRec } from "./transformers/tailRec";
+import { transformTsPlus } from "./transformers/tsplus";
+import { transformTsPlusDeclaration } from "./transformers/tsplusDeclaration";
 import {
     __String,
     addInternalEmitFlags,
@@ -321,8 +324,13 @@ import {
     WriteFileCallback,
     WriteFileCallbackData,
     writeFileEnsuringDirectories,
-} from "./_namespaces/ts.js";
-import * as performance from "./_namespaces/ts.performance.js";
+    Bundle,
+    EmitTransformers,
+    ExternalTransformers,
+    toArray,
+    TransformerFactory,
+} from "./_namespaces/ts";
+import * as performance from "./_namespaces/ts.performance";
 
 export function findConfigFile(searchPath: string, fileExists: (fileName: string) => boolean, configName = "tsconfig.json"): string | undefined {
     return forEachAncestorDirectory(searchPath, ancestor => {
@@ -391,6 +399,7 @@ export function createCompilerHost(options: CompilerOptions, setParentNodes?: bo
 export function createGetSourceFile(
     readFile: ProgramHost<any>["readFile"],
     setParentNodes: boolean | undefined,
+    getCompilerOptions: () => CompilerOptions
 ): CompilerHost["getSourceFile"] {
     return (fileName, languageVersionOrOptions, onError) => {
         let text: string | undefined;
@@ -406,7 +415,7 @@ export function createGetSourceFile(
             }
             text = "";
         }
-        return text !== undefined ? createSourceFile(fileName, text, languageVersionOrOptions, setParentNodes) : undefined;
+        return text !== undefined ? createSourceFile(fileName, text, languageVersionOrOptions, setParentNodes, undefined, getCompilerOptions()) : undefined;
     };
 }
 
@@ -469,7 +478,7 @@ export function createCompilerHostWorker(
     const newLine = getNewLineCharacter(options);
     const realpath = system.realpath && ((path: string) => system.realpath!(path));
     const compilerHost: CompilerHost = {
-        getSourceFile: createGetSourceFile(fileName => compilerHost.readFile(fileName), setParentNodes),
+        getSourceFile: createGetSourceFile(fileName => compilerHost.readFile(fileName), setParentNodes, () => options),
         getDefaultLibLocation,
         getDefaultLibFileName: options => combinePaths(getDefaultLibLocation(), getDefaultLibFileName(options)),
         writeFile: createWriteFileMeasuringIO(
@@ -2771,6 +2780,7 @@ export function createProgram(_rootNamesOrOptions: readonly string[] | CreatePro
             if (result) return result;
         }
 
+        const checker = getTypeChecker();
         // Create the emit resolver outside of the "emitTime" tracking code below.  That way
         // any cost associated with it (like type checking) are appropriate associated with
         // the type-checking counter.
@@ -2788,6 +2798,103 @@ export function createProgram(_rootNamesOrOptions: readonly string[] | CreatePro
 
         performance.mark("beforeEmit");
 
+        const resolveBaseDir = process.cwd()
+
+        const beforeTransformers: TransformerFactory<SourceFile>[] = [];
+        const afterTransformers: TransformerFactory<SourceFile>[] = [];
+        const afterDeclarationsTransformers: TransformerFactory<SourceFile | Bundle>[] = [];
+
+        const requireStack: string[] = [];
+
+        let hasTsNode = false;
+
+        // @ts-expect-error
+        if (options.transformers && !global['ts-plus']?.resolvingTransformer) {
+            for (const entry of options.transformers) {
+                const { name, position, ...cleanConfig } = entry
+                if (!name) {
+                    continue;
+                }
+                if (name.match(/\.ts$/) && !hasTsNode) {
+                    try {
+                        require('ts-node').register({
+                            transpileOnly: true,
+                            compilerOptions: {
+                                target: "ES2018",
+                                esModuleInterop: true,
+                                module: "commonjs"
+                            }
+                        })
+                        hasTsNode = true
+                    } catch (e) {
+                        if (e.code === "MODULE_NOT_FOUND") {
+                            throw new Error("Cannot use a typescript-based transformer without ts-node installed. Either add ts-node as a (dev)-dependency or install gloablly.");
+                        } else {
+                            throw e;
+                        }
+                    }
+                }
+                const modulePath = require.resolve(name, { paths: [resolveBaseDir] });
+
+                if (requireStack.includes(modulePath)) continue;
+
+                requireStack.push(modulePath);
+                // @ts-expect-error
+                global['ts-plus'] = global['ts-plus'] ?? {};
+                // @ts-expect-error
+                global['ts-plus'].resolvingTransformer = true;
+                const commonJsModule = require(modulePath);
+                // @ts-expect-error
+                global['ts-plus'].resolvingTransformer = false;
+                requireStack.pop();
+                const factoryModule = (typeof commonJsModule === 'function' ? { default: commonJsModule } : commonJsModule);
+                const factory = factoryModule.default;
+                if (!factory) {
+                    throw new Error(`tsconfig.json > transformers: "${entry.name}" does not have export "default": ` + require("util").inspect(factoryModule));
+                }
+                if (typeof factory !== "function") {
+                    throw new Error(`tsconfig.json > transformers: "${entry.name} export "default" is not a plugin: ` + require("util").inspect(factory));
+                }
+                const transformer: ExternalTransformers = factory(program, cleanConfig);
+                if (typeof transformer === "function") {
+                    if (position && position === 'after') {
+                        afterTransformers.push(transformer);
+                    }
+                    else if (position && position === 'afterDeclaration') {
+                        afterDeclarationsTransformers.push(transformer as TransformerFactory<SourceFile | Bundle>);
+                    }
+                    else {
+                        beforeTransformers.push(transformer);
+                    }
+                } else {
+                    transformer.before && beforeTransformers.push(...toArray(transformer.before));
+                    transformer.after && afterTransformers.push(...toArray(transformer.after));
+                    transformer.afterDeclarations && afterDeclarationsTransformers.push(...toArray(transformer.afterDeclarations));
+                }
+            }
+        }
+
+        customTransformers = {
+            before: [
+                ...(customTransformers?.before ?? []),
+                ...beforeTransformers
+            ],
+            after: [
+                ...(customTransformers?.after ?? []),
+                ...afterTransformers
+            ],
+            afterDeclarations: [
+                ...(customTransformers?.afterDeclarations ?? []),
+                ...afterDeclarationsTransformers
+            ]
+        }
+
+        const emitTransformers = getTransformers(options, customTransformers, emitOnly);
+        const patchedTransformers: EmitTransformers = {
+            scriptTransformers: [transformTsPlus(checker, options, host), transformTailRec(checker, options, host), ...emitTransformers.scriptTransformers],
+            declarationTransformers: [transformTsPlusDeclaration(checker, options, host), ...emitTransformers.declarationTransformers]
+        }
+
         const emitResult = typeChecker.runWithCancellationToken(
             cancellationToken,
             () =>
@@ -2795,7 +2902,7 @@ export function createProgram(_rootNamesOrOptions: readonly string[] | CreatePro
                     emitResolver,
                     getEmitHost(writeFileCallback),
                     sourceFile,
-                    getTransformers(options, customTransformers, emitOnly),
+                    patchedTransformers,
                     emitOnly,
                     /*onlyBuildInfo*/ false,
                     forceDtsEmit,

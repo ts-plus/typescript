@@ -101,7 +101,9 @@
         "es2022.full",
         "es2023.full",
         "es2024.full",
-        "esnext.full"
+        "esnext.full",
+        // Extension
+        "tsplus"
     ],
     "paths": {
         "dom.generated": "lib.dom.d.ts",
