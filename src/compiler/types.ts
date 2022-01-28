@@ -3304,7 +3304,8 @@ namespace ts {
         Fluent = "EtsFluentSymbol",
         FluentVariable = "EtsFluentVariableSymbol",
         Static = "EtsStaticSymbol",
-        Getter = "EtsGetterSymbol"
+        Getter = "EtsGetterSymbol",
+        GetterVariable = "EtsGetterVariableSymbol"
     }
 
     export interface EtsFluentSymbol extends TransientSymbol {
@@ -3334,7 +3335,18 @@ namespace ts {
         etsDeclaration: FunctionDeclaration;
     }
 
-    export type EtsSymbol = EtsFluentSymbol | EtsStaticSymbol | EtsGetterSymbol | EtsFluentVariableSymbol;
+    export interface EtsGetterVariableSymbol extends TransientSymbol {
+        etsTag: EtsSymbolTag.GetterVariable;
+        etsDeclaration: VariableDeclaration & { name: Identifier };
+        etsSelfType: Type;
+    }
+
+    export type EtsSymbol =
+        | EtsFluentSymbol
+        | EtsStaticSymbol
+        | EtsGetterSymbol
+        | EtsFluentVariableSymbol
+        | EtsGetterVariableSymbol;
 
     export interface JSDocLink extends Node {
         readonly kind: SyntaxKind.JSDocLink;

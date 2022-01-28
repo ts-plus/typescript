@@ -14529,7 +14529,7 @@ namespace ts {
 
         // ETS EXTENSION START
         function checkEtsCustomCall(
-            declaration: FunctionDeclaration,
+            declaration: Declaration,
             args: Expression[],
             checkMode: CheckMode | undefined,
             addDiagnostic?: (_: Diagnostic) => void,
@@ -28701,7 +28701,7 @@ namespace ts {
                     const symbol = getterExt.patched(leftType)
                     if (symbol) {
                         const type = getTypeOfSymbol(symbol);
-                        type.symbol = symbol; // EtsGetterSymbol
+                        type.symbol = symbol; // EtsGetterSymbol | EtsGetterVariableSymbol
                         return type;
                     }
                 }
@@ -42826,6 +42826,14 @@ namespace ts {
             symbol.etsResolvedSignatures = signatures as SignatureWithParameters[];
             return symbol;
         }
+        function createEtsGetterVariableSymbol(name: string, dataFirst: VariableDeclaration & { name: Identifier }, returnType: Type, selfType: Type) {
+            const symbol = createSymbol(SymbolFlags.Property, name as __String) as EtsGetterVariableSymbol;
+            symbol.type = returnType;
+            symbol.etsTag = EtsSymbolTag.GetterVariable;
+            symbol.etsDeclaration = dataFirst;
+            symbol.etsSelfType = selfType;
+            return symbol;
+        }
         function createEtsStaticSymbol(name: string, dataFirst: FunctionDeclaration, signatures: Signature[]): EtsStaticSymbol {
             const symbol = createSymbol(SymbolFlags.Function, name as __String) as EtsStaticSymbol;
             symbol.etsTag = EtsSymbolTag.Static;
@@ -42870,6 +42878,19 @@ namespace ts {
                     return void 0;
                 }
                 return createEtsGetterSymbol(_name, _dataFirst, res, self);
+            }
+        }
+        function getEtsGetterSymbolForVariableDeclaration(name: string, declaration: VariableDeclaration & { name: Identifier }) {
+            return (self: Type) => {
+                const res = checkEtsCustomCall(
+                    declaration,
+                    [factory.createSyntheticExpression(self)],
+                    CheckMode.Normal
+                )
+                if (isErrorType(res)) {
+                    return void 0;
+                }
+                return createEtsGetterVariableSymbol(name, declaration, res, self);
             }
         }
         function getEtsStaticSymbol(name: string, dataFirst: FunctionDeclaration) {
@@ -42949,6 +42970,25 @@ namespace ts {
                                     definition: file
                                 })
                             }
+                        }
+                        const getterTag = collectEtsGetterTags(decl)[0];
+                        if (getterTag) {
+                            const [, target, name] = getterTag.comment.split(" ");
+                            if (!getterCache.has(target)) {
+                                getterCache.set(target, new Map())
+                            }
+                            if (!getterCache.has(target)) {
+                                getterCache.set(target, new Map());
+                            }
+                            const map = getterCache.get(target)!;
+                            map.set(name, {
+                                patched: getEtsGetterSymbolForVariableDeclaration(
+                                    name,
+                                    (decl as VariableDeclaration & { name: Identifier })
+                                ),
+                                exportName: decl.name.escapedText.toString(),
+                                definition: file
+                            })
                         }
                     }
                 }
@@ -45022,6 +45062,7 @@ namespace ts {
                 }
                 break;
             }
+            case EtsSymbolTag.GetterVariable:
             case EtsSymbolTag.Getter: {
                 return getNameForType(symbol.etsSelfType) || "<anonymous>";
             }

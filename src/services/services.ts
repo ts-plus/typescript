@@ -1797,6 +1797,7 @@ namespace ts {
                             displayParts.push(displayPart(type.symbol.escapedName as string, SymbolDisplayPartKind.methodName));
                             break;
                         }
+                        case EtsSymbolTag.GetterVariable:
                         case EtsSymbolTag.Getter: {
                             displayParts.push(textPart("("));
                             displayParts.push(textPart("getter"));
@@ -1826,6 +1827,7 @@ namespace ts {
                                 tags: getJsDocTagsOfSignature(declaration, typeChecker)
                             };
                         }
+                        case EtsSymbolTag.GetterVariable:
                         case EtsSymbolTag.Getter: {
                             displayParts = displayParts.concat(typeChecker.runWithCancellationToken(cancellationToken, typeChecker => typeToDisplayParts(typeChecker, type, getContainerNode(nodeForQuickInfo))));
                             return {
