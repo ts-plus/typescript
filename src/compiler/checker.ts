@@ -42812,7 +42812,7 @@ namespace ts {
             signature.instantiations = call.instantiations;
             return signature;
         }
-        function createEtsFluentSymbol(name: string, dataFirst: FunctionDeclaration, signatures: Signature[]): EtsFluentSymbol {
+        function createEtsFluentFunctionSymbol(name: string, dataFirst: FunctionDeclaration, signatures: Signature[]): EtsFluentSymbol {
             const symbol = createSymbol(SymbolFlags.Function, name as __String) as EtsFluentSymbol;
             symbol.etsTag = EtsSymbolTag.Fluent;
             symbol.etsDeclaration = dataFirst;
@@ -42834,14 +42834,33 @@ namespace ts {
             symbol.etsSelfType = selfType;
             return symbol;
         }
-        function createEtsStaticSymbol(name: string, dataFirst: FunctionDeclaration, signatures: Signature[]): EtsStaticSymbol {
+        function createEtsStaticFunctionSymbol(name: string, dataFirst: FunctionDeclaration, signatures: Signature[]): EtsStaticSymbol {
             const symbol = createSymbol(SymbolFlags.Function, name as __String) as EtsStaticSymbol;
             symbol.etsTag = EtsSymbolTag.Static;
             symbol.etsDeclaration = dataFirst;
             symbol.etsResolvedSignatures = signatures;
             return symbol;
         }
-        function createEtsGetterSymbol(name: string, dataFirst: FunctionDeclaration, returnType: Type, selfType: Type) {
+        function createEtsStaticVariableSymbol(name: string, declaration: VariableDeclaration, originalSymbol: Symbol): Symbol {
+            const symbol = cloneSymbol(originalSymbol);
+            symbol.escapedName = name as __String;
+            const patchedDeclaration = factory.updateVariableDeclaration(
+                declaration,
+                factory.createIdentifier(name),
+                declaration.exclamationToken,
+                declaration.type,
+                declaration.initializer
+            );
+            setParent(patchedDeclaration, declaration.parent);
+            setParent(patchedDeclaration.name, patchedDeclaration)
+            // @ts-expect-error
+            patchedDeclaration.name.ets_name = name;
+            symbol.declarations = [patchedDeclaration];
+            symbol.valueDeclaration = patchedDeclaration;
+            patchedDeclaration.jsDoc = getJSDocCommentsAndTags(declaration) as JSDoc[];
+            return symbol;
+        }
+        function createEtsGetterFunctionSymbol(name: string, dataFirst: FunctionDeclaration, returnType: Type, selfType: Type) {
             const symbol = createSymbol(SymbolFlags.Property, name as __String) as EtsGetterSymbol;
             symbol.type = returnType;
             symbol.etsTag = EtsSymbolTag.Getter;
@@ -42849,11 +42868,11 @@ namespace ts {
             symbol.etsSelfType = selfType;
             return symbol;
         }
-        function getEtsFluentSymbol(name: string, dataFirst: FunctionDeclaration) {
+        function getEtsFluentSymbolForFunctionDeclaration(name: string, dataFirst: FunctionDeclaration) {
             const type = getTypeOfNode(dataFirst);
             const signatures = getSignaturesOfType(type, SignatureKind.Call);
             const methods = signatures.map(etsThisifySignature);
-            const symbol = createEtsFluentSymbol(name, dataFirst, methods) as EtsFluentSymbol;
+            const symbol = createEtsFluentFunctionSymbol(name, dataFirst, methods) as EtsFluentSymbol;
             const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
             return createSymbolWithType(symbol, final);
         }
@@ -42867,7 +42886,7 @@ namespace ts {
                 return createSymbolWithType(symbol, final);
             }
         }
-        function getEtsGetterSymbol(_name: string, _dataFirst: FunctionDeclaration) {
+        function getEtsGetterSymbolForFunctionDeclaration(_name: string, _dataFirst: FunctionDeclaration) {
             return (self: Type) => {
                 const res = checkEtsCustomCall(
                     _dataFirst,
@@ -42877,7 +42896,7 @@ namespace ts {
                 if (isErrorType(res)) {
                     return void 0;
                 }
-                return createEtsGetterSymbol(_name, _dataFirst, res, self);
+                return createEtsGetterFunctionSymbol(_name, _dataFirst, res, self);
             }
         }
         function getEtsGetterSymbolForVariableDeclaration(name: string, declaration: VariableDeclaration & { name: Identifier }) {
@@ -42893,165 +42912,201 @@ namespace ts {
                 return createEtsGetterVariableSymbol(name, declaration, res, self);
             }
         }
-        function getEtsStaticSymbol(name: string, dataFirst: FunctionDeclaration) {
+        function getEtsStaticSymbolForFunctionDeclaration(name: string, dataFirst: FunctionDeclaration) {
             const signatures = getSignaturesOfType(getTypeOfNode(dataFirst), SignatureKind.Call);
             const methods = signatures.map(cloneSignature);
-            const symbol = createEtsStaticSymbol(name, dataFirst, methods);
+            const symbol = createEtsStaticFunctionSymbol(name, dataFirst, methods);
             const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
             return createSymbolWithType(symbol, final);
         }
-        function collectEtsSymbols(file: SourceFile, statements: NodeArray<Statement>): void {
-            for (const statement of statements) {
-                if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
-                    const tag = collectEtsTypeTags(statement)[0];
-                    if (tag) {
-                        const type = getTypeOfNode(statement);
-                        if (type.symbol) {
-                            typeSymbolCache.set(type.symbol, tag.comment.replace(/^type /, ""));
-                        }
-                        if (type.aliasSymbol) {
-                            typeSymbolCache.set(type.aliasSymbol, tag.comment.replace(/^type /, ""));
-                        }
-                    }
+        function getEtsStaticSymbolForVariableDeclaration(name: string, declaration: VariableDeclaration) {
+            const symbol = getSymbolAtLocation(declaration.name);
+            if (symbol) {
+                return createEtsStaticVariableSymbol(name, declaration, symbol)
+            }
+        }
+        function tryCacheEtsType(declaration: InterfaceDeclaration | TypeAliasDeclaration): void {
+            const tag = collectEtsTypeTags(declaration)[0];
+            if (tag) {
+                const type = getTypeOfNode(declaration);
+                if (type.symbol) {
+                    typeSymbolCache.set(type.symbol, tag.comment.replace(/^type /, ""));
                 }
-                if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
-                    collectEtsSymbols(file, statement.body.statements)
+                if (type.aliasSymbol) {
+                    typeSymbolCache.set(type.aliasSymbol, tag.comment.replace(/^type /, ""));
                 }
-                if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
-                    const staticTag = collectEtsStaticTags(statement)[0];
-                    if (staticTag) {
-                        const [, target, name] = staticTag.comment.split(" ");
-                        if (!staticCache.has(target)) {
-                            staticCache.set(target, new Map());
+            }
+        }
+        function tryCacheEtsStaticVariable(file: SourceFile, statement: VariableStatement) {
+            const staticTag = collectEtsStaticTags(statement)[0];
+            if (staticTag) {
+                const [, target, name] = staticTag.comment.split(" ");
+                if (!staticCache.has(target)) {
+                    staticCache.set(target, new Map());
+                }
+                const map = staticCache.get(target)!;
+                const patched = getEtsStaticSymbolForVariableDeclaration(name, statement.declarationList.declarations[0]);
+                if (patched) {
+                    map.set(name, {
+                        patched,
+                        definition: file,
+                        exportName: patched.escapedName.toString()
+                    })
+                }
+            }
+        }
+        function tryCacheEtsFluentVariable(file: SourceFile, statement: VariableStatement) {
+            if (statement.declarationList.declarations.length === 1) {
+                const declaration = statement.declarationList.declarations[0]
+                if(isIdentifier(declaration.name)) {
+                    const fluentTag = collectEtsFluentTags(declaration)[0];
+                    if(fluentTag) {
+                        const [, target, name] = fluentTag.comment.split(" ");
+                        if (!fluentCache.has(target)) {
+                            fluentCache.set(target, new Map());
                         }
-                        const map = staticCache.get(target)!;
-                        const decl = statement.declarationList.declarations[0]!;
-                        const symbol = getSymbolAtLocation(decl.name);
-                        if (symbol) {
-                            const newSymbol = cloneSymbol(symbol);
-                            newSymbol.escapedName = name as __String;
-                            const newDecl = factory.updateVariableDeclaration(
-                                decl,
-                                factory.createIdentifier(name),
-                                decl.exclamationToken,
-                                decl.type,
-                                decl.initializer
-                            );
-                            setParent(newDecl, decl.parent);
-                            setParent(newDecl.name, newDecl);
-                            // @ts-expect-error
-                            newDecl.name.ets_name = name;
-                            newSymbol.declarations = [
-                                newDecl
-                            ];
-                            newSymbol.valueDeclaration = newSymbol.declarations[0];
-                            newDecl.jsDoc = getJSDocCommentsAndTags(statement) as JSDoc[];
+                        const patched = getEtsFluentSymbolForVariableDeclaration(
+                            name,
+                            (declaration as VariableDeclaration & { name: Identifier })
+                        )
+                        if(patched) {
+                            const map = fluentCache.get(target)!;
                             map.set(name, {
-                                patched: newSymbol,
-                                exportName: symbol.escapedName.toString(),
-                                definition: file
-                            });
-                        }
-                    }
-                    const decl = statement.declarationList.declarations[0]
-                    if(isIdentifier(decl.name)) {
-                        const fluentTag = collectEtsFluentTags(decl)[0];
-                        if(fluentTag) {
-                            const [, target, name] = fluentTag.comment.split(" ");
-                            if (!fluentCache.has(target)) {
-                                fluentCache.set(target, new Map());
-                            }
-                            const patched = getEtsFluentSymbolForVariableDeclaration(name, (decl as VariableDeclaration & { name: Identifier }))
-                            if(patched) {
-                                const map = fluentCache.get(target)!;
-                                map.set(name, {
-                                    patched,
-                                    exportName: decl.name.escapedText.toString(),
-                                    definition: file
-                                })
-                            }
-                        }
-                        const getterTag = collectEtsGetterTags(decl)[0];
-                        if (getterTag) {
-                            const [, target, name] = getterTag.comment.split(" ");
-                            if (!getterCache.has(target)) {
-                                getterCache.set(target, new Map())
-                            }
-                            if (!getterCache.has(target)) {
-                                getterCache.set(target, new Map());
-                            }
-                            const map = getterCache.get(target)!;
-                            map.set(name, {
-                                patched: getEtsGetterSymbolForVariableDeclaration(
-                                    name,
-                                    (decl as VariableDeclaration & { name: Identifier })
-                                ),
-                                exportName: decl.name.escapedText.toString(),
+                                patched,
+                                exportName: declaration.name.escapedText.toString(),
                                 definition: file
                             })
                         }
                     }
                 }
-                if (isFunctionDeclaration(statement) && statement.name && isIdentifier(statement.name) && statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
-                    const operatorTag = collectEtsOperatorTags(statement)[0];
-                    if (operatorTag) {
-                        const symbol = getSymbolAtLocation(statement.name)
-                        if (symbol) {
-                            const [, target, name] = operatorTag.comment.split(" ");
-                            if (!operatorCache.has(target)) {
-                                operatorCache.set(target, new Map());
-                            }
-                            const map = operatorCache.get(target)!;
-                            map.set(name, {
-                                patched: symbol,
-                                exportName: statement.name.escapedText.toString(),
-                                definition: file
-                            });
-                        }
-                    }
-                    const fluentTag = collectEtsFluentTags(statement)[0];
-                    if (fluentTag) {
-                        const [, target, name] = fluentTag.comment.split(" ");
-                        if (!fluentCache.has(target)) {
-                            fluentCache.set(target, new Map());
-                        }
-                        const map = fluentCache.get(target)!;
-                        map.set(name, {
-                            patched: getEtsFluentSymbol(name, statement),
-                            exportName: statement.name.escapedText.toString(),
-                            definition: file
-                        });
-                    }
-                    const getterTag = collectEtsGetterTags(statement)[0];
+            }
+        }
+        function tryCacheEtsGetterVariable(file: SourceFile, statement: VariableStatement) {
+            if (statement.declarationList.declarations.length === 1) {
+                const declaration = statement.declarationList.declarations[0]
+                if (isIdentifier(declaration.name)) {
+                    const getterTag = collectEtsGetterTags(declaration)[0];
                     if (getterTag) {
                         const [, target, name] = getterTag.comment.split(" ");
+                        if (!getterCache.has(target)) {
+                            getterCache.set(target, new Map())
+                        }
                         if (!getterCache.has(target)) {
                             getterCache.set(target, new Map());
                         }
                         const map = getterCache.get(target)!;
                         map.set(name, {
-                            patched: getEtsGetterSymbol(name, statement),
-                            exportName: statement.name.escapedText.toString(),
+                            patched: getEtsGetterSymbolForVariableDeclaration(
+                                name,
+                                (declaration as VariableDeclaration & { name: Identifier })
+                            ),
+                            exportName: declaration.name.escapedText.toString(),
                             definition: file
-                        });
+                        })
                     }
-                    const staticTag = collectEtsStaticTags(statement)[0];
-                    if (staticTag && statement.name) {
-                        const [, target, name] = staticTag.comment.split(" ");
-                        if (!staticCache.has(target)) {
-                            staticCache.set(target, new Map());
+                }
+            }
+        }
+        function tryCacheEtsOperatorFunction(file: SourceFile, declaration: FunctionDeclaration) {
+            if(declaration.name && isIdentifier(declaration.name)) {
+                const operatorTag = collectEtsOperatorTags(declaration)[0];
+                if (operatorTag) {
+                    const symbol = getSymbolAtLocation(declaration.name)
+                    if (symbol) {
+                        const [, target, name] = operatorTag.comment.split(" ");
+                        if (!operatorCache.has(target)) {
+                            operatorCache.set(target, new Map());
                         }
-                        const map = staticCache.get(target)!;
+                        const map = operatorCache.get(target)!;
                         map.set(name, {
-                            patched: getEtsStaticSymbol(name, statement),
-                            exportName: statement.name.escapedText.toString(),
+                            patched: symbol,
+                            exportName: declaration.name.escapedText.toString(),
                             definition: file
                         });
                     }
-                    const identityTag = collectEtsUnifyTags(statement)[0];
-                    if (identityTag && statement.name) {
-                        const [, target] = identityTag.comment.split(" ");
-                        identityCache.set(target, statement);
+                }
+            }
+        }
+        function tryCacheEtsFluentFunction(file: SourceFile, declaration: FunctionDeclaration) {
+            if(declaration.name && isIdentifier(declaration.name)) {
+                const fluentTag = collectEtsFluentTags(declaration)[0];
+                if (fluentTag) {
+                    const [, target, name] = fluentTag.comment.split(" ");
+                    if (!fluentCache.has(target)) {
+                        fluentCache.set(target, new Map());
+                    }
+                    const map = fluentCache.get(target)!;
+                    map.set(name, {
+                        patched: getEtsFluentSymbolForFunctionDeclaration(name, declaration),
+                        exportName: declaration.name.escapedText.toString(),
+                        definition: file
+                    });
+                }
+            }
+        }
+        function tryCacheEtsGetterFunction(file: SourceFile, declaration: FunctionDeclaration) {
+            if(declaration.name && isIdentifier(declaration.name)) {
+                const getterTag = collectEtsGetterTags(declaration)[0];
+                if (getterTag) {
+                    const [, target, name] = getterTag.comment.split(" ");
+                    if (!getterCache.has(target)) {
+                        getterCache.set(target, new Map());
+                    }
+                    const map = getterCache.get(target)!;
+                    map.set(name, {
+                        patched: getEtsGetterSymbolForFunctionDeclaration(name, declaration),
+                        exportName: declaration.name.escapedText.toString(),
+                        definition: file
+                    });
+                }
+            }
+        }
+        function tryCacheEtsStaticFunction(file: SourceFile, declaration: FunctionDeclaration) {
+            if(declaration.name && isIdentifier(declaration.name)) {
+                const staticTag = collectEtsStaticTags(declaration)[0];
+                if (staticTag) {
+                    const [, target, name] = staticTag.comment.split(" ");
+                    if (!staticCache.has(target)) {
+                        staticCache.set(target, new Map());
+                    }
+                    const map = staticCache.get(target)!;
+                    map.set(name, {
+                        patched: getEtsStaticSymbolForFunctionDeclaration(name, declaration),
+                        exportName: declaration.name.escapedText.toString(),
+                        definition: file
+                    });
+                }
+            }
+        }
+        function tryCacheEtsUnifyFunction(declaration: FunctionDeclaration) {
+            if(declaration.name && isIdentifier(declaration.name)) {
+                const unifyTag = collectEtsUnifyTags(declaration)[0];
+                if (unifyTag) {
+                    const [, target] = unifyTag.comment.split(" ");
+                    identityCache.set(target, declaration);
+                }
+            }
+        }
+        function collectEtsSymbols(file: SourceFile, statements: NodeArray<Statement>): void {
+            for (const statement of statements) {
+                if(statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
+                    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
+                        tryCacheEtsType(statement)
+                    }
+                    if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
+                        collectEtsSymbols(file, statement.body.statements)
+                    }
+                    if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                        tryCacheEtsStaticVariable(file, statement);
+                        tryCacheEtsFluentVariable(file, statement);
+                        tryCacheEtsGetterVariable(file, statement);
+                    }
+                    if (isFunctionDeclaration(statement)) {
+                        tryCacheEtsOperatorFunction(file, statement);
+                        tryCacheEtsStaticFunction(file, statement);
+                        tryCacheEtsFluentFunction(file, statement);
+                        tryCacheEtsGetterFunction(file, statement);
+                        tryCacheEtsUnifyFunction(statement);
                     }
                 }
             }
