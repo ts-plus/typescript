@@ -23771,6 +23771,17 @@ namespace ts {
                         const type = getTypeOfDottedName((node as PropertyAccessExpression).expression, diagnostic);
                         if (type) {
                             const name = (node as PropertyAccessExpression).name;
+                            // TSPLUS EXTENSION BEGIN
+                            // Since our fluent properties are "fake", to resolve a dotted name, we have to look up
+                            // the parent type in the cache
+                            const symbol = type.symbol || type.aliasSymbol;
+                            if (symbol && typeSymbolCache.has(symbol)) {
+                                const fluentExtenion = getFluentExtension(type, name.escapedText as string);
+                                if (fluentExtenion) {
+                                    return getTypeOfSymbol(fluentExtenion.patched);
+                                }
+                            }
+                            // TSPLUS EXTENSION END
                             let prop: Symbol | undefined;
                             if (isPrivateIdentifier(name)) {
                                 if (!type.symbol) {
@@ -42807,6 +42818,15 @@ namespace ts {
             const signature = cloneSignature(call);
             const target = signature.parameters[0];
             signature.thisParameter = createSymbolWithType(createSymbol(target.flags, "this" as __String), getTypeOfSymbol(target));
+            const typePredicate = getTypePredicateOfSignature(call);
+            if (typePredicate && typePredicate.parameterIndex === 0) {
+                signature.resolvedTypePredicate = createTypePredicate(
+                    typePredicate.kind === TypePredicateKind.Identifier ? TypePredicateKind.This : TypePredicateKind.AssertsThis,
+                    "this",
+                    0,
+                    typePredicate.type
+                );
+            }
             signature.parameters = signature.parameters.slice(1, signature.parameters.length);
             signature.minArgumentCount = signature.minArgumentCount - 1;
             signature.instantiations = call.instantiations;

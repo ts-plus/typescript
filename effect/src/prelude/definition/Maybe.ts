@@ -58,13 +58,30 @@ export function zip_<A, B>(self: Maybe<A>, that: Maybe<B>): Maybe<readonly [A, B
 }
 
 /**
- * @ets getter Maybe value
+ * @ets fluent Maybe isJust
  */
-export function get<A>(self: Maybe<A>): A | undefined {
-    return self._tag === "Just" ? self.value : undefined
+export function isJust<A>(self: Maybe<A>): self is Just<A> {
+    return self._tag === "Just";
 }
+
+/**
+ * @ets fluent Maybe assertJust
+ */
+export function assertJust<A>(self: Maybe<A>): asserts self is Just<A> {
+    if(self._tag !== "Just") {
+        throw new Error("Not Just");
+    }
+}
+    
+
+// /**
+//  * @ets getter Maybe value
+//  */
+// export function get<A>(self: Maybe<A>): A | undefined {
+//     return self._tag === "Just" ? self.value : undefined
+// }
 
 export const result = Maybe.just(0).match(() => 0, () => 1)
 export const op = Maybe.just(0) + Maybe.just(1)
 
-export const x = op.value
+// export const x = op.value
