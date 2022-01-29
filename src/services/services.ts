@@ -1766,7 +1766,7 @@ namespace ts {
                         textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
                         displayParts,
                         documentation: getDocumentationComment([declaration], typeChecker),
-                        tags: getJsDocTagsOfSignature(declaration, typeChecker)
+                        tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
                     };
                 }
             }
@@ -1823,7 +1823,7 @@ namespace ts {
                                 textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
                                 displayParts,
                                 documentation: getDocumentationComment([declaration], typeChecker),
-                                tags: getJsDocTagsOfSignature(declaration, typeChecker)
+                                tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
                             };
                         }
                         case EtsSymbolTag.Getter: {
@@ -1834,7 +1834,7 @@ namespace ts {
                                 textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
                                 displayParts,
                                 documentation: getDocumentationComment([type.symbol.etsDeclaration], typeChecker),
-                                tags: getJsDocTagsOfSignature(type.symbol.etsDeclaration, typeChecker)
+                                tags: getJsDocTagsOfDeclarations([type.symbol.etsDeclaration], typeChecker)
                             }
                         }
                     }
@@ -1869,7 +1869,7 @@ namespace ts {
                                     textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
                                     displayParts,
                                     documentation: getDocumentationComment([declaration], typeChecker),
-                                    tags: getJsDocTagsOfSignature(declaration, typeChecker)
+                                    tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
                                 }
                             }
                         }
