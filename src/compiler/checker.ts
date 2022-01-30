@@ -42966,12 +42966,6 @@ namespace ts {
             const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
             return createSymbolWithType(symbol, final);
         }
-        function getEtsStaticSymbolForVariableDeclaration(name: string, declaration: VariableDeclaration) {
-            const symbol = getSymbolAtLocation(declaration.name);
-            if (symbol) {
-                return createEtsStaticVariableSymbol(name, declaration, symbol)
-            }
-        }
         function tryCacheEtsType(declaration: InterfaceDeclaration | TypeAliasDeclaration): void {
             const tag = collectEtsTypeTags(declaration)[0];
             if (tag) {
@@ -42992,12 +42986,14 @@ namespace ts {
                     staticCache.set(target, new Map());
                 }
                 const map = staticCache.get(target)!;
-                const patched = getEtsStaticSymbolForVariableDeclaration(name, statement.declarationList.declarations[0]);
-                if (patched) {
+                const declaration = statement.declarationList.declarations[0];
+                const symbol = getSymbolAtLocation(declaration.name);
+                if (symbol) {
+                    const patched = createEtsStaticVariableSymbol(name, declaration, symbol);
                     map.set(name, {
                         patched,
                         definition: file,
-                        exportName: patched.escapedName.toString()
+                        exportName: symbol.escapedName.toString()
                     })
                 }
             }
