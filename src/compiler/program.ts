@@ -1967,7 +1967,7 @@ namespace ts {
 
             const emitTransformers = getTransformers(options, customTransformers, emitOnlyDtsFiles);
             const patchedTransformers: EmitTransformers = {
-                scriptTransformers: [transformTsPlus(checker, options, host), ...emitTransformers.scriptTransformers],
+                scriptTransformers: [transformTsPlus(checker, options, host), transformTailRec(checker, options, host), ...emitTransformers.scriptTransformers],
                 declarationTransformers: emitTransformers.declarationTransformers
             }
             const emitResult = emitFiles(

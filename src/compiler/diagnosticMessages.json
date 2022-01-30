@@ -7251,5 +7251,17 @@
     "A 'return' statement cannot be used inside a class static block.": {
         "category": "Error",
         "code": 18041
+    },
+    "A recursive call must be in a tail position of a 'tailRec' annotated function.": {
+        "category": "Error",
+        "code": 50000
+    },
+    "A recursive call cannot cross a function boundary in a 'tailRec' annotated function.": {
+        "category": "Error",
+        "code": 50001
+    },
+    "Parameter destructuring is not allowed in a 'tailRec' annotated function.": {
+        "category": "Error",
+        "code": 50002
     }
 }

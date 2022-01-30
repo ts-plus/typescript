@@ -4522,6 +4522,7 @@ namespace ts {
         shouldMakeLazy(signatureParam: Symbol, callArg: Type): boolean
         isPipeCall(node: CallExpression): boolean
         getCallExtension(node: Node): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
+        isTailRec(node: FunctionDeclaration): boolean
     }
 
     /* @internal */
