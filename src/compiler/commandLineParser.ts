@@ -198,11 +198,11 @@ namespace ts {
             defaultValueDescription: false,
         },
         {
-            name: "etsModuleDiscoveryLocalSuffix",
+            name: "tsPlusModuleDiscoveryLocalSuffix",
             type: "string"
         },
         {
-            name: "etsTracingPackageName",
+            name: "tsPlusTracingPackageName",
             type: "string"
         },
         {

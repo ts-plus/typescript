@@ -39,13 +39,13 @@ namespace ts.GoToDefinition {
             });
         }
 
-        // BEGIN ETS EXTENSION
+        // TSPLUS EXTENSION BEGIN
         let symbol: Symbol | undefined;
 
         if(isPropertyAccessExpression(parent)) {
             const nodeType = typeChecker.getTypeAtLocation(node);
-            if(nodeType.symbol && isEtsSymbol(nodeType.symbol)) {
-                symbol = nodeType.symbol.etsDeclaration.symbol;
+            if(nodeType.symbol && isTsPlusSymbol(nodeType.symbol)) {
+                symbol = nodeType.symbol.tsPlusDeclaration.symbol;
             } else {
                 const type = typeChecker.getTypeAtLocation(parent.expression);
                 const extensions = typeChecker.getExtensions(type);
@@ -70,7 +70,7 @@ namespace ts.GoToDefinition {
         if(!symbol) {
             symbol = getSymbol(node, typeChecker);
         }
-        // END ETS EXTENSION
+        // TSPLUS EXTENSION END
 
         // Could not find a symbol e.g. node is string or number keyword,
         // or the symbol was an internal symbol and does not have a declaration e.g. undefined symbol

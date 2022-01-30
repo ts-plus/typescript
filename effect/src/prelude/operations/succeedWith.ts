@@ -5,17 +5,17 @@ import { LazyArgument } from "../../utils/LazyArgument.js";
 /**
  * Imports a synchronous side-effect into a pure value
  *
- * @ets static ets/EffectOps succeed
+ * @tsplus static ets/EffectOps succeed
  */
-export function succeedWith<A>(effect: LazyArgument<A>, __etsTrace?: string): Effect<unknown, never, A> {
-    return T.succeedWith(effect, __etsTrace);
+export function succeedWith<A>(effect: LazyArgument<A>, __tsplusTrace?: string): Effect<unknown, never, A> {
+    return T.succeedWith(effect, __tsplusTrace);
 }
 
 /**
  * Imports a synchronous side-effect into a pure value
  *
- * @ets static ets/EffectOps __call
+ * @tsplus static ets/EffectOps __call
  */
-export function effectApply<A>(effect: LazyArgument<A>, __etsTrace?: string): Effect<unknown, never, A> {
-    return T.succeedWith(effect, __etsTrace);
+export function effectApply<A>(effect: LazyArgument<A>, __tsplusTrace?: string): Effect<unknown, never, A> {
+    return T.succeedWith(effect, __tsplusTrace);
 }

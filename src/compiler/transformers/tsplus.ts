@@ -1,19 +1,19 @@
 /*@internal*/
 namespace ts {
-    class EtsImporter {
+    class TsPlusImporter {
         readonly imports: ESMap<string, Identifier> = new Map();
         constructor(readonly factory: NodeFactory) { }
 
         get(path: string): Identifier {
             if (!this.imports.has(path)) {
-                this.imports.set(path, this.factory.createUniqueName("ets_module"));
+                this.imports.set(path, this.factory.createUniqueName("tsplus_module"));
             }
             return this.imports.get(path)!;
         }
     }
-    export function transformETS(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
+    export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
         return function (context: TransformationContext) {
-            const importer = new EtsImporter(context.factory);
+            const importer = new TsPlusImporter(context.factory);
             const fileVar = factory.createUniqueName("fileName");
             let fileVarUsed = false;
             return chainBundle(context, transformSourceFile);
@@ -50,7 +50,7 @@ namespace ts {
                                     undefined,
                                     undefined,
                                     factory.createStringLiteral(
-                                        (options.etsTracingPackageName ? options.etsTracingPackageName + ":" : "") +
+                                        (options.tsPlusTracingPackageName ? options.tsPlusTracingPackageName + ":" : "") +
                                         (options.configFilePath ? getRelativePathFromFile(options.configFilePath, node.fileName, host.getCanonicalFileName).replace(/^\.(\\|\/)/, "") : node.fileName)
                                     )
                                 )
@@ -101,7 +101,7 @@ namespace ts {
                 if (operator) {
                     const type = checker.getTypeOfSymbol(operator.patched)
                     const call = checker.getSignaturesOfType(type, SignatureKind.Call)[0];
-                    const lastTrace = call.parameters.length > 0 ? call.parameters[call.parameters.length - 1].escapedName === "___etsTrace" : false
+                    const lastTrace = call.parameters.length > 0 ? call.parameters[call.parameters.length - 1].escapedName === "___tsplusTrace" : false
                     const params = [visitNode(node.left, visitor(source, traceInScope)), visitNode(node.right, visitor(source, traceInScope))]
                     if (checker.shouldMakeLazy(call.parameters[1], checker.getTypeAtLocation(node.right))) {
                         params[1] = context.factory.createArrowFunction(void 0, void 0, [], void 0, void 0, params[1]);
@@ -122,7 +122,7 @@ namespace ts {
                     const last = node.parameters[node.parameters.length - 1]
 
                     if (last.name.kind === SyntaxKind.Identifier) {
-                        if ((last.name as Identifier).escapedText === "___etsTrace") {
+                        if ((last.name as Identifier).escapedText === "___tsplusTrace") {
                             return visitEachChild(node, visitor(source, last.name as Identifier), context)
                         }
                     }
@@ -225,7 +225,7 @@ namespace ts {
                         }
                     }
                     if (newArgs.length === params.length - 1) {
-                        if (params[params.length - 1].escapedName === "___etsTrace") {
+                        if (params[params.length - 1].escapedName === "___tsplusTrace") {
                             if (traceInScope) {
                                 newArgs.push(traceInScope);
                             } else {
@@ -243,7 +243,7 @@ namespace ts {
                 return visitEachChild(node, visitor, context);
             }
         }
-        function getPathOfExtension(factory: NodeFactory, importer: EtsImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile) {
+        function getPathOfExtension(factory: NodeFactory, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile) {
             if (source.fileName === extension.definition.fileName) {
                 return factory.createIdentifier(extension.exportName);
             }

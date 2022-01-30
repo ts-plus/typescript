@@ -19,7 +19,7 @@ export const prog = Effect.do
 
 export const result = prog | Effect.fail("error");
 
-prog.unsafeRunPromise();
+prog.unsafeRunPromise()
 
 export const xxx = pipe(0, n => n + 1, n => `hello: ${n}`);
 

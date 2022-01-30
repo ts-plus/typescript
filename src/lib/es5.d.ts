@@ -4473,7 +4473,7 @@ interface Date {
 }
 
 /**
- * @ets macro pipe
+ * @tsplus macro pipe
  */
 declare function pipe<A>(a: A): A;
 declare function pipe<A, B>(a: A, ab: (a: A) => B): B;

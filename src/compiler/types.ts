@@ -868,7 +868,7 @@ namespace ts {
         /* @internal */ emitNode?: EmitNode;                  // Associated EmitNode (initialized by transforms)
         /* @internal */ contextualType?: Type;                // Used to temporarily assign a contextual type during overload resolution
         /* @internal */ inferenceContext?: InferenceContext;  // Inference context for contextual type
-        /* @internal */ etsName?: string;
+        /* @internal */ tsPlusName?: string;
     }
 
     export interface JSDocContainer {
@@ -3259,95 +3259,95 @@ namespace ts {
         readonly comment?: string | NodeArray<JSDocComment>;
     }
 
-    export interface JSDocEtsTypeTag extends JSDocTag {
+    export interface TsPlusJSDocTypeTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
         readonly comment: `type ${string}`
     }
 
-    export interface JSDocEtsUnifyTag extends JSDocTag {
+    export interface TsPlusJSDocUnifyTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
         readonly comment: `unify ${string}`
     }
 
-    export interface JSDocEtsExtensionTag extends JSDocTag {
+    export interface TsPlusJSDocExtensionTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
         readonly comment: `fluent ${string} ${string}`
     }
     
-    export interface JSDocEtsGetterTag extends JSDocTag {
+    export interface TsPlusJSDocGetterTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
         readonly comment: `getter ${string} ${string}`
     }
 
-    export interface JSDocEtsStaticTag extends JSDocTag {
+    export interface TsPlusJSDocStaticTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
         readonly comment: `static ${string} ${string}`
     }
 
-    export interface JSDocEtsOperatorTag extends JSDocTag {
+    export interface TsPlusJSDocOperatorTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
         readonly comment: `operator ${string} ${string}`
     }
 
-    export interface JSDocEtsMacroTag extends JSDocTag {
+    export interface TsPlusJSDocMacroTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
         readonly comment: `macro ${string}`
     }
 
-    export const enum EtsSymbolTag {
-        Fluent = "EtsFluentSymbol",
-        FluentVariable = "EtsFluentVariableSymbol",
-        Static = "EtsStaticSymbol",
-        Getter = "EtsGetterSymbol",
-        GetterVariable = "EtsGetterVariableSymbol"
+    export const enum TsPlusSymbolTag {
+        Fluent = "TsPlusFluentSymbol",
+        FluentVariable = "TsPlusFluentVariableSymbol",
+        Static = "TsPlusStaticSymbol",
+        Getter = "TsPlusGetterSymbol",
+        GetterVariable = "TsPlusGetterVariableSymbol"
     }
 
-    export interface EtsFluentSymbol extends TransientSymbol {
-        etsTag: EtsSymbolTag.Fluent
-        etsDeclaration: FunctionDeclaration;
-        etsResolvedSignatures: Signature[];
+    export interface TsPlusFluentSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.Fluent
+        tsPlusDeclaration: FunctionDeclaration;
+        tsPlusResolvedSignatures: Signature[];
     }
 
     export type SignatureWithParameters = Omit<Signature, "parameters"> & { parameters: ReadonlyArray<Symbol & { valueDeclaration: ParameterDeclaration }> }
 
-    export interface EtsFluentVariableSymbol extends TransientSymbol {
-        etsTag: EtsSymbolTag.FluentVariable;
-        etsDeclaration: VariableDeclaration & { name: Identifier };
-        etsParameters: ReadonlyArray<ParameterDeclaration>;
-        etsResolvedSignatures: SignatureWithParameters[];
+    export interface TsPlusFluentVariableSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.FluentVariable;
+        tsPlusDeclaration: VariableDeclaration & { name: Identifier };
+        tsPlusParameters: ReadonlyArray<ParameterDeclaration>;
+        tsPlusResolvedSignatures: SignatureWithParameters[];
     }
 
-    export interface EtsStaticSymbol extends TransientSymbol {
-        etsTag: EtsSymbolTag.Static;
-        etsDeclaration: FunctionDeclaration;
-        etsResolvedSignatures: Signature[];
+    export interface TsPlusStaticSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.Static;
+        tsPlusDeclaration: FunctionDeclaration;
+        tsPlusResolvedSignatures: Signature[];
     }
 
-    export interface EtsGetterSymbol extends TransientSymbol {
-        etsTag: EtsSymbolTag.Getter;
-        etsSelfType: Type;
-        etsDeclaration: FunctionDeclaration;
+    export interface TsPlusGetterSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.Getter;
+        tsPlusSelfType: Type;
+        tsPlusDeclaration: FunctionDeclaration;
     }
 
-    export interface EtsGetterVariableSymbol extends TransientSymbol {
-        etsTag: EtsSymbolTag.GetterVariable;
-        etsDeclaration: VariableDeclaration & { name: Identifier };
-        etsSelfType: Type;
+    export interface TsPlusGetterVariableSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.GetterVariable;
+        tsPlusDeclaration: VariableDeclaration & { name: Identifier };
+        tsPlusSelfType: Type;
     }
 
-    export type EtsSymbol =
-        | EtsFluentSymbol
-        | EtsStaticSymbol
-        | EtsGetterSymbol
-        | EtsFluentVariableSymbol
-        | EtsGetterVariableSymbol;
+    export type TsPlusSymbol =
+        | TsPlusFluentSymbol
+        | TsPlusStaticSymbol
+        | TsPlusGetterSymbol
+        | TsPlusFluentVariableSymbol
+        | TsPlusGetterVariableSymbol;
 
     export interface JSDocLink extends Node {
         readonly kind: SyntaxKind.JSDocLink;
@@ -3753,7 +3753,7 @@ namespace ts {
         /* @internal */ exportedModulesFromDeclarationEmit?: ExportedModulesFromDeclarationEmit;
         /* @internal */ endFlowNode?: FlowNode;
 
-        etsImportAs?: () => string | undefined
+        tsPlusImportAs?: () => string | undefined
     }
 
     /* @internal */
@@ -6276,8 +6276,8 @@ namespace ts {
 
         [option: string]: CompilerOptionsValue | TsConfigSourceFile | undefined;
 
-        etsModuleDiscoveryLocalSuffix?: "js"
-        etsTracingPackageName?: string
+        tsPlusModuleDiscoveryLocalSuffix?: "js"
+        tsPlusTracingPackageName?: string
     }
 
     export interface WatchOptions {

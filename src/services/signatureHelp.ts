@@ -79,12 +79,12 @@ namespace ts.SignatureHelp {
                 }
                 let candidates: Signature[] = [];
                 let resolvedSignature = checker.getResolvedSignatureForSignatureHelp(invocation.node, candidates, argumentCount)!; // TODO: GH#18217
-                // BEGIN: ___etsTrace overload
+                // TSPLUS EXTENSION BEGIN
                 if(resolvedSignature.declaration && isFunctionDeclaration(resolvedSignature.declaration)) {
                     const declaration = resolvedSignature.declaration;
                     const lastParam = declaration.parameters[declaration.parameters.length - 1];
                     const parameterCount = resolvedSignature.thisParameter ? declaration.parameters.length - 1 : declaration.parameters.length;
-                    if(declaration.name && lastParam && isIdentifier(lastParam.name) && lastParam.name.escapedText.toString() === "___etsTrace" && argumentCount < parameterCount) {
+                    if(declaration.name && lastParam && isIdentifier(lastParam.name) && lastParam.name.escapedText.toString() === "___tsplusTrace" && argumentCount < parameterCount) {
                         const untracedDeclaration = factory.createFunctionDeclaration(
                             declaration.decorators,
                             declaration.modifiers,
@@ -111,7 +111,7 @@ namespace ts.SignatureHelp {
                         candidates = [untracedSignature];
                     }
                 }
-                // END: ___etsTrace overload
+                // TSPLUS EXTENSION END
                 return candidates.length === 0 ? undefined : { kind: CandidateOrTypeKind.Candidate, candidates, resolvedSignature };
             }
             case InvocationKind.TypeArgs: {

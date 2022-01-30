@@ -9,8 +9,8 @@
         "declarationDir": "build/dts",
         "skipLibCheck": true,
         "lib": ["ES2021"],
-        "etsModuleDiscoveryLocalSuffix": "js",
-        "etsTracingPackageName": "@app"
+        "tsPlusModuleDiscoveryLocalSuffix": "js",
+        "tsPlusTracingPackageName": "@app"
     },
     "include": ["src/**/*.ts"]
 }

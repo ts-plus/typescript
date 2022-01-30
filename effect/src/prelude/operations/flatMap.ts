@@ -6,8 +6,8 @@ import { Effect } from "../definition/Effect.js";
  * the passing of its value to the specified continuation function `f`,
  * followed by the effect that it returns.
  *
- * @ets fluent ets/Effect flatMap
+ * @tsplus fluent ets/Effect flatMap
  */
-export function chain_<R, E, A, R1, E1, A1>(self: Effect<R, E, A>, f: (a: A) => Effect<R1, E1, A1>, __etsTrace?: string): Effect<R & R1, E | E1, A1> {
-    return T.chain_(self, f, __etsTrace);
+export function chain_<R, E, A, R1, E1, A1>(self: Effect<R, E, A>, f: (a: A) => Effect<R1, E1, A1>, __tsplusTrace?: string): Effect<R & R1, E | E1, A1> {
+    return T.chain_(self, f, __tsplusTrace);
 }

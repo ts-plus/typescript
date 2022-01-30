@@ -4,6 +4,6 @@ import { Effect } from "../definition/Effect.js";
 /**
  * Creates a do context, to be used with bind/let
  *
- * @ets static ets/EffectOps do
+ * @tsplus static ets/EffectOps do
  */
 export const do_: Effect<unknown, never, {}> = T.do;
