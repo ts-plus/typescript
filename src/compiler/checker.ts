@@ -274,7 +274,7 @@ namespace ts {
     }));
 
     // TSPLUS EXTENSION START
-    export const invertedBinaryOp = {
+    const invertedBinaryOp = {
         [SyntaxKind.LessThanToken]: "<" as __String,
         [SyntaxKind.GreaterThanToken]: ">" as __String,
         [SyntaxKind.LessThanEqualsToken]: "<=" as __String,
@@ -785,7 +785,9 @@ namespace ts {
             getCallExtension,
             shouldMakeLazy,
             isPipeCall,
-            isTailRec
+            isTailRec,
+            cloneSymbol,
+            getTextOfBinaryOp
             // TSPLUS EXTENSION END
         };
 
@@ -796,6 +798,9 @@ namespace ts {
                 return (type.symbol.declarations || []).flatMap(collectTsPlusMacroTags).filter((tag) => tag.comment === "macro pipe").length > 0;
             }
             return false;
+        }
+        function getTextOfBinaryOp(kind: SyntaxKind): string | undefined {
+            return invertedBinaryOp[kind as keyof typeof invertedBinaryOp] as string | undefined;
         }
         function getCallExtension(node: Node) {
             return callCache.get(node);
@@ -45268,5 +45273,34 @@ namespace ts {
         }
         return "<anonymous>";
     }
+    
+    export function filterLazyArgument(typeChecker: TypeChecker, parameters: ReadonlyArray<Symbol & { valueDeclaration: ParameterDeclaration }>): ReadonlyArray<Symbol & { valueDeclaration: ParameterDeclaration }> {
+        return map(parameters, (param) => {
+            if (isIdentifier(param.valueDeclaration.name) && getAllJSDocTags(param.valueDeclaration, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && startsWith(tag.comment, "tsplus/LazyArgument"))) {
+                const type = typeChecker.getTypeOfSymbol(param);
+                if (type.flags & TypeFlags.Union) {
+                    if ((type as UnionType).types[1]) {
+                        const newSymbol = typeChecker.cloneSymbol(param);
+                        // @ts-expect-error
+                        newSymbol.type = (type as UnionType).types[1];
+                        return (newSymbol as unknown as Symbol & { valueDeclaration: ParameterDeclaration });
+                    }
+                }
+                return param;
+            } else {
+                return param;
+            }
+        })
+    }
+
+    export function isLazyParameter(parameter: Symbol & { valueDeclaration: ParameterDeclaration }): boolean {
+        return isIdentifier(parameter.valueDeclaration) &&
+            getAllJSDocTags(parameter.valueDeclaration, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && startsWith(tag.comment, "tsplus/LazyArgument"))[0] !== undefined;
+    }
+
+    export function isSymbolParameterDeclaration(symbol: Symbol): symbol is Symbol & { valueDeclaration: ParameterDeclaration } {
+        return !!symbol.valueDeclaration && isVariableLike(symbol.valueDeclaration) && isParameterDeclaration(symbol.valueDeclaration);
+    }
+
     // TSPLUS EXTENSION END
 }

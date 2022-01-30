@@ -80,7 +80,7 @@ namespace ts.SignatureHelp {
                 let candidates: Signature[] = [];
                 let resolvedSignature = checker.getResolvedSignatureForSignatureHelp(invocation.node, candidates, argumentCount)!; // TODO: GH#18217
                 // TSPLUS EXTENSION BEGIN
-                if(resolvedSignature.declaration && isFunctionDeclaration(resolvedSignature.declaration)) {
+                if(resolvedSignature.declaration && isFunctionDeclaration(resolvedSignature.declaration) && resolvedSignature.parameters.every(isSymbolParameterDeclaration)) {
                     const declaration = resolvedSignature.declaration;
                     const lastParam = declaration.parameters[declaration.parameters.length - 1];
                     const parameterCount = resolvedSignature.thisParameter ? declaration.parameters.length - 1 : declaration.parameters.length;
@@ -101,7 +101,7 @@ namespace ts.SignatureHelp {
                             untracedDeclaration,
                             resolvedSignature.typeParameters,
                             resolvedSignature.thisParameter,
-                            resolvedSignature.parameters.slice(0, resolvedSignature.parameters.length - 1),
+                            filterLazyArgument(checker, resolvedSignature.parameters.slice(0, resolvedSignature.parameters.length - 1)),
                             resolvedSignature.getReturnType(),
                             resolvedSignature.resolvedTypePredicate,
                             resolvedSignature.minArgumentCount,
@@ -109,6 +109,19 @@ namespace ts.SignatureHelp {
                         );
                         resolvedSignature = untracedSignature;
                         candidates = [untracedSignature];
+                    } else if (some(resolvedSignature.parameters, isLazyParameter)) {
+                        const signature = checker.createSignature(
+                            declaration,
+                            resolvedSignature.typeParameters,
+                            resolvedSignature.thisParameter,
+                            filterLazyArgument(checker, resolvedSignature.parameters),
+                            resolvedSignature.getReturnType(),
+                            resolvedSignature.resolvedTypePredicate,
+                            resolvedSignature.minArgumentCount,
+                            resolvedSignature.flags
+                        );
+                        resolvedSignature = signature;
+                        candidates = [resolvedSignature];
                     }
                 }
                 // TSPLUS EXTENSION END

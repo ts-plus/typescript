@@ -1679,10 +1679,6 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION BEGIN
-        function isSymbolParameterDeclaration(symbol: Symbol): symbol is Symbol & { valueDeclaration: ParameterDeclaration } {
-            return !!symbol.valueDeclaration && isVariableLike(symbol.valueDeclaration) && isParameterDeclaration(symbol.valueDeclaration);
-        }
-
         function getUntracedDisplayParts(typeChecker: TypeChecker, node: Node, declaration: FunctionDeclaration | VariableDeclaration & { name: Identifier }, resolvedSignature: Signature, /* symbol: TsPlusStaticSymbol | TsPlusFluentSymbol | TsPlusFluentVariableSymbol */): SymbolDisplayPart[] {
             const paramLength = resolvedSignature.parameters.length;
             const lastParam = resolvedSignature.parameters[paramLength - 1];
@@ -1717,7 +1713,7 @@ namespace ts {
                     untracedDeclaration,
                     resolvedSignature.typeParameters,
                     resolvedSignature.thisParameter,
-                    resolvedSignature.parameters.slice(0, resolvedSignature.parameters.length - 1),
+                    filterLazyArgument(typeChecker, resolvedSignature.parameters.slice(0, resolvedSignature.parameters.length - 1)),
                     resolvedSignature.getReturnType(),
                     resolvedSignature.resolvedTypePredicate,
                     resolvedSignature.minArgumentCount - 1,
@@ -1845,8 +1841,7 @@ namespace ts {
                 }
                 if (isToken(node) && isBinaryExpression(node.parent)) {
                     const leftType = typeChecker.getTypeAtLocation(node.parent.left)
-                    // @ts-expect-error
-                    const operator = invertedBinaryOp[node.kind] as string | undefined;
+                    const operator = typeChecker.getTextOfBinaryOp(node.kind);
                     if (operator) {
                         const overload = typeChecker.getOperatorExtension(leftType, operator)
                         if (overload) {

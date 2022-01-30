@@ -4523,6 +4523,8 @@ namespace ts {
         isPipeCall(node: CallExpression): boolean
         getCallExtension(node: Node): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
         isTailRec(node: FunctionDeclaration): boolean
+        cloneSymbol(symbol: Symbol): Symbol
+        getTextOfBinaryOp(kind: SyntaxKind): string | undefined
     }
 
     /* @internal */

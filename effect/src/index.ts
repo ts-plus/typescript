@@ -30,3 +30,15 @@ const y = x.isJust() ? x.value : undefined;
 x.assertJust();
 
 const z = x.value;
+
+
+
+
+
+
+
+
+
+
+
+Effect.fail(0)
