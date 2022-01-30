@@ -1679,33 +1679,35 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION BEGIN
-        function getUntracedDisplayParts(typeChecker: TypeChecker, node: Node, symbol: TsPlusStaticSymbol | TsPlusFluentSymbol | TsPlusFluentVariableSymbol): SymbolDisplayPart[] {
-            const declaration = symbol.tsPlusDeclaration;
-            const resolvedSignature = symbol.tsPlusResolvedSignatures[0];
-            const paramLength = resolvedSignature.parameters.length
-            const lastParam = resolvedSignature.parameters[paramLength - 1]
-            if(resolvedSignature && lastParam && lastParam.name === "__tsplusTrace") {
-                let untracedDeclaration: FunctionDeclaration
-                if(symbol.tsPlusTag === TsPlusSymbolTag.FluentVariable) {
+        function isSymbolParameterDeclaration(symbol: Symbol): symbol is Symbol & { valueDeclaration: ParameterDeclaration } {
+            return !!symbol.valueDeclaration && isVariableLike(symbol.valueDeclaration) && isParameterDeclaration(symbol.valueDeclaration);
+        }
+
+        function getUntracedDisplayParts(typeChecker: TypeChecker, node: Node, declaration: FunctionDeclaration | VariableDeclaration & { name: Identifier }, resolvedSignature: Signature, /* symbol: TsPlusStaticSymbol | TsPlusFluentSymbol | TsPlusFluentVariableSymbol */): SymbolDisplayPart[] {
+            const paramLength = resolvedSignature.parameters.length;
+            const lastParam = resolvedSignature.parameters[paramLength - 1];
+            if (resolvedSignature.parameters.every(isSymbolParameterDeclaration) && lastParam && lastParam.name === "__tsplusTrace") {
+                let untracedDeclaration: FunctionDeclaration;
+                if(isVariableDeclaration(declaration)) {
                     untracedDeclaration = factory.createFunctionDeclaration(
-                        symbol.tsPlusDeclaration.decorators,
-                        symbol.tsPlusDeclaration.modifiers,
+                        declaration.decorators,
+                        declaration.modifiers,
                         undefined,
-                        symbol.tsPlusDeclaration.name,
+                        declaration.name,
                         undefined,
-                        symbol.tsPlusResolvedSignatures[0].parameters.map((s) => s.valueDeclaration).slice(0, paramLength - 1),
-                        symbol.tsPlusDeclaration.type,
+                        map(resolvedSignature.parameters, (param) => param.valueDeclaration).slice(0, paramLength - 1),
+                        declaration.type,
                         undefined
-                    )
+                    );
                 } else {
                     untracedDeclaration = factory.createFunctionDeclaration(
-                        symbol.tsPlusDeclaration.decorators,
-                        symbol.tsPlusDeclaration.modifiers,
-                        symbol.tsPlusDeclaration.asteriskToken,
-                        symbol.tsPlusDeclaration.name,
-                        symbol.tsPlusDeclaration.typeParameters,
-                        symbol.tsPlusDeclaration.parameters.slice(0, symbol.tsPlusDeclaration.parameters.length - 1),
-                        symbol.tsPlusDeclaration.type,
+                        declaration.decorators,
+                        declaration.modifiers,
+                        declaration.asteriskToken,
+                        declaration.name,
+                        declaration.typeParameters,
+                        declaration.parameters.slice(0, declaration.parameters.length - 1),
+                        declaration.type,
                         undefined
                     );
                 }
@@ -1729,7 +1731,7 @@ namespace ts {
                 return typeChecker.runWithCancellationToken(
                     cancellationToken,
                     typeChecker => signatureToDisplayParts(typeChecker, resolvedSignature, getContainerNode(node))
-                )
+                );
             }
         }
         // TSPLUS EXTENSION END
@@ -1758,7 +1760,7 @@ namespace ts {
                     displayParts.push(textPart("call"));
                     displayParts.push(textPart(")"));
                     displayParts.push(spacePart());
-                    displayParts = displayParts.concat(getUntracedDisplayParts(typeChecker, nodeForQuickInfo, symbol));
+                    displayParts = displayParts.concat(getUntracedDisplayParts(typeChecker, nodeForQuickInfo, symbol.tsPlusDeclaration, symbol.tsPlusResolvedSignatures[0]));
                     const declaration = symbol.tsPlusDeclaration;
                     return {
                         kind: ScriptElementKind.memberFunctionElement,
@@ -1817,7 +1819,7 @@ namespace ts {
                         case TsPlusSymbolTag.Static: {
                             const symbol = type.symbol;
                             const declaration = symbol.tsPlusDeclaration;
-                            displayParts = displayParts.concat(getUntracedDisplayParts(typeChecker, nodeForQuickInfo, symbol));
+                            displayParts = displayParts.concat(getUntracedDisplayParts(typeChecker, nodeForQuickInfo, declaration, symbol.tsPlusResolvedSignatures[0]));
                             return {
                                 kind: ScriptElementKind.memberFunctionElement,
                                 kindModifiers: ScriptElementKindModifier.staticModifier,
@@ -1837,6 +1839,41 @@ namespace ts {
                                 displayParts,
                                 documentation: getDocumentationComment([type.symbol.tsPlusDeclaration], typeChecker),
                                 tags: getJsDocTagsOfDeclarations([type.symbol.tsPlusDeclaration], typeChecker)
+                            }
+                        }
+                    }
+                }
+                if (isToken(node) && isBinaryExpression(node.parent)) {
+                    const leftType = typeChecker.getTypeAtLocation(node.parent.left)
+                    // @ts-expect-error
+                    const operator = invertedBinaryOp[node.kind] as string | undefined;
+                    if (operator) {
+                        const overload = typeChecker.getOperatorExtension(leftType, operator)
+                        if (overload) {
+                            const declaration = find(overload.patched.declarations || [], isFunctionDeclaration)
+                            const declarationSignature = declaration ? typeChecker.getSignatureFromDeclaration(declaration) : undefined
+                            if (declaration && declarationSignature) {
+                                let displayParts: SymbolDisplayPart[] = [];
+                                displayParts.push(textPart("("));
+                                displayParts.push(textPart("operator"));
+                                displayParts.push(textPart(")"));
+                                displayParts.push(spacePart());
+                                displayParts.push(displayPart(operator, SymbolDisplayPartKind.operator));
+                                displayParts.push(spacePart());
+                                displayParts = displayParts.concat(
+                                    typeChecker.runWithCancellationToken(
+                                        cancellationToken,
+                                        (typeChecker) => getUntracedDisplayParts(typeChecker, node, declaration, declarationSignature)
+                                    )
+                                )
+                                return {
+                                    kind: ScriptElementKind.functionElement,
+                                    kindModifiers: ScriptElementKindModifier.none,
+                                    textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                                    displayParts,
+                                    documentation: getDocumentationComment([declaration], typeChecker),
+                                    tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
+                                }
                             }
                         }
                     }

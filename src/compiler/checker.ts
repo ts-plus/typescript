@@ -274,7 +274,7 @@ namespace ts {
     }));
 
     // TSPLUS EXTENSION START
-    const invertedBinaryOp = {
+    export const invertedBinaryOp = {
         [SyntaxKind.LessThanToken]: "<" as __String,
         [SyntaxKind.GreaterThanToken]: ">" as __String,
         [SyntaxKind.LessThanEqualsToken]: "<=" as __String,
