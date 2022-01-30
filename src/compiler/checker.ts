@@ -36606,13 +36606,19 @@ namespace ts {
                         nullTransformationContext
                     );
                 }
-                else {
-                    return visitEachChild(
-                        node,
-                        checkTailRecFunctionVisitor(functionNode, parameterSymbols),
-                        nullTransformationContext
-                    );
+                else if (isCallExpression(node)) {
+                    const funcNameSymbol = getSymbolAtLocation(functionNode.name!);
+                    const symbol = getSymbolAtLocation(node.expression);
+                    if (symbol === funcNameSymbol) {
+                        error(node, Diagnostics.A_recursive_call_must_be_in_a_tail_position_of_a_tailRec_annotated_function);
+                        return node;
+                    }
                 }
+                return visitEachChild(
+                    node,
+                    checkTailRecFunctionVisitor(functionNode, parameterSymbols),
+                    nullTransformationContext
+                );
             };
         }
         function getSymbolsOfBindingName(node: BindingName): readonly Symbol[] {
