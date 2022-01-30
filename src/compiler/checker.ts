@@ -805,7 +805,7 @@ namespace ts {
         function getCallExtension(node: Node) {
             return callCache.get(node);
         }
-        function isTailRec(node: FunctionDeclaration) {
+        function isTailRec(node: Node) {
             return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName?.escapedText === "tsplus" && tag.comment === "tailRec")[0] !== undefined;
         }
         function shouldMakeLazy(signatureParam: Symbol, callArg: Type) {
@@ -36557,46 +36557,54 @@ namespace ts {
         function checkTailRecFunction(node: FunctionDeclaration): void {
             if (node.body) {
                 checkTailRecFunctionParameters(node.parameters);
-                const paramSymbols = flatMap(node.parameters, (param) => getSymbolsOfBindingName(param.name))
+                const paramSymbols = flatMap(node.parameters, (param) => getSymbolsOfBindingName(param.name));
                 forEach(node.body.statements, (s) => {
-                    visitEachChild(
-                        s,
-                        checkTailRecFunctionVisitor(node, paramSymbols),
-                        nullTransformationContext
-                    )
-                })
+                    visitNode(s, checkTailRecFunctionVisitor(node, paramSymbols));
+                });
             }
-            visitEachChild(
-                node,
-                checkTailRecFunctionVisitor(
-                    node,
-                    flatMap(node.parameters, (param) => getSymbolsOfBindingName(param.name))
-                ),
-                nullTransformationContext
-            );
+            else {
+                error(node, Diagnostics.Invalid_declaration_annotated_as_tailRec);
+            }
+        }
+        function checkTailRecVariableDeclaration(node: VariableDeclaration): void {
+            if (isIdentifier(node.name) && node.initializer && isArrowFunction(node.initializer)) {
+                checkTailRecFunctionParameters(node.initializer.parameters);
+                const paramSymbols = flatMap(node.initializer.parameters, (param) => getSymbolsOfBindingName(param.name));
+                if (isBlock(node.initializer.body)) {
+                    forEach(node.initializer.body.statements, (s) => {
+                        visitNode(s, checkTailRecFunctionVisitor(node, paramSymbols));
+                    });
+                }
+                else {
+                    checkTailRecReturnStatement(node, paramSymbols)(node.initializer.body);
+                }
+            }
+            else {
+                error(node, Diagnostics.Invalid_declaration_annotated_as_tailRec);
+            }
         }
         function checkTailRecFunctionParameters(params: NodeArray<ParameterDeclaration>): void {
             forEach(params, (param) => {
                 if (!isIdentifier(param.name)) {
-                    error(param, Diagnostics.Parameter_destructuring_is_not_allowed_in_a_tailRec_annotated_function)
+                    error(param, Diagnostics.Parameter_destructuring_is_not_allowed_in_a_tailRec_annotated_function);
                 }
-            })
+            });
         }
-        function checkTailRecFunctionVisitor(functionNode: FunctionDeclaration, parameterSymbols: ReadonlyArray<Symbol>) {
+        function checkTailRecFunctionVisitor(functionNode: FunctionDeclaration | VariableDeclaration, parameterSymbols: readonly Symbol[]) {
             return function (node: Node): VisitResult<Node> {
                 if (isReturnStatement(node) && node.expression) {
                     return visitEachChild(
                         node,
                         checkTailRecReturnStatement(functionNode, parameterSymbols),
                         nullTransformationContext
-                    )
+                    );
                 }
                 else if (isFunctionDeclaration(node) || isArrowFunction(node)) {
                     return visitEachChild(
                         node,
                         checkTailRecNestedFunction(functionNode),
                         nullTransformationContext
-                    )
+                    );
                 }
                 else {
                     return visitEachChild(
@@ -36605,9 +36613,9 @@ namespace ts {
                         nullTransformationContext
                     );
                 }
-            }
+            };
         }
-        function getSymbolsOfBindingName(node: BindingName): ReadonlyArray<Symbol> {
+        function getSymbolsOfBindingName(node: BindingName): readonly Symbol[] {
             if (isIdentifier(node)) {
                 const symbol = getSymbolAtLocation(node);
                 return symbol ? [symbol] : [];
@@ -36620,8 +36628,8 @@ namespace ts {
             }
         }
 
-        function checkTailRecNestedFunction(functionNode: FunctionDeclaration) {
-            return function(node: Node): VisitResult<Node> {
+        function checkTailRecNestedFunction(functionNode: FunctionDeclaration | VariableDeclaration) {
+            return function (node: Node): VisitResult<Node> {
                 const funcNameSymbol = getSymbolAtLocation(functionNode.name!);
                 if (isCallExpression(node) && isIdentifier(node.expression)) {
                     const callNameSymbol = getSymbolAtLocation(node.expression);
@@ -36630,12 +36638,12 @@ namespace ts {
                     }
                 }
                 return visitEachChild(node, checkTailRecNestedFunction(functionNode), nullTransformationContext);
-            }
+            };
         }
 
-        function checkTailRecReturnStatement(functionNode: FunctionDeclaration, parameterSymbols: ReadonlyArray<Symbol>, firstIter = true) {
+        function checkTailRecReturnStatement(functionNode: FunctionDeclaration | VariableDeclaration, parameterSymbols: readonly Symbol[], firstIter = true) {
             return function (node: Node): VisitResult<Node> {
-                const funcNameSymbol = getSymbolAtLocation(functionNode.name!)
+                const funcNameSymbol = getSymbolAtLocation(functionNode.name!);
                 if (isCallExpression(node)) {
                     if(firstIter) {
                         return node;
@@ -36647,9 +36655,9 @@ namespace ts {
                     }
                 }
                 else {
-                    return visitEachChild(node, checkTailRecReturnStatement(functionNode, parameterSymbols, false), nullTransformationContext)
+                    return visitEachChild(node, checkTailRecReturnStatement(functionNode, parameterSymbols, false), nullTransformationContext);
                 }
-            }
+            };
         }
 
         function checkFunctionDeclaration(node: FunctionDeclaration): void {
@@ -37643,6 +37651,9 @@ namespace ts {
 
         function checkVariableDeclaration(node: VariableDeclaration) {
             tracing?.push(tracing.Phase.Check, "checkVariableDeclaration", { kind: node.kind, pos: node.pos, end: node.end, path: (node as TracingNode).tracingPath });
+            if (isTailRec(node)) {
+                checkTailRecVariableDeclaration(node);
+            }
             checkGrammarVariableDeclaration(node);
             checkVariableLikeDeclaration(node);
             tracing?.pop();

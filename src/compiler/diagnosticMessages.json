@@ -7263,5 +7263,9 @@
     "Parameter destructuring is not allowed in a 'tailRec' annotated function.": {
         "category": "Error",
         "code": 50002
+    },
+    "Invalid declaration annotated as 'tailRec'": {
+        "category": "Error",
+        "code": 50003
     }
 }
