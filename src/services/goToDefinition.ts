@@ -52,7 +52,7 @@ namespace ts.GoToDefinition {
             }
             else {
                 const type = typeChecker.getTypeAtLocation(parent.expression);
-                const extensions = typeChecker.getExtensions(type);
+                const extensions = typeChecker.getExtensions(type, parent.expression);
 
                 if(extensions) {
                     const name = parent.name.escapedText.toString();

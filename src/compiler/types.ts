@@ -4523,7 +4523,7 @@ namespace ts {
 
         getGlobalImport(file: SourceFile): string
         getLocalImport(from: SourceFile, file: SourceFile): string
-        getExtensions(targetType: Type): ESMap<string, Symbol>
+        getExtensions(targetType: Type, selfNode: Expression): ESMap<string, Symbol>
         getFluentExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
         getGetterExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
         getStaticExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined

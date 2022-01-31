@@ -352,7 +352,7 @@ namespace ts {
         const importAsCache = new Map<string, string>();
         const typeSymbolCache = new Map<Symbol, string>();
         const fluentCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
-        const getterCache = new Map<string, ESMap<string, { patched: (targetType: Type) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
+        const getterCache = new Map<string, ESMap<string, { patched: (targetType: Type, node: Node) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
         const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
         const staticCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
         const identityCache = new Map<string, FunctionDeclaration>();
@@ -841,7 +841,7 @@ namespace ts {
             })
             return returnArray
         }
-        function getExtensions(targetType: Type) {
+        function getExtensions(targetType: Type, node: Node) {
             const symbols = collectRelevantSymbols(targetType);
             const copy: ESMap<string, Symbol> = new Map();
             symbols.forEach((target) => {
@@ -862,7 +862,7 @@ namespace ts {
                     const _getter = getterCache.get(typeSymbol);
                     if (_getter) {
                         _getter.forEach((v, k) => {
-                            const symbol = v.patched(targetType);
+                            const symbol = v.patched(targetType, node);
                             if (symbol) {
                                 copy.set(k, symbol);
                             }
@@ -28718,7 +28718,7 @@ namespace ts {
                 }
                 const getterExt = getGetterExtension(leftType, right.escapedText.toString())
                 if (getterExt) {
-                    const symbol = getterExt.patched(leftType)
+                    const symbol = getterExt.patched(leftType, _left)
                     if (symbol) {
                         const type = getTypeOfSymbol(symbol);
                         // @ts-expect-error
@@ -43066,10 +43066,12 @@ namespace ts {
             }
         }
         function getTsPlusGetterSymbolForFunctionDeclaration(_name: string, _dataFirst: FunctionDeclaration) {
-            return (self: Type) => {
+            return (self: Type, selfNode: Expression) => {
+                // const selfNode = factory.createSyntheticExpression(self);
+                // setParent(selfNode, selfNode)
                 const res = checkTsPlusCustomCall(
                     _dataFirst,
-                    [factory.createSyntheticExpression(self)],
+                    [selfNode],
                     CheckMode.Normal
                 );
                 if (isErrorType(res)) {
@@ -43079,10 +43081,12 @@ namespace ts {
             };
         }
         function getTsPlusGetterSymbolForVariableDeclaration(name: string, declaration: VariableDeclaration & { name: Identifier }) {
-            return (self: Type) => {
+            return (self: Type, selfNode: Expression) => {
+                // const selfNode = factory.createSyntheticExpression(self);
+                // setParent(selfNode, selfNode);
                 const res = checkTsPlusCustomCall(
                     declaration,
-                    [factory.createSyntheticExpression(self)],
+                    [selfNode],
                     CheckMode.Normal
                 );
                 if (isErrorType(res)) {

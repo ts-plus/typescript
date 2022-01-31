@@ -1884,12 +1884,12 @@ namespace ts {
                     }
                 }
                 if(isPropertyAccessExpression(node.parent)) {
-                    const parentType = typeChecker.getTypeAtLocation(node.parent.expression);
-                    const extensions = typeChecker.getExtensions(parentType);
+                    const targetType = typeChecker.getTypeAtLocation(node.parent.expression);
+                    const extensions = typeChecker.getExtensions(targetType, node.parent.expression);
                     if(extensions) {
                         const type = typeChecker.getTypeAtLocation(node);
                         const name = node.parent.name.escapedText as string;
-                        const staticSymbol = typeChecker.getStaticExtension(parentType, name);
+                        const staticSymbol = typeChecker.getStaticExtension(targetType, name);
                         if(type && staticSymbol) {
                             const declaration = staticSymbol.patched.valueDeclaration;
                             if (declaration) {
