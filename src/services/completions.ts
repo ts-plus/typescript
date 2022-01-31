@@ -2172,8 +2172,8 @@ namespace ts.Completions {
                 }
             }
 
-            if (isExpressionNode(node)) {
-                const extensions = typeChecker.getExtensions(type, node as Expression);
+            if (isExpression(node)) {
+                const extensions = typeChecker.getExtensions(node);
                 if (extensions) {
                     extensions.forEach((extension) => {
                         addPropertySymbol(extension, /* insertAwait */ false, /* insertQuestionDot */ false);

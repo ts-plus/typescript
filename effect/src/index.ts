@@ -52,4 +52,11 @@ export function arrayGetter <A>(self: Array<A>): Array<A> {
   return self;
 }
 
-const a = [1, 2, 3].map0((a) => a).getter.map0((a) => a).getter
+/**
+ * @tsplus getter Array head
+ */
+export function arrayHead <A>(self: Array<A>): A | undefined {
+  return self[0]
+}
+
+const a = [1, 2, 3].map0((a) => a).getter.map0((a) => a).getter.head

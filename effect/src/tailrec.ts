@@ -5,7 +5,7 @@ import * as O from '@effect-ts/core/Option'
 /**
  * @tsplus tailRec
  */
-function fac (x: number, acc = 1): number {
+function fac(x: number, acc = 1): number {
     if (x === 0) {
         return acc;
     }
@@ -15,7 +15,7 @@ function fac (x: number, acc = 1): number {
 /**
  * @tsplus tailRec
  */
- function findLoop <A, B>(
+ function findLoop<A, B>(
     cause: C.Cause<A>,
     f: (cause: C.Cause<A>) => O.Option<B>,
     stack: L.List<C.Cause<A>>
