@@ -41,8 +41,15 @@ declare global {
 /**
  * @tsplus fluent Array map0
  */
-export function afunc <A>(self: Array<A>, f: (a: A) => A): Array<A> {
+export function arrayFunc <A>(self: Array<A>, f: (a: A) => A): Array<A> {
   return self.map(f);
 }
 
-[].map0((a) => a)
+/**
+ * @tsplus getter Array getter
+ */
+export function arrayGetter <A>(self: Array<A>): Array<A> {
+  return self;
+}
+
+const a = [1, 2, 3].map0((a) => a).getter.map0((a) => a).getter

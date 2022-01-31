@@ -1679,7 +1679,7 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION BEGIN
-        function getUntracedDisplayParts(typeChecker: TypeChecker, node: Node, declaration: FunctionDeclaration | VariableDeclaration & { name: Identifier }, resolvedSignature: Signature, /* symbol: TsPlusStaticSymbol | TsPlusFluentSymbol | TsPlusFluentVariableSymbol */): SymbolDisplayPart[] {
+        function getUntracedDisplayParts(typeChecker: TypeChecker, node: Node, declaration: FunctionDeclaration | VariableDeclaration & { name: Identifier }, resolvedSignature: Signature): SymbolDisplayPart[] {
             const paramLength = resolvedSignature.parameters.length;
             const lastParam = resolvedSignature.parameters[paramLength - 1];
             if (resolvedSignature.parameters.every(isSymbolParameterDeclaration) && lastParam && lastParam.name === "__tsplusTrace") {
@@ -1695,7 +1695,8 @@ namespace ts {
                         declaration.type,
                         undefined
                     );
-                } else {
+                }
+                else {
                     untracedDeclaration = factory.createFunctionDeclaration(
                         declaration.decorators,
                         declaration.modifiers,
@@ -1723,7 +1724,8 @@ namespace ts {
                     cancellationToken,
                     typeChecker => signatureToDisplayParts(typeChecker, untracedSignature, getContainerNode(node))
                 );
-            } else {
+            }
+            else {
                 return typeChecker.runWithCancellationToken(
                     cancellationToken,
                     typeChecker => signatureToDisplayParts(typeChecker, resolvedSignature, getContainerNode(node))
@@ -1747,11 +1749,11 @@ namespace ts {
             const symbol = getSymbolAtLocationForQuickInfo(nodeForQuickInfo, typeChecker);
 
             // TSPLUS EXTENSION BEGIN
-            const call = typeChecker.getCallExtension(nodeForQuickInfo)
+            const call = typeChecker.getCallExtension(nodeForQuickInfo);
             if(call) {
-                const symbol = typeChecker.getTypeOfSymbol(call.patched).symbol
+                const symbol = typeChecker.getTypeOfSymbol(call.patched).symbol;
                 if(isTsPlusSymbol(symbol) && symbol.tsPlusTag === TsPlusSymbolTag.Static) {
-                    let displayParts: SymbolDisplayPart[] = []
+                    let displayParts: SymbolDisplayPart[] = [];
                     displayParts.push(textPart("("));
                     displayParts.push(textPart("call"));
                     displayParts.push(textPart(")"));
@@ -1773,80 +1775,88 @@ namespace ts {
             if (!symbol || typeChecker.isUnknownSymbol(symbol)) {
                 const type = shouldGetType(sourceFile, nodeForQuickInfo, position) ? typeChecker.getTypeAtLocation(nodeForQuickInfo) : undefined;
                 // TSPLUS EXTENSION BEGIN
-                if(type && type.symbol && isTsPlusSymbol(type.symbol)) {
-                    let displayParts: SymbolDisplayPart[] = []
-                    switch(type.symbol.tsPlusTag) {
-                        case TsPlusSymbolTag.FluentVariable:
-                        case TsPlusSymbolTag.Fluent: {
-                            displayParts.push(textPart("("));
-                            displayParts.push(textPart("fluent"));
-                            displayParts.push(textPart(")"));
-                            displayParts.push(spacePart());
-                            displayParts.push(displayPart(getThisTypeNameForTsPlusSymbol(type.symbol), SymbolDisplayPartKind.className));
-                            displayParts.push(punctuationPart(SyntaxKind.DotToken));
-                            displayParts.push(displayPart(type.symbol.escapedName as string, SymbolDisplayPartKind.methodName));
-                            break;
-                        }
-                        case TsPlusSymbolTag.Static: {
-                            displayParts.push(textPart("("));
-                            displayParts.push(textPart("static"));
-                            displayParts.push(textPart(")"));
-                            displayParts.push(spacePart());
-                            displayParts.push(displayPart(type.symbol.escapedName as string, SymbolDisplayPartKind.methodName));
-                            break;
-                        }
-                        case TsPlusSymbolTag.GetterVariable:
-                        case TsPlusSymbolTag.Getter: {
-                            displayParts.push(textPart("("));
-                            displayParts.push(textPart("getter"));
-                            displayParts.push(textPart(")"));
-                            displayParts.push(spacePart());
-                            displayParts.push(displayPart(getThisTypeNameForTsPlusSymbol(type.symbol), SymbolDisplayPartKind.className));
-                            displayParts.push(punctuationPart(SyntaxKind.DotToken));
-                            displayParts.push(displayPart(type.symbol.name, SymbolDisplayPartKind.fieldName));
-                            displayParts.push(punctuationPart(SyntaxKind.ColonToken));
-                            displayParts.push(spacePart());
-                            break;
-                        }
+                if (type) {
+                    let tsPlusSymbol: TsPlusSymbol | undefined;
+                    if (type.symbol && isTsPlusSymbol(type.symbol)) {
+                        tsPlusSymbol = type.symbol;
                     }
-                    switch(type.symbol.tsPlusTag) {
-                        case TsPlusSymbolTag.FluentVariable:
-                        case TsPlusSymbolTag.Fluent:
-                        case TsPlusSymbolTag.Static: {
-                            const symbol = type.symbol;
-                            const declaration = symbol.tsPlusDeclaration;
-                            displayParts = displayParts.concat(getUntracedDisplayParts(typeChecker, nodeForQuickInfo, declaration, symbol.tsPlusResolvedSignatures[0]));
-                            return {
-                                kind: ScriptElementKind.memberFunctionElement,
-                                kindModifiers: ScriptElementKindModifier.staticModifier,
-                                textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
-                                displayParts,
-                                documentation: getDocumentationComment([declaration], typeChecker),
-                                tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
-                            };
+                    else if (type && isTsPlusType(type)) {
+                        tsPlusSymbol = type.tsPlusSymbol;
+                    }
+                    if(tsPlusSymbol) {
+                        let displayParts: SymbolDisplayPart[] = [];
+                        switch(tsPlusSymbol.tsPlusTag) {
+                            case TsPlusSymbolTag.FluentVariable:
+                            case TsPlusSymbolTag.Fluent: {
+                                displayParts.push(textPart("("));
+                                displayParts.push(textPart("fluent"));
+                                displayParts.push(textPart(")"));
+                                displayParts.push(spacePart());
+                                displayParts.push(displayPart(getThisTypeNameForTsPlusSymbol(tsPlusSymbol), SymbolDisplayPartKind.className));
+                                displayParts.push(punctuationPart(SyntaxKind.DotToken));
+                                displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.methodName));
+                                break;
+                            }
+                            case TsPlusSymbolTag.Static: {
+                                displayParts.push(textPart("("));
+                                displayParts.push(textPart("static"));
+                                displayParts.push(textPart(")"));
+                                displayParts.push(spacePart());
+                                displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.methodName));
+                                break;
+                            }
+                            case TsPlusSymbolTag.GetterVariable:
+                            case TsPlusSymbolTag.Getter: {
+                                displayParts.push(textPart("("));
+                                displayParts.push(textPart("getter"));
+                                displayParts.push(textPart(")"));
+                                displayParts.push(spacePart());
+                                displayParts.push(displayPart(getThisTypeNameForTsPlusSymbol(tsPlusSymbol), SymbolDisplayPartKind.className));
+                                displayParts.push(punctuationPart(SyntaxKind.DotToken));
+                                displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.fieldName));
+                                displayParts.push(punctuationPart(SyntaxKind.ColonToken));
+                                displayParts.push(spacePart());
+                                break;
+                            }
                         }
-                        case TsPlusSymbolTag.GetterVariable:
-                        case TsPlusSymbolTag.Getter: {
-                            displayParts = displayParts.concat(typeChecker.runWithCancellationToken(cancellationToken, typeChecker => typeToDisplayParts(typeChecker, type, getContainerNode(nodeForQuickInfo))));
-                            return {
-                                kind: ScriptElementKind.memberGetAccessorElement,
-                                kindModifiers: ScriptElementKindModifier.none,
-                                textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
-                                displayParts,
-                                documentation: getDocumentationComment([type.symbol.tsPlusDeclaration], typeChecker),
-                                tags: getJsDocTagsOfDeclarations([type.symbol.tsPlusDeclaration], typeChecker)
+                        switch(tsPlusSymbol.tsPlusTag) {
+                            case TsPlusSymbolTag.FluentVariable:
+                            case TsPlusSymbolTag.Fluent:
+                            case TsPlusSymbolTag.Static: {
+                                const declaration = tsPlusSymbol.tsPlusDeclaration;
+                                displayParts = displayParts.concat(getUntracedDisplayParts(typeChecker, nodeForQuickInfo, declaration, tsPlusSymbol.tsPlusResolvedSignatures[0]));
+                                return {
+                                    kind: ScriptElementKind.memberFunctionElement,
+                                    kindModifiers: ScriptElementKindModifier.staticModifier,
+                                    textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                                    displayParts,
+                                    documentation: getDocumentationComment([declaration], typeChecker),
+                                    tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
+                                };
+                            }
+                            case TsPlusSymbolTag.GetterVariable:
+                            case TsPlusSymbolTag.Getter: {
+                                displayParts = displayParts.concat(typeChecker.runWithCancellationToken(cancellationToken, typeChecker => typeToDisplayParts(typeChecker, type, getContainerNode(nodeForQuickInfo))));
+                                return {
+                                    kind: ScriptElementKind.memberGetAccessorElement,
+                                    kindModifiers: ScriptElementKindModifier.none,
+                                    textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                                    displayParts,
+                                    documentation: getDocumentationComment([tsPlusSymbol.tsPlusDeclaration], typeChecker),
+                                    tags: getJsDocTagsOfDeclarations([tsPlusSymbol.tsPlusDeclaration], typeChecker)
+                                };
                             }
                         }
                     }
                 }
                 if (isToken(node) && isBinaryExpression(node.parent)) {
-                    const leftType = typeChecker.getTypeAtLocation(node.parent.left)
+                    const leftType = typeChecker.getTypeAtLocation(node.parent.left);
                     const operator = typeChecker.getTextOfBinaryOp(node.kind);
                     if (operator) {
-                        const overload = typeChecker.getOperatorExtension(leftType, operator)
+                        const overload = typeChecker.getOperatorExtension(leftType, operator);
                         if (overload) {
-                            const declaration = find(overload.patched.declarations || [], isFunctionDeclaration)
-                            const declarationSignature = declaration ? typeChecker.getSignatureFromDeclaration(declaration) : undefined
+                            const declaration = find(overload.patched.declarations || [], isFunctionDeclaration);
+                            const declarationSignature = declaration ? typeChecker.getSignatureFromDeclaration(declaration) : undefined;
                             if (declaration && declarationSignature) {
                                 let displayParts: SymbolDisplayPart[] = [];
                                 displayParts.push(textPart("("));
@@ -1860,7 +1870,7 @@ namespace ts {
                                         cancellationToken,
                                         (typeChecker) => getUntracedDisplayParts(typeChecker, node, declaration, declarationSignature)
                                     )
-                                )
+                                );
                                 return {
                                     kind: ScriptElementKind.functionElement,
                                     kindModifiers: ScriptElementKindModifier.none,
@@ -1868,7 +1878,7 @@ namespace ts {
                                     displayParts,
                                     documentation: getDocumentationComment([declaration], typeChecker),
                                     tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
-                                }
+                                };
                             }
                         }
                     }
@@ -1881,7 +1891,7 @@ namespace ts {
                         const name = node.parent.name.escapedText as string;
                         const staticSymbol = typeChecker.getStaticExtension(parentType, name);
                         if(type && staticSymbol) {
-                            const declaration = staticSymbol.patched.valueDeclaration
+                            const declaration = staticSymbol.patched.valueDeclaration;
                             if (declaration) {
                                 let displayParts: SymbolDisplayPart[] = [];
                                 displayParts.push(textPart("("));
@@ -1889,7 +1899,7 @@ namespace ts {
                                 displayParts.push(textPart(")"));
                                 displayParts.push(spacePart());
                                 displayParts.push(displayPart(name, SymbolDisplayPartKind.fieldName));
-                                displayParts.push(punctuationPart(SyntaxKind.ColonToken))
+                                displayParts.push(punctuationPart(SyntaxKind.ColonToken));
                                 displayParts.push(spacePart());
                                 displayParts = displayParts.concat(
                                     typeChecker.runWithCancellationToken(
@@ -1904,7 +1914,7 @@ namespace ts {
                                     displayParts,
                                     documentation: getDocumentationComment([declaration], typeChecker),
                                     tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
-                                }
+                                };
                             }
                         }
                     }
