@@ -1,16 +1,9 @@
 {
-    "compilerOptions": {
-        "module": "ESNext",
-        "target": "ES2021",
-        "moduleResolution": "Node",
-        "strict": true,
-        "outDir": "build/esm",
-        "declaration": true,
-        "declarationDir": "build/dts",
-        "skipLibCheck": true,
-        "lib": ["ES2021"],
-        "tsPlusModuleDiscoveryLocalSuffix": "js",
-        "tsPlusTracingPackageName": "@app"
-    },
-    "include": ["src/**/*.ts"]
-}
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {},
+    "include": [],
+    "references": [
+      { "path": "./src/a" },
+      { "path": "./src/b" }
+    ]
+  }

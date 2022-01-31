@@ -43296,6 +43296,9 @@ namespace ts {
             getterCache.clear();
             callCache.clear();
             for (const file of host.getSourceFiles()) {
+                if (file.fileName.includes("effect")) {
+                    console.log(file.fileName, compilerOptions.configFilePath, file.resolvedPath, file.resolvedPath === file.path);
+                }
                 collectTsPlusSymbols(file, file.statements);
             }
         }

@@ -59,9 +59,13 @@ namespace ts {
                         )
                     )
                 ] : [];
+                const statements = [...fileVarDef, ...imports, ...transformed.statements]
+                node.resolvedModules?.forEach((elem) => {
+                    console.log(elem)
+                })
                 return context.factory.updateSourceFile(
                     transformed,
-                    [...fileVarDef, ...imports, ...transformed.statements],
+                    statements,
                     transformed.isDeclarationFile,
                     transformed.referencedFiles,
                     transformed.typeReferenceDirectives,
@@ -248,7 +252,10 @@ namespace ts {
                 return factory.createIdentifier(extension.exportName);
             }
 
-            const id = importer.get(extension.definition.isDeclarationFile ? checker.getGlobalImport(extension.definition) : checker.getLocalImport(source, extension.definition));
+            // THIS HAS BEEN TMP DISABLED TO AVOID AN EXCEPTION
+            // const id = importer.get(extension.definition.isDeclarationFile ? checker.getGlobalImport(extension.definition) : checker.getLocalImport(source, extension.definition));
+
+            const id = importer.get(checker.getLocalImport(source, extension.definition));
 
             return factory.createPropertyAccessExpression(
                 id,

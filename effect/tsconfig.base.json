@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+      "composite": true,
+      "declaration": true,
+      "declarationMap": true,
+      "incremental": true,
+      "isolatedModules": true,
+      "esModuleInterop": true,
+      "lib": ["ES2020", "DOM"],
+      "moduleResolution": "node",
+      "sourceMap": true,
+      "skipLibCheck": true,
+      "strict": true,
+      "noUncheckedIndexedAccess": true,
+      "noErrorTruncation": true,
+      "resolveJsonModule": true,
+      "target": "ES2020"
+    }
+  }
