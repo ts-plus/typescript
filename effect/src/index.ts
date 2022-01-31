@@ -31,14 +31,25 @@ x.assertJust();
 
 const z = x.value;
 
+declare global {
+  /**
+   * @tsplus type Array
+   */
+  export interface Array<T> {}
+}
 
+/**
+ * @tsplus fluent Array map0
+ */
+export function arrayFunc <A>(self: Array<A>, f: (a: A) => A): Array<A> {
+  return self.map(f);
+}
 
+/**
+ * @tsplus getter Array getter
+ */
+export function arrayGetter <A>(self: Array<A>): Array<A> {
+  return self;
+}
 
-
-
-
-
-
-
-
-Effect.fail(0)
+const a = [1, 2, 3].map0((a) => a).getter.map0((a) => a).getter

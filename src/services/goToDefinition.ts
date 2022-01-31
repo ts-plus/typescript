@@ -46,9 +46,13 @@ namespace ts.GoToDefinition {
             const nodeType = typeChecker.getTypeAtLocation(node);
             if(nodeType.symbol && isTsPlusSymbol(nodeType.symbol)) {
                 symbol = nodeType.symbol.tsPlusDeclaration.symbol;
-            } else {
+            }
+            else if (isTsPlusType(nodeType)) {
+                symbol = nodeType.tsPlusSymbol.tsPlusDeclaration.symbol;
+            }
+            else {
                 const type = typeChecker.getTypeAtLocation(parent.expression);
-                const extensions = typeChecker.getExtensions(type);
+                const extensions = typeChecker.getExtensions(type, parent.expression);
 
                 if(extensions) {
                     const name = parent.name.escapedText.toString();

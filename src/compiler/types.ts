@@ -3313,6 +3313,7 @@ namespace ts {
         tsPlusTag: TsPlusSymbolTag.Fluent
         tsPlusDeclaration: FunctionDeclaration;
         tsPlusResolvedSignatures: Signature[];
+        tsPlusName: string;
     }
 
     export type SignatureWithParameters = Omit<Signature, "parameters"> & { parameters: ReadonlyArray<Symbol & { valueDeclaration: ParameterDeclaration }> }
@@ -3322,24 +3323,28 @@ namespace ts {
         tsPlusDeclaration: VariableDeclaration & { name: Identifier };
         tsPlusParameters: ReadonlyArray<ParameterDeclaration>;
         tsPlusResolvedSignatures: SignatureWithParameters[];
+        tsPlusName: string;
     }
 
     export interface TsPlusStaticSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.Static;
         tsPlusDeclaration: FunctionDeclaration;
         tsPlusResolvedSignatures: Signature[];
+        tsPlusName: string;
     }
 
     export interface TsPlusGetterSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.Getter;
         tsPlusSelfType: Type;
         tsPlusDeclaration: FunctionDeclaration;
+        tsPlusName: string;
     }
 
     export interface TsPlusGetterVariableSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.GetterVariable;
         tsPlusDeclaration: VariableDeclaration & { name: Identifier };
         tsPlusSelfType: Type;
+        tsPlusName: string;
     }
 
     export type TsPlusSymbol =
@@ -3348,6 +3353,10 @@ namespace ts {
         | TsPlusGetterSymbol
         | TsPlusFluentVariableSymbol
         | TsPlusGetterVariableSymbol;
+
+    export interface TsPlusType extends Type {
+        tsPlusSymbol: TsPlusSymbol;
+    }
 
     export interface JSDocLink extends Node {
         readonly kind: SyntaxKind.JSDocLink;
@@ -4514,7 +4523,7 @@ namespace ts {
 
         getGlobalImport(file: SourceFile): string
         getLocalImport(from: SourceFile, file: SourceFile): string
-        getExtensions(targetType: Type): ESMap<string, Symbol>
+        getExtensions(targetType: Type, selfNode: Expression): ESMap<string, Symbol>
         getFluentExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
         getGetterExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
         getStaticExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined

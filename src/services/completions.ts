@@ -2172,11 +2172,13 @@ namespace ts.Completions {
                 }
             }
 
-            const extensions = typeChecker.getExtensions(type);
-            if (extensions) {
-                extensions.forEach((extension) => {
-                    addPropertySymbol(extension, /* insertAwait */ false, /* insertQuestionDot */ false);
-                });
+            if (isExpressionNode(node)) {
+                const extensions = typeChecker.getExtensions(type, node as Expression);
+                if (extensions) {
+                    extensions.forEach((extension) => {
+                        addPropertySymbol(extension, /* insertAwait */ false, /* insertQuestionDot */ false);
+                    });
+                }
             }
 
             if (insertAwait && preferences.includeCompletionsWithInsertText) {
