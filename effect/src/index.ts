@@ -31,14 +31,18 @@ x.assertJust();
 
 const z = x.value;
 
+declare global {
+  /**
+   * @tsplus type Array
+   */
+  export interface Array<T> {}
+}
 
+/**
+ * @tsplus fluent Array map0
+ */
+export function afunc <A>(self: Array<A>, f: (a: A) => A): Array<A> {
+  return self.map(f);
+}
 
-
-
-
-
-
-
-
-
-Effect.fail(0)
+[].map0((a) => a)

@@ -43252,12 +43252,12 @@ namespace ts {
         }
         function collectTsPlusSymbols(file: SourceFile, statements: NodeArray<Statement>): void {
             for (const statement of statements) {
+                if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
+                    collectTsPlusSymbols(file, statement.body.statements)
+                }
                 if(statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
                     if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
                         tryCacheTsPlusType(statement)
-                    }
-                    if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
-                        collectTsPlusSymbols(file, statement.body.statements)
                     }
                     if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
                         tryCacheTsPlusStaticVariable(file, statement);
