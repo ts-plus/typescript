@@ -1,5 +1,6 @@
 import { Effect } from "./prelude.js";
 import { Maybe } from "./prelude.js";
+import { Nothing } from "./prelude/definition/Maybe.js";
 
 export const isPositive = (n: number) =>
   n > 0 ? Maybe.just("positive") : Maybe.nothing();
@@ -30,6 +31,8 @@ const y = x.isJust() ? x.value : undefined;
 x.assertJust();
 
 const z = x.value;
+
+const z2 = x.isJust() ? x.zip(Maybe.just("ok")) : 0
 
 declare global {
   /**
@@ -90,3 +93,16 @@ Maybe.just(0).identityGetter
 Maybe.identity(0)
 
 Effect.identity(0)
+
+const maybe: Maybe<number> = Maybe.just(0)
+
+if (maybe.isNothing()) {
+  const u = maybe
+  const x = maybe.assertJust()
+}
+
+const xx3: Nothing = {
+  _tag: "Nothing"
+}
+
+const x4 = xx3.assertJust()

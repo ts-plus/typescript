@@ -1,3 +1,6 @@
+/**
+ * @tsplus type Nothing
+ */
 export interface Nothing {
     readonly _tag: "Nothing"
 }
@@ -65,12 +68,26 @@ export function isJust<A>(self: Maybe<A>): self is Just<A> {
 }
 
 /**
+ * @tsplus fluent Maybe isNothing
+ */
+export function isNothing<A>(self: Maybe<A>): self is Nothing {
+    return self._tag === "Nothing";
+}
+
+/**
  * @tsplus fluent Maybe assertJust
  */
 export function assertJust<A>(self: Maybe<A>): asserts self is Just<A> {
     if(self._tag !== "Just") {
         throw new Error("Not Just");
     }
+}
+
+/**
+ * @tsplus fluent Nothing assertJust
+ */
+export function assertJustNothing(self: Nothing): never {
+    throw new Error("Not Just");
 }
     
 

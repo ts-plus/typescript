@@ -350,7 +350,7 @@ namespace ts {
 
         // TSPLUS EXTENSION START
         const importAsCache = new Map<string, string>();
-        const typeSymbolCache = new Map<Symbol, string>();
+        const typeSymbolCache = new Map<Symbol, string[]>();
         const fluentCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
         const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
@@ -835,28 +835,29 @@ namespace ts {
             const copy: ESMap<string, Symbol> = new Map();
             symbols.forEach((target) => {
                 if (typeSymbolCache.has(target)) {
-                    const typeSymbol = typeSymbolCache.get(target)!;
-                    const _static = staticCache.get(typeSymbol);
-                    if (_static) {
-                        _static.forEach((v, k) => {
-                            copy.set(k, v.patched);
-                        });
-                    }
-                    const _fluent = fluentCache.get(typeSymbol);
-                    if (_fluent) {
-                        _fluent.forEach((v, k) => {
-                            copy.set(k, v.patched);
-                        });
-                    }
-                    const _getter = getterCache.get(typeSymbol);
-                    if (_getter) {
-                        _getter.forEach((v, k) => {
-                            const symbol = v.patched(selfNode);
-                            if (symbol) {
-                                copy.set(k, symbol);
-                            }
-                        });
-                    }
+                    typeSymbolCache.get(target)!.forEach((typeSymbol) => {
+                        const _static = staticCache.get(typeSymbol);
+                        if (_static) {
+                            _static.forEach((v, k) => {
+                                copy.set(k, v.patched);
+                            });
+                        }
+                        const _fluent = fluentCache.get(typeSymbol);
+                        if (_fluent) {
+                            _fluent.forEach((v, k) => {
+                                copy.set(k, v.patched);
+                            });
+                        }
+                        const _getter = getterCache.get(typeSymbol);
+                        if (_getter) {
+                            _getter.forEach((v, k) => {
+                                const symbol = v.patched(selfNode);
+                                if (symbol) {
+                                    copy.set(k, symbol);
+                                }
+                            });
+                        }
+                    });
                 }
             })
             copy.delete("__call");
@@ -866,8 +867,18 @@ namespace ts {
             const symbols = collectRelevantSymbols(targetType)
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
-                    const typeSymbol = typeSymbolCache.get(target)!;
-                    return fluentCache.get(typeSymbol)?.get(name);
+                    const x = typeSymbolCache.get(target)!.flatMap(
+                        (tag) => {
+                            if (fluentCache.has(tag)) {
+                                const cache = fluentCache.get(tag)
+                                if (cache?.has(name)) {
+                                    return [cache.get(name)!]
+                                }
+                            }
+                            return []
+                        }
+                    )
+                    return x.length > 0 ? x[x.length - 1] : undefined;
                 }
             }
         }
@@ -875,8 +886,18 @@ namespace ts {
             const symbols = collectRelevantSymbols(targetType)
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
-                    const typeSymbol = typeSymbolCache.get(target)!;
-                    return getterCache.get(typeSymbol)?.get(name);
+                    const x = typeSymbolCache.get(target)!.flatMap(
+                        (tag) => {
+                            if (getterCache.has(tag)) {
+                                const cache = getterCache.get(tag)
+                                if (cache?.has(name)) {
+                                    return [cache.get(name)!]
+                                }
+                            }
+                            return []
+                        }
+                    )
+                    return x.length > 0 ? x[x.length - 1] : undefined;
                 }
             }
         }
@@ -884,8 +905,18 @@ namespace ts {
             const symbols = collectRelevantSymbols(targetType)
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
-                    const typeSymbol = typeSymbolCache.get(target)!;
-                    return staticCache.get(typeSymbol)?.get(name);
+                    const x = typeSymbolCache.get(target)!.flatMap(
+                        (tag) => {
+                            if (staticCache.has(tag)) {
+                                const cache = staticCache.get(tag)
+                                if (cache?.has(name)) {
+                                    return [cache.get(name)!]
+                                }
+                            }
+                            return []
+                        }
+                    )
+                    return x.length > 0 ? x[x.length - 1] : undefined;
                 }
             }
         }
@@ -893,8 +924,18 @@ namespace ts {
             const symbols = collectRelevantSymbols(targetType)
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
-                    const typeSymbol = typeSymbolCache.get(target)!;
-                    return operatorCache.get(typeSymbol)?.get(name);
+                    const x = typeSymbolCache.get(target)!.flatMap(
+                        (tag) => {
+                            if (operatorCache.has(tag)) {
+                                const cache = operatorCache.get(tag)
+                                if (cache?.has(name)) {
+                                    return [cache.get(name)!]
+                                }
+                            }
+                            return []
+                        }
+                    )
+                    return x.length > 0 ? x[x.length - 1] : undefined;
                 }
             }
         }
@@ -43065,15 +43106,40 @@ namespace ts {
             const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
             return createSymbolWithType(symbol, final);
         }
+        function addToTypeSymbolCache(symbol: Symbol, tag: string, priority: "before" | "after") {
+            if (!typeSymbolCache.has(symbol)) {
+                typeSymbolCache.set(symbol, [])
+            }
+            const tags = typeSymbolCache.get(symbol)!
+            if (!tags.includes(tag)) {
+                if (priority === "before") {
+                    typeSymbolCache.set(symbol, [tag, ...tags])
+                } else {
+                    tags.push(tag)
+                }
+            }
+        }
         function tryCacheTsPlusType(declaration: InterfaceDeclaration | TypeAliasDeclaration): void {
             const tag = collectTsPlusTypeTags(declaration)[0];
             if (tag) {
                 const type = getTypeOfNode(declaration);
+                const typeTag = tag.comment.replace(/^type /, "");
                 if (type.symbol) {
-                    typeSymbolCache.set(type.symbol, tag.comment.replace(/^type /, ""));
+                    addToTypeSymbolCache(type.symbol, typeTag, "after");
                 }
                 if (type.aliasSymbol) {
-                    typeSymbolCache.set(type.aliasSymbol, tag.comment.replace(/^type /, ""));
+                    addToTypeSymbolCache(type.aliasSymbol, typeTag, "after");
+                }
+                if (type.flags & TypeFlags.Union) {
+                    const types = (type as UnionType).types;
+                    for (const member of types) {
+                        if (member.symbol) {
+                            addToTypeSymbolCache(member.symbol, typeTag, "before");
+                        }
+                        if (member.aliasSymbol) {
+                            addToTypeSymbolCache(member.aliasSymbol, typeTag, "before");
+                        }
+                    }
                 }
             }
         }
