@@ -810,20 +810,8 @@ namespace ts {
         }
         function shouldMakeLazy(signatureParam: Symbol, callArg: Type) {
             const type = getTypeOfParameter(signatureParam);
-            if (type.flags & TypeFlags.Union) {
-                const types = (type as UnionType).types;
-                const lazyArg = types.find((type) => {
-                    if (type.symbol) {
-                        const tag = type.symbol.declarations?.flatMap(collectTsPlusTypeTags)[0];
-                        if (tag?.comment === "type tsplus/LazyArgument") {
-                            return true;
-                        }
-                    }
-                    return false;
-                });
-                if (lazyArg) {
-                    return !isTypeAssignableTo(callArg, lazyArg);
-                }
+            if (isLazyParameterByType(type)) {
+                return !isTypeAssignableTo(callArg, type);
             }
             return false
         }
@@ -29758,7 +29746,10 @@ namespace ts {
             for (let i = 0; i < argCount; i++) {
                 const arg = args[i];
                 if (arg.kind !== SyntaxKind.OmittedExpression) {
-                    const paramType = getTypeAtPosition(signature, i);
+                    // TSPLUS EXTENTION BEGIN
+                    const _paramType = getTypeAtPosition(signature, i);
+                    const paramType = isLazyParameterByType(_paramType) ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
+                    // TSPLUS EXTENTION END
                     const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
                     inferTypes(context.inferences, argType, paramType);
                 }
@@ -29771,6 +29762,18 @@ namespace ts {
 
             return getInferredTypes(context);
         }
+
+        // TSPLUS EXTENSION BEGIN
+        function isLazyParameterByType(type: Type) {
+            if (type.symbol && type.symbol.declarations && type.symbol.declarations.length > 0) {
+                const tag = collectTsPlusTypeTags(type.symbol.declarations[0])[0];
+                if (tag && tag.comment === "type tsplus/LazyArgument") {
+                    return true;
+                }
+            }
+            return false;
+        }
+        // TSPLUS EXTENSION END
 
         function getMutableArrayOrTupleType(type: Type) {
             return type.flags & TypeFlags.Union ? mapType(type, getMutableArrayOrTupleType) :
@@ -30007,7 +30010,10 @@ namespace ts {
             for (let i = 0; i < argCount; i++) {
                 const arg = args[i];
                 if (arg.kind !== SyntaxKind.OmittedExpression) {
-                    const paramType = getTypeAtPosition(signature, i);
+                    // TSPLUS EXTENTION BEGIN
+                    const _paramType = getTypeAtPosition(signature, i);
+                    const paramType = isLazyParameterByType(_paramType) ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
+                    // TSPLUS EXTENTION END
                     const argType = checkExpressionWithContextualType(arg, paramType, /*inferenceContext*/ undefined, checkMode);
                     // If one or more arguments are still excluded (as indicated by CheckMode.SkipContextSensitive),
                     // we obtain the regular type of any object literal arguments because we may not have inferred complete
@@ -30729,18 +30735,6 @@ namespace ts {
 
             return maxParamsIndex;
         }
-        // TSPLUS EXTENSION BEGIN
-        function isLazyParameter(parameter: Symbol) {
-            const type: Type = getTypeOfSymbol(parameter)
-            if (type.symbol && type.symbol.declarations && type.symbol.declarations.length > 0) {
-                const tag = collectTsPlusTypeTags(type.symbol.declarations[0])[0];
-                if (tag && tag.comment === "type tsplus/LazyArgument") {
-                    return true;
-                }
-            }
-            return false;
-        }
-        // TSPLUS EXTENSION END
         function resolveCallExpression(node: CallExpression, candidatesOutArray: Signature[] | undefined, checkMode: CheckMode): Signature {
             if (node.expression.kind === SyntaxKind.SuperKeyword) {
                 const superType = checkSuperExpression(node.expression);
@@ -30807,16 +30801,6 @@ namespace ts {
                     callCache.set(node.expression, callExtension);
                 }
             }
-            callSignatures = callSignatures.map((s) => {
-                s.parameters = s.parameters.map((p) => {
-                    const type = getTypeOfSymbol(p);
-                    if (isLazyParameter(p)) {
-                        return createSymbolWithType(p, getUnionType([type, (type as TypeReference).resolvedTypeArguments![0]]));
-                    }
-                    return p;
-                });
-                return s;
-            })
             // TSPLUS EXTENSION END
 
             const numConstructSignatures = getSignaturesOfType(apparentType, SignatureKind.Construct).length;
@@ -34061,10 +34045,12 @@ namespace ts {
             const context = getContextNode(node);
             const saveContextualType = context.contextualType;
             const saveInferenceContext = context.inferenceContext;
+            
             try {
                 context.contextualType = contextualType;
                 context.inferenceContext = inferenceContext;
                 const type = checkExpression(node, checkMode | CheckMode.Contextual | (inferenceContext ? CheckMode.Inferential : 0));
+
                 // We strip literal freshness when an appropriate contextual type is present such that contextually typed
                 // literals always preserve their literal types (otherwise they might widen during type inference). An alternative
                 // here would be to not mark contextually typed literals as fresh in the first place.
@@ -45276,25 +45262,6 @@ namespace ts {
             }
         }
         return "<anonymous>";
-    }
-
-    export function filterLazyArgument(typeChecker: TypeChecker, parameters: ReadonlyArray<Symbol & { valueDeclaration: ParameterDeclaration }>): ReadonlyArray<Symbol & { valueDeclaration: ParameterDeclaration }> {
-        return map(parameters, (param) => {
-            if (isIdentifier(param.valueDeclaration.name) && getAllJSDocTags(param.valueDeclaration, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && startsWith(tag.comment, "tsplus/LazyArgument"))) {
-                const type = typeChecker.getTypeOfSymbol(param);
-                if (type.flags & TypeFlags.Union) {
-                    if ((type as UnionType).types[1]) {
-                        const newSymbol = typeChecker.cloneSymbol(param);
-                        // @ts-expect-error
-                        newSymbol.type = (type as UnionType).types[1];
-                        return (newSymbol as unknown as Symbol & { valueDeclaration: ParameterDeclaration });
-                    }
-                }
-                return param;
-            } else {
-                return param;
-            }
-        })
     }
 
     export function isLazyParameter(parameter: Symbol & { valueDeclaration: ParameterDeclaration }): boolean {

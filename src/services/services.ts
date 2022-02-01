@@ -1714,7 +1714,7 @@ namespace ts {
                     untracedDeclaration,
                     resolvedSignature.typeParameters,
                     resolvedSignature.thisParameter,
-                    filterLazyArgument(typeChecker, resolvedSignature.parameters.slice(0, resolvedSignature.parameters.length - 1)),
+                    resolvedSignature.parameters,
                     resolvedSignature.getReturnType(),
                     resolvedSignature.resolvedTypePredicate,
                     resolvedSignature.minArgumentCount - 1,
