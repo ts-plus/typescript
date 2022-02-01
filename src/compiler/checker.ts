@@ -14576,17 +14576,6 @@ namespace ts {
             const funcType = getTypeOfNode(declaration);
             const apparentType = getApparentType(funcType);
             const candidate = getSignaturesOfType(apparentType, SignatureKind.Call)[0]!;
-
-            candidate.parameters = candidate.parameters.map((p) => {
-                const type = getTypeOfSymbol(p);
-                if (type.symbol) {
-                    const tag = type.symbol.declarations?.flatMap(collectTsPlusTypeTags)[0];
-                    if (tag?.comment === "type tsplus/LazyArgument") {
-                        return createSymbolWithType(p, getUnionType([type, (type as TypeReference).resolvedTypeArguments![0]]));
-                    }
-                }
-                return p;
-            })
             const node = factory.createCallExpression(
                 factory.createIdentifier("$tsplus_custom_call"),
                 [],
