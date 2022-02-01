@@ -7267,5 +7267,9 @@
     "Invalid declaration annotated as 'tailRec'": {
         "category": "Error",
         "code": 50003
+    },
+    "Values of type 'any' are not allowed in lazy function arguments, if the behaviour is intended use an arrow function.": {
+        "category": "Error",
+        "code": 50004
     }
 }

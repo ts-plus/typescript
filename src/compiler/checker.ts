@@ -30053,9 +30053,18 @@ namespace ts {
                 if (arg.kind !== SyntaxKind.OmittedExpression) {
                     // TSPLUS EXTENTION BEGIN
                     const _paramType = getTypeAtPosition(signature, i);
-                    const paramType = isLazyParameterByType(_paramType) ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
+                    const isLazy = isLazyParameterByType(_paramType);
+                    const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
                     // TSPLUS EXTENTION END
                     const argType = checkExpressionWithContextualType(arg, paramType, /*inferenceContext*/ undefined, checkMode);
+                    // TSPLUS EXTENTION BEGIN
+                    if (isLazy && isTypeIdenticalTo(argType, anyType)) {
+                        return [createDiagnosticForNode(
+                            arg,
+                            Diagnostics.Values_of_type_any_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
+                        )]
+                    }
+                    // TSPLUS EXTENTION END
                     // If one or more arguments are still excluded (as indicated by CheckMode.SkipContextSensitive),
                     // we obtain the regular type of any object literal arguments because we may not have inferred complete
                     // parameter types yet and therefore excess property checks may yield false positives (see #17041).

@@ -106,3 +106,10 @@ const xx3: Nothing = {
 }
 
 const x4 = xx3.assertJust()
+
+const zzz = 0 as any
+
+const zzz2 = Effect.succeed(() => zzz)
+
+// @ts-expect-error
+const zzz3 = Effect.succeed(zzz)
