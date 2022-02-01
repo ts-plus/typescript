@@ -66,3 +66,27 @@ const x2 = Effect(0)
 function id2<A>(a: A): A { return a }
 
 const xxx2 = id2("aaa")
+
+/**
+ * @tsplus fluent ets/Effect identity
+ * @tsplus fluent Maybe identity
+ * @tsplus getter ets/Effect identityGetter
+ * @tsplus getter Maybe identityGetter
+ * @tsplus static ets/EffectOps identity
+ * @tsplus static MaybeOps identity
+ */
+export function identity<A>(self: A): A {
+  return self;
+}
+
+Effect.succeed(0).identity()
+
+Maybe.just(0).identity()
+
+Effect.succeed(0).identityGetter
+
+Maybe.just(0).identityGetter
+
+Maybe.identity(0)
+
+Effect.identity(0)
