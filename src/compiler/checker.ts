@@ -43078,8 +43078,8 @@ namespace ts {
             }
         }
         function tryCacheTsPlusStaticVariable(file: SourceFile, statement: VariableStatement) {
-            const staticTag = collectTsPlusStaticTags(statement)[0];
-            if (staticTag) {
+            const staticTags = collectTsPlusStaticTags(statement);
+            for (const staticTag of staticTags) {
                 const [, target, name] = staticTag.comment.split(" ");
                 if (!staticCache.has(target)) {
                     staticCache.set(target, new Map());
@@ -43101,8 +43101,8 @@ namespace ts {
             if (statement.declarationList.declarations.length === 1) {
                 const declaration = statement.declarationList.declarations[0];
                 if(isIdentifier(declaration.name)) {
-                    const fluentTag = collectTsPlusFluentTags(declaration)[0];
-                    if(fluentTag) {
+                    const fluentTags = collectTsPlusFluentTags(declaration);
+                    for (const fluentTag of fluentTags) {
                         const [, target, name] = fluentTag.comment.split(" ");
                         if (!fluentCache.has(target)) {
                             fluentCache.set(target, new Map());
@@ -43125,10 +43125,10 @@ namespace ts {
         }
         function tryCacheTsPlusGetterVariable(file: SourceFile, statement: VariableStatement) {
             if (statement.declarationList.declarations.length === 1) {
-                const declaration = statement.declarationList.declarations[0]
+                const declaration = statement.declarationList.declarations[0];
                 if (isIdentifier(declaration.name)) {
-                    const getterTag = collectTsPlusGetterTags(declaration)[0];
-                    if (getterTag) {
+                    const getterTags = collectTsPlusGetterTags(declaration);
+                    for (const getterTag of getterTags) {
                         const [, target, name] = getterTag.comment.split(" ");
                         if (!getterCache.has(target)) {
                             getterCache.set(target, new Map())
@@ -43151,8 +43151,8 @@ namespace ts {
         }
         function tryCacheTsPlusOperatorFunction(file: SourceFile, declaration: FunctionDeclaration) {
             if(declaration.name && isIdentifier(declaration.name)) {
-                const operatorTag = collectTsPlusOperatorTags(declaration)[0];
-                if (operatorTag) {
+                const operatorTags = collectTsPlusOperatorTags(declaration);
+                for (const operatorTag of operatorTags) {
                     const symbol = getSymbolAtLocation(declaration.name)
                     if (symbol) {
                         const [, target, name] = operatorTag.comment.split(" ");
@@ -43171,8 +43171,8 @@ namespace ts {
         }
         function tryCacheTsPlusFluentFunction(file: SourceFile, declaration: FunctionDeclaration) {
             if(declaration.name && isIdentifier(declaration.name)) {
-                const fluentTag = collectTsPlusFluentTags(declaration)[0];
-                if (fluentTag) {
+                const fluentTags = collectTsPlusFluentTags(declaration);
+                for (const fluentTag of fluentTags) {
                     const [, target, name] = fluentTag.comment.split(" ");
                     if (!fluentCache.has(target)) {
                         fluentCache.set(target, new Map());
@@ -43188,8 +43188,8 @@ namespace ts {
         }
         function tryCacheTsPlusGetterFunction(file: SourceFile, declaration: FunctionDeclaration) {
             if(declaration.name && isIdentifier(declaration.name)) {
-                const getterTag = collectTsPlusGetterTags(declaration)[0];
-                if (getterTag) {
+                const getterTags = collectTsPlusGetterTags(declaration);
+                for (const getterTag of getterTags) {
                     const [, target, name] = getterTag.comment.split(" ");
                     if (!getterCache.has(target)) {
                         getterCache.set(target, new Map());
@@ -43205,8 +43205,8 @@ namespace ts {
         }
         function tryCacheTsPlusStaticFunction(file: SourceFile, declaration: FunctionDeclaration) {
             if(declaration.name && isIdentifier(declaration.name)) {
-                const staticTag = collectTsPlusStaticTags(declaration)[0];
-                if (staticTag) {
+                const staticTags = collectTsPlusStaticTags(declaration);
+                for (const staticTag of staticTags) {
                     const [, target, name] = staticTag.comment.split(" ");
                     if (!staticCache.has(target)) {
                         staticCache.set(target, new Map());
@@ -43222,8 +43222,8 @@ namespace ts {
         }
         function tryCacheTsPlusUnifyFunction(declaration: FunctionDeclaration) {
             if(declaration.name && isIdentifier(declaration.name)) {
-                const unifyTag = collectTsPlusUnifyTags(declaration)[0];
-                if (unifyTag) {
+                const unifyTags = collectTsPlusUnifyTags(declaration);
+                for (const unifyTag of unifyTags) {
                     const [, target] = unifyTag.comment.split(" ");
                     identityCache.set(target, declaration);
                 }
