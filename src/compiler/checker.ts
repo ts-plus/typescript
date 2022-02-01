@@ -33405,25 +33405,6 @@ namespace ts {
             const trampoline = createBinaryExpressionTrampoline(onEnter, onLeft, onOperator, onRight, onExit, foldState);
 
             return (node: BinaryExpression, checkMode: CheckMode | undefined) => {
-                // TSPLUS EXTENSION START
-                const leftType = getTypeOfNode(node.left);
-                // @ts-expect-error
-                const operator = invertedBinaryOp[node.operatorToken.kind] as string | undefined
-                if (operator) {
-                    const operatorOverload = getOperatorExtension(leftType, operator);
-                    if (operatorOverload) {
-                        const declaration = operatorOverload.patched.declarations?.find(isFunctionDeclaration);
-                        if (declaration) {
-                            return checkTsPlusCustomCall(
-                                declaration as FunctionDeclaration,
-                                [node.left, node.right],
-                                checkMode,
-                                (_) => diagnostics.add(_)
-                            );
-                        }
-                    }
-                }
-                // TSPLUS EXTENSION END
                 const result = trampoline(node, checkMode);
                 Debug.assertIsDefined(result);
                 return result;
@@ -33587,6 +33568,26 @@ namespace ts {
             errorNode?: Node
         ): Type {
             const operator = operatorToken.kind;
+
+            // TSPLUS EXTENSION START
+            // @ts-expect-error
+            const operatorMappingEntry = invertedBinaryOp[operator] as string | undefined
+            if (operatorMappingEntry) {
+                const operatorOverload = getOperatorExtension(leftType, operatorMappingEntry);
+                if (operatorOverload) {
+                    const declaration = operatorOverload.patched.declarations?.find(isFunctionDeclaration);
+                    if (declaration) {
+                        return checkTsPlusCustomCall(
+                            declaration as FunctionDeclaration,
+                            [left, right],
+                            CheckMode.Normal,
+                            (_) => diagnostics.add(_)
+                        );
+                    }
+                }
+            }
+            // TSPLUS EXTENSION END
+
             switch (operator) {
                 case SyntaxKind.AsteriskToken:
                 case SyntaxKind.AsteriskAsteriskToken:
