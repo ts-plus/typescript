@@ -33473,6 +33473,7 @@ namespace ts {
                 checkGrammarNullishCoalesceWithLogicalExpression(node);
 
                 const operator = node.operatorToken.kind;
+
                 if (operator === SyntaxKind.EqualsToken && (node.left.kind === SyntaxKind.ObjectLiteralExpression || node.left.kind === SyntaxKind.ArrayLiteralExpression)) {
                     state.skip = true;
                     setLastResult(state, checkDestructuringAssignment(node.left, checkExpression(node.right, checkMode), checkMode, node.right.kind === SyntaxKind.ThisKeyword));
@@ -33495,6 +33496,25 @@ namespace ts {
                     setLeftType(state, leftType);
                     setLastResult(state, /*type*/ undefined);
                     const operator = operatorToken.kind;
+                    // TSPLUS EXTENSION START
+                    // @ts-expect-error
+                    const operatorMappingEntry = invertedBinaryOp[operator] as string | undefined
+                    if (operatorMappingEntry) {
+                        const operatorOverload = getOperatorExtension(leftType, operatorMappingEntry);
+                        if (operatorOverload) {
+                            const declaration = operatorOverload.patched.declarations?.find(isFunctionDeclaration);
+                            if (declaration) {
+                                setLastResult(state, checkTsPlusCustomCall(
+                                    declaration as FunctionDeclaration,
+                                    [node.left, node.right],
+                                    state.checkMode || CheckMode.Normal,
+                                    (_) => diagnostics.add(_)
+                                ));
+                                state.skip = true;
+                            }
+                        }
+                    }
+                    // TSPLUS EXTENSION END
                     if (operator === SyntaxKind.AmpersandAmpersandToken || operator === SyntaxKind.BarBarToken || operator === SyntaxKind.QuestionQuestionToken) {
                         if (operator === SyntaxKind.AmpersandAmpersandToken) {
                             const parent = walkUpParenthesizedExpressions(node.parent);
@@ -33606,25 +33626,6 @@ namespace ts {
             errorNode?: Node
         ): Type {
             const operator = operatorToken.kind;
-
-            // TSPLUS EXTENSION START
-            // @ts-expect-error
-            const operatorMappingEntry = invertedBinaryOp[operator] as string | undefined
-            if (operatorMappingEntry) {
-                const operatorOverload = getOperatorExtension(leftType, operatorMappingEntry);
-                if (operatorOverload) {
-                    const declaration = operatorOverload.patched.declarations?.find(isFunctionDeclaration);
-                    if (declaration) {
-                        return checkTsPlusCustomCall(
-                            declaration as FunctionDeclaration,
-                            [left, right],
-                            CheckMode.Normal,
-                            (_) => diagnostics.add(_)
-                        );
-                    }
-                }
-            }
-            // TSPLUS EXTENSION END
 
             switch (operator) {
                 case SyntaxKind.AsteriskToken:
