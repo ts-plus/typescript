@@ -28778,7 +28778,7 @@ namespace ts {
             const inType = getPropertiesOfType(leftType).findIndex((p) => p.escapedName === right.escapedText) !== -1;
             if (!inType) {
                 const fluentExt = getFluentExtension(leftType, right.escapedText.toString())
-                if (fluentExt && isCallExpression(node.parent)) {
+                if (fluentExt && isCallExpression(node.parent) && node.parent.expression === node) {
                     return getTypeOfSymbol(fluentExt.patched)
                 }
                 const getterExt = getGetterExtension(leftType, right.escapedText.toString())
