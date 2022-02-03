@@ -20,6 +20,8 @@ export const prog = Effect.do
 
 export const result = prog | Effect.fail("error");
 
+export const zipped = Effect.succeed(0) + Effect.succeed(1)
+
 prog.unsafeRunPromise()
 
 export const xxx = pipe(0, n => n + 1, n => `hello: ${n}`);

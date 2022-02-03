@@ -4534,6 +4534,7 @@ namespace ts {
         isTailRec(node: Node): boolean
         cloneSymbol(symbol: Symbol): Symbol
         getTextOfBinaryOp(kind: SyntaxKind): string | undefined
+        getInstantiatedTsPlusSignature(declaration: Declaration, args: Expression[], checkMode: CheckMode | undefined): Signature
     }
 
     /* @internal */

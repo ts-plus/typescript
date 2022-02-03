@@ -174,7 +174,7 @@ namespace ts {
         ResolvedBaseTypes,
     }
 
-    const enum CheckMode {
+    export const enum CheckMode {
         Normal = 0,                     // Normal type checking
         Contextual = 1 << 0,            // Explicitly assigned contextual type, therefore not cacheable
         Inferential = 1 << 1,           // Inferential typing
@@ -787,7 +787,8 @@ namespace ts {
             isPipeCall,
             isTailRec,
             cloneSymbol,
-            getTextOfBinaryOp
+            getTextOfBinaryOp,
+            getInstantiatedTsPlusSignature
             // TSPLUS EXTENSION END
         };
 
@@ -14634,6 +14635,43 @@ namespace ts {
                 return errorType;
             }
             return getReturnTypeOfSignature(candidate);
+        }
+        function getInstantiatedTsPlusSignature(
+            declaration: Declaration,
+            args: Expression[],
+            checkMode: CheckMode | undefined,
+        ): Signature {
+            const funcType = getTypeOfNode(declaration);
+            const apparentType = getApparentType(funcType);
+            const candidate = getSignaturesOfType(apparentType, SignatureKind.Call)[0]!;
+            const node = factory.createCallExpression(
+                factory.createIdentifier("$tsplus_custom_call"),
+                [],
+                args
+            );
+            setParent(node, declaration.parent);
+            if (candidate.typeParameters) {
+                const inferenceContext = createInferenceContext(
+                    candidate.typeParameters,
+                    candidate,
+                    InferenceFlags.None
+                );
+                const typeArgumentTypes = inferTypeArguments(
+                    node,
+                    candidate,
+                    args,
+                    checkMode || CheckMode.Normal,
+                    inferenceContext
+                );
+                const signature = getSignatureInstantiation(
+                    candidate,
+                    typeArgumentTypes,
+                    /*isJavascript*/ false,
+                    inferenceContext && inferenceContext.inferredTypeParameters
+                );
+                return signature;
+            }
+            return candidate;
         }
         function getUnionType(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type): Type {
             const unionType = getUnionTypeOriginal(types, unionReduction, aliasSymbol, aliasTypeArguments, origin);
@@ -45308,25 +45346,38 @@ namespace ts {
             return type.aliasSymbol.escapedName as string;
         }
     }
+    export function getThisTypeNameForCallLikeExpression(checker: TypeChecker, node: Node): string | undefined {
+        if(isCallLikeExpression(node)) {
+            const signature = checker.getResolvedSignature(node);
+            if (signature && signature.thisParameter) {
+                const resolvedThisType = checker.getTypeOfSymbol(signature.thisParameter)
+                if (resolvedThisType.symbol) {
+                    return unescapeLeadingUnderscores(resolvedThisType.symbol.escapedName)
+                } else if (resolvedThisType.aliasSymbol) {
+                    return unescapeLeadingUnderscores(resolvedThisType.aliasSymbol.escapedName)
+                }
+            }
+        }
+    }
     export function getThisTypeNameForTsPlusSymbol(symbol: TsPlusSymbol): string {
         switch(symbol.tsPlusTag) {
             case TsPlusSymbolTag.FluentVariable:
             case TsPlusSymbolTag.Fluent: {
                 if(symbol.tsPlusResolvedSignatures[0] && symbol.tsPlusResolvedSignatures[0].thisParameter) {
-                    return getNameForType((symbol.tsPlusResolvedSignatures[0].thisParameter as TransientSymbol).type) || "<anonymous>";
+                    return getNameForType((symbol.tsPlusResolvedSignatures[0].thisParameter as TransientSymbol).type) || anon;
                 }
                 break;
             }
             case TsPlusSymbolTag.GetterVariable:
             case TsPlusSymbolTag.Getter: {
-                return getNameForType(symbol.tsPlusSelfType) || "<anonymous>";
+                return getNameForType(symbol.tsPlusSelfType) || anon;
             }
             case TsPlusSymbolTag.Static: {
                 // Statics do not have a `this` type
                 break;
             }
         }
-        return "<anonymous>";
+        return anon;
     }
 
     export function isLazyParameter(parameter: Symbol & { valueDeclaration: ParameterDeclaration }): boolean {
