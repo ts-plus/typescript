@@ -36563,12 +36563,15 @@ namespace ts {
         }
 
         function checkTailRecFunction(node: FunctionDeclaration): void {
-            if (node.body) {
-                checkTailRecFunctionParameters(node.parameters);
-                const paramSymbols = flatMap(node.parameters, (param) => getSymbolsOfBindingName(param.name));
-                forEach(node.body.statements, (s) => {
-                    visitNode(s, checkTailRecFunctionVisitor(node, paramSymbols));
-                });
+            if (node.body && node.name) {
+                const funcNameSymbol = getSymbolAtLocation(node.name)
+                if (funcNameSymbol) {
+                    checkTailRecFunctionParameters(node.parameters);
+                    const paramSymbols = flatMap(node.parameters, (param) => getSymbolsOfBindingName(param.name));
+                    forEach(node.body.statements, (s) => {
+                        visitNode(s, checkTailRecFunctionVisitor(funcNameSymbol, paramSymbols));
+                    });
+                }
             }
             else {
                 error(node, Diagnostics.Invalid_declaration_annotated_as_tailRec);
@@ -36576,15 +36579,18 @@ namespace ts {
         }
         function checkTailRecVariableDeclaration(node: VariableDeclaration): void {
             if (isIdentifier(node.name) && node.initializer && isArrowFunction(node.initializer)) {
-                checkTailRecFunctionParameters(node.initializer.parameters);
-                const paramSymbols = flatMap(node.initializer.parameters, (param) => getSymbolsOfBindingName(param.name));
-                if (isBlock(node.initializer.body)) {
-                    forEach(node.initializer.body.statements, (s) => {
-                        visitNode(s, checkTailRecFunctionVisitor(node, paramSymbols));
-                    });
-                }
-                else {
-                    checkTailRecReturnStatement(node, paramSymbols)(node.initializer.body);
+                const funcNameSymbol = getSymbolAtLocation(node.name)
+                if (funcNameSymbol) {
+                    checkTailRecFunctionParameters(node.initializer.parameters);
+                    const paramSymbols = flatMap(node.initializer.parameters, (param) => getSymbolsOfBindingName(param.name));
+                    if (isBlock(node.initializer.body)) {
+                        forEach(node.initializer.body.statements, (s) => {
+                            visitNode(s, checkTailRecFunctionVisitor(funcNameSymbol, paramSymbols));
+                        });
+                    }
+                    else {
+                        checkTailRecReturnStatement(funcNameSymbol, paramSymbols)(node.initializer.body);
+                    }
                 }
             }
             else {
@@ -36598,24 +36604,23 @@ namespace ts {
                 }
             });
         }
-        function checkTailRecFunctionVisitor(functionNode: FunctionDeclaration | VariableDeclaration, parameterSymbols: readonly Symbol[]) {
+        function checkTailRecFunctionVisitor(funcNameSymbol: Symbol, parameterSymbols: readonly Symbol[]) {
             return function (node: Node): VisitResult<Node> {
                 if (isReturnStatement(node) && node.expression) {
                     return visitEachChild(
                         node,
-                        checkTailRecReturnStatement(functionNode, parameterSymbols),
+                        checkTailRecReturnStatement(funcNameSymbol, parameterSymbols),
                         nullTransformationContext
                     );
                 }
                 else if (isFunctionDeclaration(node) || isArrowFunction(node)) {
                     return visitEachChild(
                         node,
-                        checkTailRecNestedFunction(functionNode),
+                        checkTailRecNestedFunction(funcNameSymbol),
                         nullTransformationContext
                     );
                 }
                 else if (isCallExpression(node)) {
-                    const funcNameSymbol = getSymbolAtLocation(functionNode.name!);
                     const symbol = getSymbolAtLocation(node.expression);
                     if (symbol === funcNameSymbol) {
                         error(node, Diagnostics.A_recursive_call_must_be_in_a_tail_position_of_a_tailRec_annotated_function);
@@ -36624,7 +36629,7 @@ namespace ts {
                 }
                 return visitEachChild(
                     node,
-                    checkTailRecFunctionVisitor(functionNode, parameterSymbols),
+                    checkTailRecFunctionVisitor(funcNameSymbol, parameterSymbols),
                     nullTransformationContext
                 );
             };
@@ -36642,35 +36647,30 @@ namespace ts {
             }
         }
 
-        function checkTailRecNestedFunction(functionNode: FunctionDeclaration | VariableDeclaration) {
+        function checkTailRecNestedFunction(funcNameSymbol: Symbol) {
             return function (node: Node): VisitResult<Node> {
-                const funcNameSymbol = getSymbolAtLocation(functionNode.name!);
                 if (isCallExpression(node) && isIdentifier(node.expression)) {
                     const callNameSymbol = getSymbolAtLocation(node.expression);
                     if (callNameSymbol === funcNameSymbol) {
                         error(node, Diagnostics.A_recursive_call_cannot_cross_a_function_boundary_in_a_tailRec_annotated_function);
+                        return node;
                     }
                 }
-                return visitEachChild(node, checkTailRecNestedFunction(functionNode), nullTransformationContext);
+                return visitEachChild(node, checkTailRecNestedFunction(funcNameSymbol), nullTransformationContext);
             };
         }
 
-        function checkTailRecReturnStatement(functionNode: FunctionDeclaration | VariableDeclaration, parameterSymbols: readonly Symbol[], firstIter = true) {
+        // TODO(peter): Right now the heuristic for detecting whether a recursive call is in the tail position
+        // is overly simple. It does not, for example, allow for recursive calls in ternery expressions.
+        function checkTailRecReturnStatement(funcNameSymbol: Symbol, parameterSymbols: readonly Symbol[], firstIter = true) {
             return function (node: Node): VisitResult<Node> {
-                const funcNameSymbol = getSymbolAtLocation(functionNode.name!);
-                if (isCallExpression(node)) {
-                    if(firstIter) {
-                        return node;
-                    }
+                if (isCallExpression(node) && !firstIter) {
                     const symbol = getSymbolAtLocation(node.expression);
                     if (symbol === funcNameSymbol) {
                         error(node, Diagnostics.A_recursive_call_must_be_in_a_tail_position_of_a_tailRec_annotated_function);
-                        return node;
                     }
                 }
-                else {
-                    return visitEachChild(node, checkTailRecReturnStatement(functionNode, parameterSymbols, false), nullTransformationContext);
-                }
+                return visitEachChild(node, checkTailRecReturnStatement(funcNameSymbol, parameterSymbols, false), nullTransformationContext);
             };
         }
 
