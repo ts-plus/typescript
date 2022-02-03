@@ -3270,6 +3270,12 @@ namespace ts {
         readonly tagName: Identifier;
         readonly comment: `unify ${string}`
     }
+    
+    export interface TsPlusJSDocIndexTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `index ${string}`
+    }
 
     export interface TsPlusJSDocExtensionTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
@@ -4535,6 +4541,7 @@ namespace ts {
         cloneSymbol(symbol: Symbol): Symbol
         getTextOfBinaryOp(kind: SyntaxKind): string | undefined
         getInstantiatedTsPlusSignature(declaration: Declaration, args: Expression[], checkMode: CheckMode | undefined): Signature
+        getIndexAccessExpressionCache(): ESMap<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>
     }
 
     /* @internal */

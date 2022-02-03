@@ -84,6 +84,13 @@ export function assertJust<A>(self: Maybe<A>): asserts self is Just<A> {
 }
 
 /**
+ * @tsplus getter Maybe value
+ */
+export function value<A>(self: Maybe<A>) {
+    return self._tag === "Just" ? self.value : void 0
+}
+
+/**
  * @tsplus fluent Nothing assertJust
  */
 export function assertJustNothing(self: Nothing): never {

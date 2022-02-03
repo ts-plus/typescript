@@ -81,6 +81,8 @@ namespace ts {
             function visitor(source: SourceFile, traceInScope: Identifier | undefined) {
                 return function (node: Node): VisitResult<Node> {
                     switch (node.kind) {
+                        case SyntaxKind.ElementAccessExpression:
+                            return visitElementAccessExpression(source, traceInScope, node as ElementAccessExpression, context)
                         case SyntaxKind.BinaryExpression:
                             return visitBinaryExpression(source, traceInScope, node as BinaryExpression, context)
                         case SyntaxKind.FunctionDeclaration:
@@ -93,6 +95,19 @@ namespace ts {
                             return visitEachChild(node, visitor(source, traceInScope), context);
                     }
                 }
+            }
+            function visitElementAccessExpression(source: SourceFile, traceInScope: Identifier | undefined, node: ElementAccessExpression, context: TransformationContext): VisitResult<Node> {
+                const custom = checker.getIndexAccessExpressionCache().get(node)
+                if (custom) {
+                    const expression = visitNode(node.expression, visitor(source, traceInScope))
+                    const argument = visitNode(node.argumentExpression, visitor(source, traceInScope))
+                    return context.factory.createCallExpression(
+                        getPathOfExtension(context.factory, importer, custom, source),
+                        [],
+                        [expression, argument]
+                    )
+                }
+                return visitEachChild(node, visitor(source, traceInScope), context)
             }
             function visitBinaryExpression(source: SourceFile, traceInScope: Identifier | undefined, node: BinaryExpression, context: TransformationContext): VisitResult<Node> {
                 const leftType = checker.getTypeAtLocation(node.left);

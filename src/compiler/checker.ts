@@ -357,6 +357,8 @@ namespace ts {
         const staticCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
         const identityCache = new Map<string, FunctionDeclaration>();
         const callCache = new Map<Node, { patched: Symbol, definition: SourceFile, exportName: string }>();
+        const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
+        const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         // TSPLUS EXTENSION END
 
         // Cancellation that controls whether or not we can cancel in the middle of type checking.
@@ -788,7 +790,8 @@ namespace ts {
             isTailRec,
             cloneSymbol,
             getTextOfBinaryOp,
-            getInstantiatedTsPlusSignature
+            getInstantiatedTsPlusSignature,
+            getIndexAccessExpressionCache: () => indexAccessExpressionCache
             // TSPLUS EXTENSION END
         };
 
@@ -29499,7 +29502,7 @@ namespace ts {
             const objectType = getAssignmentTargetKind(node) !== AssignmentKind.None || isMethodAccessForCall(node) ? getWidenedType(exprType) : exprType;
             const indexExpression = node.argumentExpression;
             const indexType = checkExpression(indexExpression);
-
+            
             if (isErrorType(objectType) || objectType === silentNeverType) {
                 return objectType;
             }
@@ -29509,6 +29512,35 @@ namespace ts {
                 return errorType;
             }
 
+            // TSPLUS EXTENSION BEGIN
+            const symbols = collectRelevantSymbols(objectType)
+            const tags = symbols.flatMap((symbol) => {
+                const tag = typeSymbolCache.get(symbol)
+                if (tag) {
+                    return tag
+                }
+                return []
+            })
+            const indexer = tags.flatMap((tag) => {
+                const indexer = indexCache.get(tag)
+                if (indexer) {
+                    return [indexer]
+                }
+                return []
+            })[0]
+            if (indexer) {
+                const res = checkTsPlusCustomCall(
+                    indexer.declaration,
+                    [node.expression, indexExpression],
+                    checkMode
+                )
+                if (!isErrorType(res)) {
+                    indexAccessExpressionCache.set(node, indexer)
+                    return res;
+                }
+            }
+            // TSPLUS EXTENSION END
+    
             const effectiveIndexType = isForInVariableForNumericPropertyNames(indexExpression) ? numberType : indexType;
             const accessFlags = isAssignmentTarget(node) ?
                 AccessFlags.Writing | (isGenericObjectType(objectType) && !isThisTypeParameter(objectType) ? AccessFlags.NoIndexSignatures : 0) :
@@ -42992,6 +43024,12 @@ namespace ts {
                 (tag): tag is TsPlusJSDocExtensionTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("fluent")
             );
         }
+        function collectTsPlusIndexTags(statement: Declaration) {
+            return getAllJSDocTags(
+                statement,
+                (tag): tag is TsPlusJSDocIndexTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("index")
+            );
+        }
         function collectTsPlusTypeTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
@@ -43346,6 +43384,19 @@ namespace ts {
                 }
             }
         }
+        function tryCacheTsPlusIndexFunction(declaration: FunctionDeclaration) {
+            if(declaration.name && isIdentifier(declaration.name)) {
+                const unifyTags = collectTsPlusIndexTags(declaration);
+                for (const unifyTag of unifyTags) {
+                    const [, target] = unifyTag.comment.split(" ");
+                    indexCache.set(target, {
+                        declaration,
+                        definition: getSourceFileOfNode(declaration),
+                        exportName: declaration.name.escapedText.toString()
+                    });
+                }
+            }
+        }
         function collectTsPlusSymbols(file: SourceFile, statements: NodeArray<Statement>): void {
             for (const statement of statements) {
                 if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
@@ -43366,6 +43417,7 @@ namespace ts {
                         tryCacheTsPlusFluentFunction(file, statement);
                         tryCacheTsPlusGetterFunction(file, statement);
                         tryCacheTsPlusUnifyFunction(statement);
+                        tryCacheTsPlusIndexFunction(statement);
                     }
                 }
             }
@@ -43378,6 +43430,8 @@ namespace ts {
             identityCache.clear();
             getterCache.clear();
             callCache.clear();
+            indexCache.clear();
+            indexAccessExpressionCache.clear();
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);
             }
