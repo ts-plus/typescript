@@ -43208,7 +43208,7 @@ namespace ts {
                 }
             }
         }
-        function tryCacheTsPlusType(declaration: InterfaceDeclaration | TypeAliasDeclaration): void {
+        function tryCacheTsPlusType(declaration: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration): void {
             const tag = collectTsPlusTypeTags(declaration)[0];
             if (tag) {
                 const type = getTypeOfNode(declaration);
@@ -43403,7 +43403,7 @@ namespace ts {
                     collectTsPlusSymbols(file, statement.body.statements);
                 }
                 if(statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
-                    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
+                    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement) || isClassDeclaration(statement)) {
                         tryCacheTsPlusType(statement);
                     }
                     if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
