@@ -34,14 +34,14 @@ export function unifyMaybe<X extends Maybe<any>>(self: X): Maybe<
 /**
  * @tsplus static MaybeOps nothing
  */
-export function nothing(): Maybe<never> {
+export const nothing = (): Maybe<never> => {
     return { _tag: "Nothing" }
 }
 
 /**
  * @tsplus static MaybeOps just
  */
-export function just<A>(value: A): Maybe<A> {
+export const just = <A>(value: A): Maybe<A> => {
     return { _tag: "Just", value }
 }
 

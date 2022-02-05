@@ -45,9 +45,17 @@ namespace ts.GoToDefinition {
         if(isPropertyAccessExpression(parent)) {
             const nodeType = typeChecker.getTypeAtLocation(node);
             if(nodeType.symbol && isTsPlusSymbol(nodeType.symbol)) {
-                symbol = nodeType.symbol.tsPlusDeclaration.symbol;
+                if (parent.parent && isCallLikeExpression(parent.parent)) {
+                    const declaration = getDeclarationForTsPlus(typeChecker, parent.parent, nodeType.symbol)
+                    if (declaration) {
+                        symbol = declaration.symbol
+                    }
+                }
+                if (!symbol && nodeType.symbol.tsPlusTag !== TsPlusSymbolTag.Fluent) {
+                    symbol = nodeType.symbol.tsPlusDeclaration.symbol;
+                }
             }
-            else if (isTsPlusType(nodeType)) {
+            else if (isTsPlusTypeWithDeclaration(nodeType)) {
                 symbol = nodeType.tsPlusSymbol.tsPlusDeclaration.symbol;
             }
             else {
@@ -56,11 +64,11 @@ namespace ts.GoToDefinition {
 
                 if(extensions) {
                     const name = parent.name.escapedText.toString();
-                    const staticSymbol = typeChecker.getStaticExtension(type, name);
-                    if(staticSymbol) {
-                        // If execution gets here, it means we have a const static extension,
+                    const staticValueSymbol = typeChecker.getStaticValueExtension(type, name);
+                    if(staticValueSymbol) {
+                        // If execution gets here, it means we have a static variable extension,
                         // which needs to be treated a little differently
-                        const declaration = staticSymbol.patched.valueDeclaration;
+                        const declaration = staticValueSymbol.patched.valueDeclaration;
                         if(declaration && declaration.original) {
                             symbol = declaration.original.symbol;
                         }

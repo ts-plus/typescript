@@ -19,3 +19,12 @@ export function succeedWith<A>(effect: LazyArgument<A>, __tsplusTrace?: string):
 export function effectApply<A>(effect: LazyArgument<A>, __tsplusTrace?: string): Effect<unknown, never, A> {
     return T.succeedWith(effect, __tsplusTrace);
 }
+
+/**
+ * Imports a pure value into an Effect
+ *
+ * @tsplus static ets/EffectOps succeedNow
+ */
+export function succeedNow<A>(value: A, __tsplusTrace?: string): Effect<unknown, never, A> {
+    return T.succeed(value, __tsplusTrace);
+}

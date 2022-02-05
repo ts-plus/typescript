@@ -10,6 +10,8 @@ export const isPositiveEff = (n: number) =>
 
 export const resultEither = isPositive(0).match(() => "nope", () => "yeah");
 
+Effect.succeedNow("A")
+
 export const prog = Effect.do
   .bind("a", () => Effect(0))
   .bind("b", () => Effect(1))

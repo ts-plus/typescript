@@ -101,7 +101,7 @@ namespace ts.SignatureHelp {
                             untracedDeclaration,
                             resolvedSignature.typeParameters,
                             resolvedSignature.thisParameter,
-                            resolvedSignature.parameters,
+                            resolvedSignature.parameters.slice(0, declaration.parameters.length - 1),
                             resolvedSignature.getReturnType(),
                             resolvedSignature.resolvedTypePredicate,
                             resolvedSignature.minArgumentCount,
@@ -109,19 +109,6 @@ namespace ts.SignatureHelp {
                         );
                         resolvedSignature = untracedSignature;
                         candidates = [untracedSignature];
-                    } else if (some(resolvedSignature.parameters, isLazyParameter)) {
-                        const signature = checker.createSignature(
-                            declaration,
-                            resolvedSignature.typeParameters,
-                            resolvedSignature.thisParameter,
-                            resolvedSignature.parameters,
-                            resolvedSignature.getReturnType(),
-                            resolvedSignature.resolvedTypePredicate,
-                            resolvedSignature.minArgumentCount,
-                            resolvedSignature.flags
-                        );
-                        resolvedSignature = signature;
-                        candidates = [resolvedSignature];
                     }
                 }
                 // TSPLUS EXTENSION END

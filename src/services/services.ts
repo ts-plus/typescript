@@ -1679,35 +1679,15 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION BEGIN
-        function getTsPlusSignatureDisplayParts(typeChecker: TypeChecker, node: Node, declaration: FunctionDeclaration | VariableDeclaration & { name: Identifier }, resolvedSignature: Signature): SymbolDisplayPart[] {
+        function getTsPlusSignatureDisplayParts(typeChecker: TypeChecker, node: Node, declaration: SignatureDeclaration, resolvedSignature: Signature): SymbolDisplayPart[] {
             const paramLength = resolvedSignature.parameters.length;
             const lastParam = resolvedSignature.parameters[paramLength - 1];
             if (resolvedSignature.parameters.every(isSymbolParameterDeclaration) && lastParam && lastParam.name === "__tsplusTrace") {
-                let untracedDeclaration: FunctionDeclaration;
-                if(isVariableDeclaration(declaration)) {
-                    untracedDeclaration = factory.createFunctionDeclaration(
-                        declaration.decorators,
-                        declaration.modifiers,
-                        undefined,
-                        declaration.name,
-                        undefined,
-                        map(resolvedSignature.parameters, (param) => param.valueDeclaration).slice(0, paramLength - 1),
-                        declaration.type,
-                        undefined
-                    );
-                }
-                else {
-                    untracedDeclaration = factory.createFunctionDeclaration(
-                        declaration.decorators,
-                        declaration.modifiers,
-                        declaration.asteriskToken,
-                        declaration.name,
-                        declaration.typeParameters,
-                        declaration.parameters.slice(0, declaration.parameters.length - 1),
-                        declaration.type,
-                        undefined
-                    );
-                }
+                const untracedDeclaration = factory.createCallSignature(
+                    declaration.typeParameters,
+                    declaration.parameters.slice(0, paramLength - 1),
+                    declaration.type
+                );
                 setParent(untracedDeclaration, declaration.parent);
                 untracedDeclaration.jsDoc = declaration.jsDoc;
                 const untracedSignature = typeChecker.createSignature(
@@ -1720,6 +1700,10 @@ namespace ts {
                     resolvedSignature.minArgumentCount - 1,
                     resolvedSignature.flags
                 );
+                // For resolved type parameters to be shown on a signature, the `target` and `mapper` must be
+                // set on the untraced signature
+                untracedSignature.target = resolvedSignature.target;
+                untracedSignature.mapper = resolvedSignature.mapper;
                 return typeChecker.runWithCancellationToken(
                     cancellationToken,
                     typeChecker => signatureToDisplayParts(typeChecker, untracedSignature, getContainerNode(node))
@@ -1752,26 +1736,29 @@ namespace ts {
             if (isCallExpression(nodeForQuickInfo.parent)) {
                 const call = typeChecker.getCallExtension(nodeForQuickInfo);
                 if(call) {
-                    const symbol = typeChecker.getTypeOfSymbol(call.patched).symbol;
-                    if(isTsPlusSymbol(symbol) && symbol.tsPlusTag === TsPlusSymbolTag.Static) {
+                    let symbol = typeChecker.getTypeOfSymbol(call.patched).symbol;
+                    if(isTsPlusSymbol(symbol) && symbol.tsPlusTag === TsPlusSymbolTag.StaticFunction) {
                         let displayParts: SymbolDisplayPart[] = [];
                         displayParts.push(textPart("("));
                         displayParts.push(textPart("call"));
                         displayParts.push(textPart(")"));
                         displayParts.push(spacePart());
-                        const declaration = symbol.tsPlusDeclaration;
-                        const signature = declaration
-                            ? typeChecker.getInstantiatedTsPlusSignature(declaration, nodeForQuickInfo.parent.arguments.slice(), undefined)
-                            : symbol.tsPlusResolvedSignatures[0]
-                        displayParts = displayParts.concat(getTsPlusSignatureDisplayParts(typeChecker, nodeForQuickInfo, symbol.tsPlusDeclaration, signature));
-                        return {
-                            kind: ScriptElementKind.memberFunctionElement,
-                            kindModifiers: ScriptElementKindModifier.none,
-                            textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
-                            displayParts,
-                            documentation: getDocumentationComment([declaration], typeChecker),
-                            tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
-                        };
+                        const resolvedSignature = typeChecker.getResolvedSignature(nodeForQuickInfo.parent);
+                        if (resolvedSignature && resolvedSignature.declaration && !isJSDocSignature(resolvedSignature.declaration)) {
+                            const declaration = resolvedSignature.declaration;
+                            const signature = declaration
+                                ? typeChecker.getInstantiatedTsPlusSignature(declaration, nodeForQuickInfo.parent.arguments.slice(), undefined)
+                                : symbol.tsPlusResolvedSignatures[0]
+                            displayParts = displayParts.concat(getTsPlusSignatureDisplayParts(typeChecker, nodeForQuickInfo, declaration, signature));
+                            return {
+                                kind: ScriptElementKind.memberFunctionElement,
+                                kindModifiers: ScriptElementKindModifier.none,
+                                textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                                displayParts,
+                                documentation: getDocumentationComment([declaration], typeChecker),
+                                tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
+                            };
+                        }
                     }
                 }
             }
@@ -1795,7 +1782,6 @@ namespace ts {
                         }
                         let displayParts: SymbolDisplayPart[] = [];
                         switch(tsPlusSymbol.tsPlusTag) {
-                            case TsPlusSymbolTag.FluentVariable:
                             case TsPlusSymbolTag.Fluent: {
                                 displayParts.push(textPart("("));
                                 displayParts.push(textPart("fluent"));
@@ -1806,12 +1792,22 @@ namespace ts {
                                 displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.methodName));
                                 break;
                             }
-                            case TsPlusSymbolTag.Static: {
+                            case TsPlusSymbolTag.StaticFunction: {
                                 displayParts.push(textPart("("));
                                 displayParts.push(textPart("static"));
                                 displayParts.push(textPart(")"));
                                 displayParts.push(spacePart());
                                 displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.methodName));
+                                break;
+                            }
+                            case TsPlusSymbolTag.StaticValue: {
+                                displayParts.push(textPart("("));
+                                displayParts.push(textPart("static"));
+                                displayParts.push(textPart(")"));
+                                displayParts.push(spacePart());
+                                displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.methodName));
+                                displayParts.push(punctuationPart(SyntaxKind.ColonToken));
+                                displayParts.push(spacePart());
                                 break;
                             }
                             case TsPlusSymbolTag.GetterVariable:
@@ -1829,16 +1825,18 @@ namespace ts {
                             }
                         }
                         switch(tsPlusSymbol.tsPlusTag) {
-                            case TsPlusSymbolTag.FluentVariable:
-                            case TsPlusSymbolTag.Fluent:
-                            case TsPlusSymbolTag.Static: {
-                                const declaration = tsPlusSymbol.tsPlusDeclaration;
-                                let resolvedSignature = tsPlusSymbol.tsPlusResolvedSignatures[0];
+                            case TsPlusSymbolTag.Fluent: {
+                                let declaration: SignatureDeclaration | JSDocSignature | undefined
+                                let resolvedSignature: Signature = tsPlusSymbol.tsPlusResolvedSignatures[0];
                                 if (node.parent && node.parent.parent && isCallLikeExpression(node.parent.parent)) {
                                     const resolvedCallSignature = typeChecker.getResolvedSignature(node.parent.parent)
                                     if (resolvedCallSignature) {
                                         resolvedSignature = resolvedCallSignature
+                                        declaration = resolvedCallSignature.declaration
                                     }
+                                }
+                                if (!declaration || isJSDocSignature(declaration)) {
+                                    break;
                                 }
                                 displayParts = displayParts.concat(getTsPlusSignatureDisplayParts(typeChecker, nodeForQuickInfo, declaration, resolvedSignature));
                                 return {
@@ -1850,6 +1848,36 @@ namespace ts {
                                     tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
                                 };
                             }
+                            case TsPlusSymbolTag.StaticFunction: {
+                                let declaration: SignatureDeclaration | JSDocSignature | undefined
+                                if (isVariableDeclaration(tsPlusSymbol.tsPlusDeclaration)) {
+                                    declaration = tsPlusSymbol.tsPlusDeclaration.initializer;
+                                }
+                                else {
+                                    declaration = tsPlusSymbol.tsPlusDeclaration;
+                                }
+                                let resolvedSignature = tsPlusSymbol.tsPlusResolvedSignatures[0];
+                                if (node.parent && node.parent.parent && isCallLikeExpression(node.parent.parent)) {
+                                    const resolvedCallSignature = typeChecker.getResolvedSignature(node.parent.parent)
+                                    if (resolvedCallSignature) {
+                                        resolvedSignature = resolvedCallSignature
+                                        declaration = resolvedCallSignature.declaration
+                                    }
+                                }
+                                if (!declaration || isJSDocSignature(declaration)) {
+                                    break;
+                                }
+                                displayParts = displayParts.concat(getTsPlusSignatureDisplayParts(typeChecker, nodeForQuickInfo, declaration, resolvedSignature));
+                                return {
+                                    kind: ScriptElementKind.memberFunctionElement,
+                                    kindModifiers: ScriptElementKindModifier.staticModifier,
+                                    textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                                    displayParts,
+                                    documentation: getDocumentationComment([declaration], typeChecker),
+                                    tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
+                                };
+                            }
+                            case TsPlusSymbolTag.StaticValue:
                             case TsPlusSymbolTag.GetterVariable:
                             case TsPlusSymbolTag.Getter: {
                                 displayParts = displayParts.concat(typeChecker.runWithCancellationToken(cancellationToken, typeChecker => typeToDisplayParts(typeChecker, type, getContainerNode(nodeForQuickInfo))));
@@ -1908,7 +1936,7 @@ namespace ts {
                     if(extensions) {
                         const type = typeChecker.getTypeAtLocation(node);
                         const name = node.parent.name.escapedText as string;
-                        const staticSymbol = typeChecker.getStaticExtension(targetType, name);
+                        const staticSymbol = typeChecker.getStaticFunctionExtension(targetType, name);
                         if(type && staticSymbol) {
                             const declaration = staticSymbol.patched.valueDeclaration;
                             if (declaration) {
