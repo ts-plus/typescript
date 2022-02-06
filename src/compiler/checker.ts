@@ -43114,7 +43114,7 @@ namespace ts {
             symbol.tsPlusName = name;
             return symbol;
         }
-        function createTsPlusStaticFunctionSymbol(name: string, declaration: FunctionDeclaration | VariableDeclarationWithFunction, signatures: Signature[]): TsPlusStaticFunctionSymbol {
+        function createTsPlusStaticFunctionSymbol(name: string, declaration: FunctionDeclaration | VariableDeclaration, signatures: Signature[]): TsPlusStaticFunctionSymbol {
             const symbol = createSymbol(SymbolFlags.Function, name as __String) as TsPlusStaticFunctionSymbol;
             symbol.tsPlusTag = TsPlusSymbolTag.StaticFunction;
             symbol.tsPlusDeclaration = declaration;
@@ -43198,6 +43198,12 @@ namespace ts {
             const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
             return createSymbolWithType(symbol, final);
         }
+        function getTsPlusStaticSymbolForCallSignatures(file: SourceFile, exportName: string, name: string, declaration: VariableDeclaration, signatures: readonly Signature[]) {
+            const methods = map(signatures, (s) => createTsPlusSignature(s, exportName, file));
+            const symbol = createTsPlusStaticFunctionSymbol(name, declaration, methods);
+            const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
+            return createSymbolWithType(symbol, final);
+        }
         function addToTypeSymbolCache(symbol: Symbol, tag: string, priority: "before" | "after") {
             if (!typeSymbolCache.has(symbol)) {
                 typeSymbolCache.set(symbol, [])
@@ -43240,7 +43246,11 @@ namespace ts {
             for (const staticTag of staticTags) {
                 const [, target, name] = staticTag.comment.split(" ");
                 const declaration = statement.declarationList.declarations[0];
-                if (declaration.initializer && (isArrowFunction(declaration.initializer) || isFunctionExpression(declaration.initializer))) {
+                const symbol = getSymbolAtLocation(declaration.name);
+                const callSignatures = symbol !== undefined
+                    ? getSignaturesOfType(getTypeOfSymbol(symbol), SignatureKind.Call)
+                    : undefined;
+                if (callSignatures && callSignatures.length > 0) {
                     if (!staticFunctionCache.has(target)) {
                         staticFunctionCache.set(target, new Map());
                     }
@@ -43248,12 +43258,13 @@ namespace ts {
                     const symbol = getSymbolAtLocation(declaration.name)
                     if (symbol) {
                         map.set(name, {
-                            patched: getTsPlusStaticSymbolForFunctionDeclaration(file, symbol.escapedName.toString(), name, declaration as VariableDeclarationWithFunction),
+                            patched: getTsPlusStaticSymbolForCallSignatures(file, symbol.escapedName.toString(), name, declaration, callSignatures),
                             definition: file,
                             exportName: symbol.escapedName.toString()
                         })
                     }
-                } else {
+                }
+                else {
                     if (!staticValueCache.has(target)) {
                         staticValueCache.set(target, new Map());
                     }

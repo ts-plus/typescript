@@ -1849,14 +1849,8 @@ namespace ts {
                                 };
                             }
                             case TsPlusSymbolTag.StaticFunction: {
-                                let declaration: SignatureDeclaration | JSDocSignature | undefined
-                                if (isVariableDeclaration(tsPlusSymbol.tsPlusDeclaration)) {
-                                    declaration = tsPlusSymbol.tsPlusDeclaration.initializer;
-                                }
-                                else {
-                                    declaration = tsPlusSymbol.tsPlusDeclaration;
-                                }
                                 let resolvedSignature = tsPlusSymbol.tsPlusResolvedSignatures[0];
+                                let declaration: SignatureDeclaration | JSDocSignature | undefined = resolvedSignature.declaration;
                                 if (node.parent && node.parent.parent && isCallLikeExpression(node.parent.parent)) {
                                     const resolvedCallSignature = typeChecker.getResolvedSignature(node.parent.parent)
                                     if (resolvedCallSignature) {

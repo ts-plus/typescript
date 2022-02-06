@@ -3325,7 +3325,7 @@ namespace ts {
 
     export interface TsPlusStaticFunctionSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.StaticFunction;
-        tsPlusDeclaration: FunctionDeclaration | VariableDeclarationWithFunction;
+        tsPlusDeclaration: FunctionDeclaration | VariableDeclaration;
         tsPlusResolvedSignatures: Signature[];
         tsPlusName: string;
     }
