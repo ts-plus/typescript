@@ -355,10 +355,9 @@ namespace ts {
         const fluentTempCache = new Map<string, ESMap<string, Set<{ signatures: readonly TsPlusSignature[], definition: SourceFile, exportName: string }>>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
         const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
-        const staticFunctionCache = new Map<string, ESMap<string, TsPlusStaticFunctionExtension>>()
-        const staticValueCache = new Map<string, ESMap<string, TsPlusStaticValueExtension>>();
+        const staticCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
         const identityCache = new Map<string, FunctionDeclaration>();
-        const callCache = new Map<Node, TsPlusStaticFunctionExtension>();
+        const callCache = new Map<Node, { patched: Symbol, definition: SourceFile, exportName: string }>();
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         // TSPLUS EXTENSION END
@@ -785,8 +784,7 @@ namespace ts {
             getGetterExtension,
             getFluentExtension,
             getOperatorExtension,
-            getStaticFunctionExtension,
-            getStaticValueExtension,
+            getStaticExtension,
             getCallExtension,
             shouldMakeLazy,
             isPipeCall,
@@ -843,17 +841,11 @@ namespace ts {
             symbols.forEach((target) => {
                 if (typeSymbolCache.has(target)) {
                     typeSymbolCache.get(target)!.forEach((typeSymbol) => {
-                        const _staticFunctions = staticFunctionCache.get(typeSymbol);
-                        if (_staticFunctions) {
-                            _staticFunctions.forEach((v, k) => {
-                                copy.set(k, v.patched)
-                            });
-                        }
-                        const _staticValues = staticValueCache.get(typeSymbol);
-                        if(_staticValues) {
-                            _staticValues.forEach((v, k) => {
+                        const _static = staticCache.get(typeSymbol);
+                        if (_static) {
+                            _static.forEach((v, k) => {
                                 copy.set(k, v.patched);
-                            })
+                            });
                         }
                         const _fluent = fluentCache.get(typeSymbol);
                         if (_fluent) {
@@ -914,14 +906,14 @@ namespace ts {
                 }
             }
         }
-        function getStaticFunctionExtension(targetType: Type, name: string) {
+        function getStaticExtension(targetType: Type, name: string) {
             const symbols = collectRelevantSymbols(targetType)
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
                         (tag) => {
-                            if (staticFunctionCache.has(tag)) {
-                                const cache = staticFunctionCache.get(tag)
+                            if (staticCache.has(tag)) {
+                                const cache = staticCache.get(tag)
                                 if (cache?.has(name)) {
                                     return [cache.get(name)!]
                                 }
@@ -929,22 +921,6 @@ namespace ts {
                             return []
                         }
                     )
-                    return x.length > 0 ? x[x.length - 1] : undefined;
-                }
-            }
-        }
-        function getStaticValueExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType);
-            for (const target of symbols) {
-                if (typeSymbolCache.has(target)) {
-                    const x = flatMap(typeSymbolCache.get(target)!, (tag) => {
-                        if (staticValueCache.has(tag)) {
-                            const cache = staticValueCache.get(tag)
-                            if (cache?.has(name)) {
-                                return [cache.get(name)!]
-                            }
-                        }
-                    });
                     return x.length > 0 ? x[x.length - 1] : undefined;
                 }
             }
@@ -25505,7 +25481,7 @@ namespace ts {
             // for the symbol. Also, don't mark any property access expression LHS - checkPropertyAccessExpression will handle that
             if (!(node.parent && isPropertyAccessExpression(node.parent) && node.parent.expression === node)) {
                 // We should also not mark as used identifiers that will be replaced
-                if (!(node.parent && isCallExpression(node.parent) && node.parent.expression === node && getSignaturesOfType(type, SignatureKind.Call).length === 0 && getStaticFunctionExtension(type, "__call") != null)) {
+                if (!(node.parent && isCallExpression(node.parent) && node.parent.expression === node && getSignaturesOfType(type, SignatureKind.Call).length === 0 && getStaticExtension(type, "__call") != null)) {
                     markAliasReferenced(getResolvedSymbol(node), node);
                 }
             }
@@ -28819,16 +28795,9 @@ namespace ts {
                         return type;
                     }
                 }
-                const staticFuncExt = getStaticFunctionExtension(leftType, right.escapedText.toString());
-                if (staticFuncExt) {
-                    return getTypeOfSymbol(staticFuncExt.patched);
-                }
-                const staticValExt = getStaticValueExtension(leftType, right.escapedText.toString());
-                if (staticValExt) {
-                    const type = getTypeOfSymbol(staticValExt.patched);
-                    // @ts-expect-error
-                    type.tsPlusSymbol = staticValExt.patched;
-                    return type;
+                const staticExt = getStaticExtension(leftType, right.escapedText.toString());
+                if (staticExt) {
+                    return getTypeOfSymbol(staticExt.patched);
                 }
             }
         }
@@ -30920,7 +30889,7 @@ namespace ts {
 
             // TSPLUS EXTENSION START
             if (callSignatures.length === 0) {
-                const callExtension = getStaticFunctionExtension(apparentType, "__call");
+                const callExtension = getStaticExtension(apparentType, "__call");
                 
                 if (callExtension) {
                     callSignatures = Array.from(getSignaturesOfType(getTypeOfSymbol(callExtension.patched), SignatureKind.Call));
@@ -43114,20 +43083,16 @@ namespace ts {
             symbol.tsPlusName = name;
             return symbol;
         }
-        function createTsPlusStaticFunctionSymbol(name: string, declaration: FunctionDeclaration | VariableDeclaration, signatures: Signature[]): TsPlusStaticFunctionSymbol {
-            const symbol = createSymbol(SymbolFlags.Function, name as __String) as TsPlusStaticFunctionSymbol;
-            symbol.tsPlusTag = TsPlusSymbolTag.StaticFunction;
+        function createTsPlusStaticFunctionSymbol(name: string, declaration: FunctionDeclaration, signatures: Signature[]): TsPlusStaticSymbol {
+            const symbol = createSymbol(SymbolFlags.Function, name as __String) as TsPlusStaticSymbol;
+            symbol.tsPlusTag = TsPlusSymbolTag.Static;
             symbol.tsPlusDeclaration = declaration;
             symbol.tsPlusResolvedSignatures = signatures;
             symbol.tsPlusName = name;
             return symbol;
         }
-        function createTsPlusStaticValueSymbol(name: string, declaration: VariableDeclaration, originalSymbol: Symbol): Symbol {
-            const symbol = cloneSymbol(originalSymbol) as TsPlusStaticValueSymbol;
-            symbol.tsPlusTag = TsPlusSymbolTag.StaticValue;
-            symbol.tsPlusResolvedSignatures = [];
-            symbol.tsPlusName = name;
-            symbol.tsPlusDeclaration = declaration as VariableDeclaration & { name: Identifier };
+        function createTsPlusStaticVariableSymbol(name: string, declaration: VariableDeclaration, originalSymbol: Symbol): Symbol {
+            const symbol = cloneSymbol(originalSymbol);
             symbol.escapedName = name as __String;
             const patchedDeclaration = factory.updateVariableDeclaration(
                 declaration,
@@ -43191,16 +43156,10 @@ namespace ts {
                 return createTsPlusGetterVariableSymbol(name, declaration, res, getTypeOfNode(selfNode));
             };
         }
-        function getTsPlusStaticSymbolForFunctionDeclaration(file: SourceFile, exportName: string, name: string, dataFirst: FunctionDeclaration | VariableDeclarationWithFunction) {
+        function getTsPlusStaticSymbolForFunctionDeclaration(file: SourceFile, exportName: string, name: string, dataFirst: FunctionDeclaration) {
             const signatures = getSignaturesOfType(getTypeOfNode(dataFirst), SignatureKind.Call);
             const methods = map(signatures, (s) => createTsPlusSignature(s, exportName, file));
             const symbol = createTsPlusStaticFunctionSymbol(name, dataFirst, methods);
-            const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
-            return createSymbolWithType(symbol, final);
-        }
-        function getTsPlusStaticSymbolForCallSignatures(file: SourceFile, exportName: string, name: string, declaration: VariableDeclaration, signatures: readonly Signature[]) {
-            const methods = map(signatures, (s) => createTsPlusSignature(s, exportName, file));
-            const symbol = createTsPlusStaticFunctionSymbol(name, declaration, methods);
             const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
             return createSymbolWithType(symbol, final);
         }
@@ -43245,38 +43204,19 @@ namespace ts {
             const staticTags = collectTsPlusStaticTags(statement);
             for (const staticTag of staticTags) {
                 const [, target, name] = staticTag.comment.split(" ");
+                if (!staticCache.has(target)) {
+                    staticCache.set(target, new Map());
+                }
+                const map = staticCache.get(target)!;
                 const declaration = statement.declarationList.declarations[0];
                 const symbol = getSymbolAtLocation(declaration.name);
-                const callSignatures = symbol !== undefined
-                    ? getSignaturesOfType(getTypeOfSymbol(symbol), SignatureKind.Call)
-                    : undefined;
-                if (callSignatures && callSignatures.length > 0) {
-                    if (!staticFunctionCache.has(target)) {
-                        staticFunctionCache.set(target, new Map());
-                    }
-                    const map = staticFunctionCache.get(target)!
-                    const symbol = getSymbolAtLocation(declaration.name)
-                    if (symbol) {
-                        map.set(name, {
-                            patched: getTsPlusStaticSymbolForCallSignatures(file, symbol.escapedName.toString(), name, declaration, callSignatures),
-                            definition: file,
-                            exportName: symbol.escapedName.toString()
-                        })
-                    }
-                }
-                else {
-                    if (!staticValueCache.has(target)) {
-                        staticValueCache.set(target, new Map());
-                    }
-                    const map = staticValueCache.get(target)!;
-                    const symbol = getSymbolAtLocation(declaration.name);
-                    if (symbol) {
-                        map.set(name, {
-                            patched: createTsPlusStaticValueSymbol(name, declaration, symbol),
-                            definition: file,
-                            exportName: symbol.escapedName.toString()
-                        })
-                    }
+                if (symbol) {
+                    const patched = createTsPlusStaticVariableSymbol(name, declaration, symbol);
+                    map.set(name, {
+                        patched,
+                        definition: file,
+                        exportName: symbol.escapedName.toString()
+                    })
                 }
             }
         }
@@ -43400,10 +43340,10 @@ namespace ts {
                 const staticTags = collectTsPlusStaticTags(declaration);
                 for (const staticTag of staticTags) {
                     const [, target, name] = staticTag.comment.split(" ");
-                    if (!staticFunctionCache.has(target)) {
-                        staticFunctionCache.set(target, new Map());
+                    if (!staticCache.has(target)) {
+                        staticCache.set(target, new Map());
                     }
-                    const map = staticFunctionCache.get(target)!;
+                    const map = staticCache.get(target)!;
                     map.set(name, {
                         patched: getTsPlusStaticSymbolForFunctionDeclaration(file, declaration.name.escapedText.toString(), name, declaration),
                         exportName: declaration.name.escapedText.toString(),
@@ -43464,8 +43404,7 @@ namespace ts {
             fluentTempCache.clear();
             operatorCache.clear();
             typeSymbolCache.clear();
-            staticFunctionCache.clear();
-            staticValueCache.clear();
+            staticCache.clear();
             identityCache.clear();
             getterCache.clear();
             callCache.clear();
@@ -45497,7 +45436,7 @@ namespace ts {
             case TsPlusSymbolTag.Getter: {
                 return getNameForType(symbol.tsPlusSelfType) || anon;
             }
-            case TsPlusSymbolTag.StaticFunction: {
+            case TsPlusSymbolTag.Static: {
                 // Statics do not have a `this` type
                 break;
             }
@@ -45519,20 +45458,19 @@ namespace ts {
     }
 
     type TsPlusSymbolWithDeclaration = Omit<TsPlusType, "tsPlusSymbol"> & {
-        tsPlusSymbol: TsPlusGetterSymbol | TsPlusGetterVariableSymbol | TsPlusStaticValueSymbol
+        tsPlusSymbol: TsPlusGetterSymbol | TsPlusGetterVariableSymbol | TsPlusStaticSymbol
     }
 
     export function isTsPlusTypeWithDeclaration(type: Type): type is TsPlusSymbolWithDeclaration {
         return isTsPlusType(type) && (
             type.tsPlusSymbol.tsPlusTag === TsPlusSymbolTag.Getter ||
             type.tsPlusSymbol.tsPlusTag === TsPlusSymbolTag.GetterVariable ||
-            type.tsPlusSymbol.tsPlusTag === TsPlusSymbolTag.StaticValue
+            type.tsPlusSymbol.tsPlusTag === TsPlusSymbolTag.Static
         )
     }
 
     export function getDeclarationForTsPlus(checker: TypeChecker, node: Node, symbol: TsPlusSymbol): Declaration | undefined {
         switch (symbol.tsPlusTag) {
-            case TsPlusSymbolTag.StaticFunction:
             case TsPlusSymbolTag.Fluent: {
                 if (isCallLikeExpression(node)) {
                     const signature = checker.getResolvedSignature(node)
@@ -45542,7 +45480,7 @@ namespace ts {
                 }
                 break;
             }
-            case TsPlusSymbolTag.StaticValue:
+            case TsPlusSymbolTag.Static:
             case TsPlusSymbolTag.Getter:
             case TsPlusSymbolTag.GetterVariable: {
                 return symbol.tsPlusDeclaration

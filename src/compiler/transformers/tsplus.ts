@@ -148,16 +148,10 @@ namespace ts {
                 const expressionType = checker.getTypeAtLocation(node.expression);
                 const inType = checker.getPropertyOfType(expressionType, node.name.escapedText.toString());
                 if (!inType) {
-                    const staticFunctionExtension = checker.getStaticFunctionExtension(expressionType, node.name.escapedText.toString());
+                    const staticExtension = checker.getStaticExtension(expressionType, node.name.escapedText.toString());
 
-                    if (staticFunctionExtension) {
-                        return getPathOfExtension(context.factory, importer, staticFunctionExtension, source);
-                    }
-
-                    const staticValueExtension = checker.getStaticValueExtension(expressionType, node.name.escapedText.toString());
-
-                    if (staticValueExtension) {
-                        return getPathOfExtension(context.factory, importer, staticValueExtension, source);
+                    if (staticExtension) {
+                        return getPathOfExtension(context.factory, importer, staticExtension, source);
                     }
                     
                     const getterExtension = checker.getGetterExtension(expressionType, node.name.escapedText.toString());
@@ -190,7 +184,7 @@ namespace ts {
                 }
                 const expressionType = checker.getTypeAtLocation(node.expression)
                 if (checker.getSignaturesOfType(expressionType, SignatureKind.Call).length === 0) {
-                    const customCall = checker.getStaticFunctionExtension(expressionType, "__call")
+                    const customCall = checker.getStaticExtension(expressionType, "__call")
                     if (customCall) {
                         const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
                         return factory.updateCallExpression(

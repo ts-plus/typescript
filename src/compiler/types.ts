@@ -3309,8 +3309,7 @@ namespace ts {
 
     export const enum TsPlusSymbolTag {
         Fluent = "TsPlusFluentSymbol",
-        StaticFunction = "TsPlusStaticFunctionSymbol",
-        StaticValue = "TsPlusStaticValueSymbol",
+        Static = "TsPlusStaticSymbol",
         Getter = "TsPlusGetterSymbol",
         GetterVariable = "TsPlusGetterVariableSymbol"
     }
@@ -3323,18 +3322,11 @@ namespace ts {
 
     export type VariableDeclarationWithFunction = VariableDeclaration & { name: Identifier, initializer: ArrowFunction | FunctionExpression };
 
-    export interface TsPlusStaticFunctionSymbol extends TransientSymbol {
-        tsPlusTag: TsPlusSymbolTag.StaticFunction;
-        tsPlusDeclaration: FunctionDeclaration | VariableDeclaration;
+    export interface TsPlusStaticSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.Static;
+        tsPlusDeclaration: FunctionDeclaration;
         tsPlusResolvedSignatures: Signature[];
         tsPlusName: string;
-    }
-
-    export interface TsPlusStaticValueSymbol extends TransientSymbol {
-        tsPlusTag: TsPlusSymbolTag.StaticValue;
-        tsPlusResolvedSignatures: TsPlusSignature[];
-        tsPlusName: string;
-        tsPlusDeclaration: VariableDeclaration & { name: Identifier };
     }
 
     export interface TsPlusGetterSymbol extends TransientSymbol {
@@ -3353,26 +3345,13 @@ namespace ts {
 
     export type TsPlusSymbol =
         | TsPlusFluentSymbol
-        | TsPlusStaticFunctionSymbol
-        | TsPlusStaticValueSymbol
+        | TsPlusStaticSymbol
         | TsPlusGetterSymbol
         | TsPlusGetterVariableSymbol;
 
     export interface TsPlusFluentExtension {
         patched: Symbol;
         signatures: readonly TsPlusSignature[];
-    }
-
-    export interface TsPlusStaticFunctionExtension {
-        patched: Symbol;
-        definition: SourceFile;
-        exportName: string;
-    }
-
-    export interface TsPlusStaticValueExtension {
-        patched: Symbol;
-        definition: SourceFile;
-        exportName: string;
     }
 
     export interface TsPlusType extends Type {
@@ -4553,12 +4532,11 @@ namespace ts {
         getExtensions(selfNode: Expression): ESMap<string, Symbol>
         getFluentExtension(target: Type, name: string): TsPlusFluentExtension | undefined
         getGetterExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
-        getStaticFunctionExtension(target: Type, name: string): TsPlusStaticFunctionExtension | undefined
-        getStaticValueExtension(target: Type, name: string): TsPlusStaticValueExtension | undefined
+        getStaticExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
         getOperatorExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
         shouldMakeLazy(signatureParam: Symbol, callArg: Type): boolean
         isPipeCall(node: CallExpression): boolean
-        getCallExtension(node: Node): TsPlusStaticFunctionExtension | undefined
+        getCallExtension(node: Node): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
         isTailRec(node: Node): boolean
         cloneSymbol(symbol: Symbol): Symbol
         getTextOfBinaryOp(kind: SyntaxKind): string | undefined

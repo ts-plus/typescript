@@ -1737,7 +1737,7 @@ namespace ts {
                 const call = typeChecker.getCallExtension(nodeForQuickInfo);
                 if(call) {
                     let symbol = typeChecker.getTypeOfSymbol(call.patched).symbol;
-                    if(isTsPlusSymbol(symbol) && symbol.tsPlusTag === TsPlusSymbolTag.StaticFunction) {
+                    if(isTsPlusSymbol(symbol) && symbol.tsPlusTag === TsPlusSymbolTag.Static) {
                         let displayParts: SymbolDisplayPart[] = [];
                         displayParts.push(textPart("("));
                         displayParts.push(textPart("call"));
@@ -1792,22 +1792,12 @@ namespace ts {
                                 displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.methodName));
                                 break;
                             }
-                            case TsPlusSymbolTag.StaticFunction: {
+                            case TsPlusSymbolTag.Static: {
                                 displayParts.push(textPart("("));
                                 displayParts.push(textPart("static"));
                                 displayParts.push(textPart(")"));
                                 displayParts.push(spacePart());
                                 displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.methodName));
-                                break;
-                            }
-                            case TsPlusSymbolTag.StaticValue: {
-                                displayParts.push(textPart("("));
-                                displayParts.push(textPart("static"));
-                                displayParts.push(textPart(")"));
-                                displayParts.push(spacePart());
-                                displayParts.push(displayPart(tsPlusSymbol.tsPlusName, SymbolDisplayPartKind.methodName));
-                                displayParts.push(punctuationPart(SyntaxKind.ColonToken));
-                                displayParts.push(spacePart());
                                 break;
                             }
                             case TsPlusSymbolTag.GetterVariable:
@@ -1848,7 +1838,7 @@ namespace ts {
                                     tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
                                 };
                             }
-                            case TsPlusSymbolTag.StaticFunction: {
+                            case TsPlusSymbolTag.Static: {
                                 let resolvedSignature = tsPlusSymbol.tsPlusResolvedSignatures[0];
                                 let declaration: SignatureDeclaration | JSDocSignature | undefined = resolvedSignature.declaration;
                                 if (node.parent && node.parent.parent && isCallLikeExpression(node.parent.parent)) {
@@ -1871,7 +1861,6 @@ namespace ts {
                                     tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
                                 };
                             }
-                            case TsPlusSymbolTag.StaticValue:
                             case TsPlusSymbolTag.GetterVariable:
                             case TsPlusSymbolTag.Getter: {
                                 displayParts = displayParts.concat(typeChecker.runWithCancellationToken(cancellationToken, typeChecker => typeToDisplayParts(typeChecker, type, getContainerNode(nodeForQuickInfo))));
@@ -1930,7 +1919,7 @@ namespace ts {
                     if(extensions) {
                         const type = typeChecker.getTypeAtLocation(node);
                         const name = node.parent.name.escapedText as string;
-                        const staticSymbol = typeChecker.getStaticFunctionExtension(targetType, name);
+                        const staticSymbol = typeChecker.getStaticExtension(targetType, name);
                         if(type && staticSymbol) {
                             const declaration = staticSymbol.patched.valueDeclaration;
                             if (declaration) {
