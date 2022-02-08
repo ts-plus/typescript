@@ -357,6 +357,7 @@ namespace ts {
         const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
         const staticFunctionCache = new Map<string, ESMap<string, TsPlusStaticFunctionExtension>>()
         const staticValueCache = new Map<string, ESMap<string, TsPlusStaticValueExtension>>();
+        const staticUnresolvedCache = new Map<string, ESMap<string, TsPlusUnresolvedStaticExtension>>();
         const identityCache = new Map<string, FunctionDeclaration>();
         const callCache = new Map<Node, TsPlusStaticFunctionExtension>();
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
@@ -794,7 +795,9 @@ namespace ts {
             cloneSymbol,
             getTextOfBinaryOp,
             getInstantiatedTsPlusSignature,
-            getIndexAccessExpressionCache: () => indexAccessExpressionCache
+            getIndexAccessExpressionCache: () => indexAccessExpressionCache,
+            resolveStaticExtension,
+            getUnresolvedStaticExtension
             // TSPLUS EXTENSION END
         };
 
@@ -945,6 +948,25 @@ namespace ts {
                             }
                         }
                     });
+                    return x.length > 0 ? x[x.length - 1] : undefined;
+                }
+            }
+        }
+        function getUnresolvedStaticExtension(targetType: Type, name: string) {
+            const symbols = collectRelevantSymbols(targetType)
+            for (const target of symbols) {
+                if (typeSymbolCache.has(target)) {
+                    const x = typeSymbolCache.get(target)!.flatMap(
+                        (tag) => {
+                            if (staticUnresolvedCache.has(tag)) {
+                                const cache = staticUnresolvedCache.get(tag)
+                                if (cache?.has(name)) {
+                                    return [cache.get(name)!]
+                                }
+                            }
+                            return []
+                        }
+                    )
                     return x.length > 0 ? x[x.length - 1] : undefined;
                 }
             }
@@ -28830,6 +28852,48 @@ namespace ts {
                     type.tsPlusSymbol = staticValExt.patched;
                     return type;
                 }
+                const staticUnresolvedExt = getUnresolvedStaticExtension(leftType, right.escapedText.toString());
+                if (staticUnresolvedExt) {
+                    return resolveStaticExtension(staticUnresolvedExt)
+                }
+            }
+        }
+        function resolveStaticExtension(unresolved: TsPlusUnresolvedStaticExtension): Type | undefined {
+            const { symbol, target, declaration, name, definition, exportName } = unresolved
+            const callSignatures = getSignaturesOfType(getTypeOfSymbol(symbol), SignatureKind.Call)
+            if (callSignatures.length > 0) {
+                if (!staticFunctionCache.has(target)) {
+                    staticFunctionCache.set(target, new Map());
+                }
+                const map = staticFunctionCache.get(target)!
+                const symbol = getSymbolAtLocation(declaration.name)
+                if (symbol) {
+                    const patched = getTsPlusStaticSymbolForCallSignatures(definition, exportName, name, declaration, callSignatures)
+                    map.set(name, {
+                        patched,
+                        definition,
+                        exportName
+                    })
+                    staticUnresolvedCache.get(target)?.delete(name);
+                    return getTypeOfSymbol(patched);
+                }
+            }
+            else {
+                if (!staticValueCache.has(target)) {
+                    staticValueCache.set(target, new Map());
+                }
+                const map = staticValueCache.get(target)!;
+                const symbol = getSymbolAtLocation(declaration.name);
+                if (symbol) {
+                    const patched = createTsPlusStaticValueSymbol(name, declaration, symbol);
+                    map.set(name, {
+                        patched,
+                        definition,
+                        exportName
+                    })
+                    staticUnresolvedCache.get(target)?.delete(name);
+                    return getTypeOfSymbol(patched);
+                }
             }
         }
         // TSPLUS EXTENSION END
@@ -30920,6 +30984,12 @@ namespace ts {
 
             // TSPLUS EXTENSION START
             if (callSignatures.length === 0) {
+                const unresolvedCallExtension = getUnresolvedStaticExtension(apparentType, "__call");
+
+                if (unresolvedCallExtension) {
+                    resolveStaticExtension(unresolvedCallExtension);
+                }
+
                 const callExtension = getStaticFunctionExtension(apparentType, "__call");
                 
                 if (callExtension) {
@@ -43247,36 +43317,19 @@ namespace ts {
                 const [, target, name] = staticTag.comment.split(" ");
                 const declaration = statement.declarationList.declarations[0];
                 const symbol = getSymbolAtLocation(declaration.name);
-                const callSignatures = symbol !== undefined
-                    ? getSignaturesOfType(getTypeOfSymbol(symbol), SignatureKind.Call)
-                    : undefined;
-                if (callSignatures && callSignatures.length > 0) {
-                    if (!staticFunctionCache.has(target)) {
-                        staticFunctionCache.set(target, new Map());
+                if (symbol) {
+                    if (!staticUnresolvedCache.get(target)) {
+                        staticUnresolvedCache.set(target, new Map());
                     }
-                    const map = staticFunctionCache.get(target)!
-                    const symbol = getSymbolAtLocation(declaration.name)
-                    if (symbol) {
-                        map.set(name, {
-                            patched: getTsPlusStaticSymbolForCallSignatures(file, symbol.escapedName.toString(), name, declaration, callSignatures),
-                            definition: file,
-                            exportName: symbol.escapedName.toString()
-                        })
-                    }
-                }
-                else {
-                    if (!staticValueCache.has(target)) {
-                        staticValueCache.set(target, new Map());
-                    }
-                    const map = staticValueCache.get(target)!;
-                    const symbol = getSymbolAtLocation(declaration.name);
-                    if (symbol) {
-                        map.set(name, {
-                            patched: createTsPlusStaticValueSymbol(name, declaration, symbol),
-                            definition: file,
-                            exportName: symbol.escapedName.toString()
-                        })
-                    }
+                    const map = staticUnresolvedCache.get(target)!
+                    map.set(name, {
+                        target,
+                        name,
+                        symbol,
+                        declaration,
+                        exportName: symbol.escapedName.toString(),
+                        definition: file
+                    })
                 }
             }
         }

@@ -3311,6 +3311,7 @@ namespace ts {
         Fluent = "TsPlusFluentSymbol",
         StaticFunction = "TsPlusStaticFunctionSymbol",
         StaticValue = "TsPlusStaticValueSymbol",
+        UnresolvedStatic = "TsPlusUnresolvedStatic",
         Getter = "TsPlusGetterSymbol",
         GetterVariable = "TsPlusGetterVariableSymbol"
     }
@@ -3322,6 +3323,12 @@ namespace ts {
     }
 
     export type VariableDeclarationWithFunction = VariableDeclaration & { name: Identifier, initializer: ArrowFunction | FunctionExpression };
+
+    export interface TsPlusUnresolvedStaticSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.UnresolvedStatic
+        tsPlusDeclaration: VariableDeclaration
+        tsPlusName: string
+    }
 
     export interface TsPlusStaticFunctionSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.StaticFunction;
@@ -3361,6 +3368,15 @@ namespace ts {
     export interface TsPlusFluentExtension {
         patched: Symbol;
         signatures: readonly TsPlusSignature[];
+    }
+
+    export interface TsPlusUnresolvedStaticExtension {
+        symbol: Symbol;
+        declaration: VariableDeclaration;
+        definition: SourceFile;
+        target: string;
+        name: string;
+        exportName: string;
     }
 
     export interface TsPlusStaticFunctionExtension {
@@ -4564,6 +4580,8 @@ namespace ts {
         getTextOfBinaryOp(kind: SyntaxKind): string | undefined
         getInstantiatedTsPlusSignature(declaration: Declaration, args: Expression[], checkMode: CheckMode | undefined): Signature
         getIndexAccessExpressionCache(): ESMap<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>
+        resolveStaticExtension(unresolved: TsPlusUnresolvedStaticExtension): Type | undefined
+        getUnresolvedStaticExtension(targetType: Type, name: string): TsPlusUnresolvedStaticExtension | undefined
     }
 
     /* @internal */
