@@ -25527,7 +25527,14 @@ namespace ts {
             // for the symbol. Also, don't mark any property access expression LHS - checkPropertyAccessExpression will handle that
             if (!(node.parent && isPropertyAccessExpression(node.parent) && node.parent.expression === node)) {
                 // We should also not mark as used identifiers that will be replaced
-                if (!(node.parent && isCallExpression(node.parent) && node.parent.expression === node && getSignaturesOfType(type, SignatureKind.Call).length === 0 && getStaticFunctionExtension(type, "__call") != null)) {
+                if (
+                    !(node.parent &&
+                        isCallExpression(node.parent) &&
+                        node.parent.expression === node &&
+                        getSignaturesOfType(type, SignatureKind.Call).length === 0 &&
+                        (getStaticFunctionExtension(type, "__call") != null || getUnresolvedStaticExtension(type, "__call") != null)
+                    )
+                ) {
                     markAliasReferenced(getResolvedSymbol(node), node);
                 }
             }
