@@ -3307,6 +3307,9 @@ namespace ts {
         readonly comment: `macro ${string}`
     }
 
+
+    export type TsPlusMacroCallExpression<K extends string> = CallExpression & { __tsplus_brand: K };
+
     export const enum TsPlusSymbolTag {
         Fluent = "TsPlusFluentSymbol",
         StaticFunction = "TsPlusStaticFunctionSymbol",

@@ -990,6 +990,107 @@ namespace ts {
                 }
             }
         }
+        function isParamUsed(param: TypeParameterDeclaration, node: Node): boolean {
+            let used = false;
+            const bt = getTypeOfNode(param);
+            function visitor(node: Node): Node {
+                const t = getTypeOfNode(node);
+                if (isTypeIdenticalTo(bt, t)) {
+                    used = true;
+                }
+                return visitEachChild(node, visitor, nullTransformationContext);
+            }
+            visitNode(node, visitor);
+            return used;
+        }
+        function partitionTypeParametersForPipeable(dataFirst: FunctionDeclaration): [TypeParameterDeclaration[], TypeParameterDeclaration[]] {
+            if (!dataFirst.typeParameters) {
+                return [[], []]
+            }
+            const left: TypeParameterDeclaration[] = [];
+            const right: TypeParameterDeclaration[] = [];
+            forEach(dataFirst.typeParameters, (param) => {
+                let used = false;
+                forEach(dataFirst.parameters, (p, i) => {
+                    if (i !== 0) {
+                        if (p.type && isParamUsed(param, p.type)) {
+                            used = true;
+                        }
+                    }
+                })
+                if (used) {
+                    left.push(param);
+                }
+                else {
+                    right.push(param);
+                }
+            });
+            return [left, right]
+        }
+        function generatePipeable(dataFirst: FunctionDeclaration): Type {
+            const returnExpression = createSyntheticExpression(dataFirst, getReturnTypeOfSignature(
+                getSignaturesOfType(getTypeOfNode(dataFirst), SignatureKind.Call)[0]!
+            ));
+            const [paramsFirst, paramsSecond] = partitionTypeParametersForPipeable(dataFirst);
+            const returnFunction = factory.createFunctionExpression(
+                undefined,
+                undefined,
+                undefined,
+                paramsSecond,
+                [dataFirst.parameters[0]],
+                undefined,
+                factory.createBlock(
+                    [factory.createReturnStatement(returnExpression)],
+                    true
+                )
+            );
+            setParent(returnFunction.body, returnFunction);
+            setParent((returnFunction.body as Block).statements[0], returnFunction.body);
+            const returnFunctionSymbol = createSymbol(
+                SymbolFlags.Function,
+                InternalSymbolName.Function
+            );
+            returnFunction.symbol = returnFunctionSymbol;
+            returnFunctionSymbol.declarations = [returnFunction];
+            returnFunctionSymbol.valueDeclaration = returnFunction;
+            const pipeable = factory.createFunctionDeclaration(
+                undefined,
+                [factory.createModifier(ts.SyntaxKind.DeclareKeyword)],
+                undefined,
+                dataFirst.name,
+                paramsFirst,
+                dataFirst.parameters.slice(1, dataFirst.parameters.length),
+                undefined,
+                factory.createBlock(
+                    [factory.createReturnStatement(returnFunction)],
+                    true
+                )
+            );
+            setParent(returnFunction, pipeable);
+            setParent(pipeable.body, pipeable);
+            setParent((pipeable.body as Block).statements[0], pipeable.body);
+            const pipeableSymbol = createSymbol(
+                SymbolFlags.Function,
+                InternalSymbolName.Function
+            );
+            pipeable.symbol = pipeableSymbol;
+            pipeableSymbol.declarations = [pipeable];
+            setParent(pipeable, dataFirst.parent);
+            return getTypeOfNode(pipeable);
+        }
+        function isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K> {
+            if (!isCallExpression(node)) {
+                return false;
+            }
+            const typeOfExpression = getTypeOfNode(node.expression);
+            if (typeOfExpression.symbol && typeOfExpression.symbol.valueDeclaration) {
+                return getAllJSDocTags(
+                    typeOfExpression.symbol.valueDeclaration,
+                    (_): _ is JSDocTag => _.tagName.escapedText === "tsplus" && _.comment === `macro ${macro}`
+                ).length > 0;
+            }
+            return false;
+        }
         // TSPLUS EXTENSION END
 
         function getResolvedSignatureWorker(nodeIn: CallLikeExpression, candidatesOutArray: Signature[] | undefined, argumentCount: number | undefined, checkMode: CheckMode): Signature | undefined {
@@ -31665,12 +31766,23 @@ namespace ts {
             }
         }
 
+        function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
+            const checked = checkCallExpressionOriginal(node, checkMode);
+            if (isTsPlusMacroCall(node, "pipeable") && !isErrorType(checked)) {
+                const declaration = getTypeOfNode(node.arguments[0]).symbol.declarations?.find((_) => isFunctionDeclaration(_)) as FunctionDeclaration | undefined;
+                if (declaration) {
+                    return generatePipeable(declaration);
+                }
+            }
+            return checked;
+        }
+
         /**
          * Syntactically and semantically checks a call or new expression.
          * @param node The call/new expression to be checked.
          * @returns On success, the expression's signature's return type. On failure, anyType.
          */
-        function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
+        function checkCallExpressionOriginal(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
             checkGrammarTypeArguments(node, node.typeArguments);
 
             const signature = getResolvedSignature(node, /*candidatesOutArray*/ undefined, checkMode);
