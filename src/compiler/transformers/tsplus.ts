@@ -91,6 +91,8 @@ namespace ts {
                             return visitPropertyAccessExpression(source, node as PropertyAccessExpression, visitor(source, traceInScope), context);
                         case SyntaxKind.CallExpression:
                             return visitCallExpressionOrFluentCallExpression(source, traceInScope, node as CallExpression, visitor(source, traceInScope), context);
+                        case SyntaxKind.VariableStatement:
+                            return visitVariableStatement(source, node as VariableStatement, visitor(source, traceInScope), context)
                         default:
                             return visitEachChild(node, visitor(source, traceInScope), context);
                     }
@@ -172,6 +174,15 @@ namespace ts {
                 }
                 return visitEachChild(node, visitor, context);
             }
+            function visitVariableStatement(_source: SourceFile, node: VariableStatement, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
+                if (node.declarationList && node.declarationList.declarations.length > 0) {
+                    const declaration = node.declarationList.declarations[0]
+                    if(declaration.initializer && checker.isTsPlusMacroCall(declaration.initializer, 'pipeable') && isIdentifier(declaration.name)) {
+                        return transformPipeable(declaration as VariableDeclaration & { name: Identifier, initializer: CallExpression })
+                    }
+                }
+                return ts.visitEachChild(node, visitor, context)
+            }
             function optimisePipe(
                 args: NodeArray<ts.Expression>,
                 factory: ts.NodeFactory
@@ -183,6 +194,49 @@ namespace ts {
                             factory.createCallExpression(memberNode, undefined, [currentNode]),
                         args[0]!
                     )
+            }
+            function transformPipeable(node: VariableDeclaration & { name: Identifier, initializer: CallExpression }): Node {
+                const type = checker.getTypeAtLocation(node)
+                const signatures = checker.getSignaturesOfType(type, SignatureKind.Call)
+                if (signatures.length) {
+                    const signature = signatures[0]
+                    const signatureDeclaration = checker.signatureToSignatureDeclaration(
+                        signature,
+                        SyntaxKind.FunctionDeclaration,
+                        undefined,
+                        undefined
+                    )
+                    if (signatureDeclaration && signatureDeclaration.type && isFunctionTypeNode(signatureDeclaration.type)) {
+                        const returnType = signatureDeclaration.type
+                        return factory.createFunctionDeclaration(
+                            undefined,
+                            [factory.createModifier(SyntaxKind.ExportKeyword)],
+                            undefined,
+                            node.name,
+                            signatureDeclaration.typeParameters,
+                            signatureDeclaration.parameters,
+                            signatureDeclaration.type,
+                            factory.createBlock([
+                                factory.createReturnStatement(factory.createArrowFunction(
+                                    undefined,
+                                    returnType.typeParameters,
+                                    returnType.parameters,
+                                    returnType.type,
+                                    undefined,
+                                    factory.createCallExpression(
+                                        node.initializer.arguments[0],
+                                        undefined,
+                                        [
+                                            ...map(signatureDeclaration.type.parameters, (pdecl) => pdecl.name as Identifier),
+                                            ...map(signatureDeclaration.parameters, (pdecl) => pdecl.name as Identifier)
+                                        ]
+                                    )
+                                ))
+                            ])
+                        )
+                    }
+                }
+                return node;
             }
             function visitCallExpressionOrFluentCallExpression(source: SourceFile, traceInScope: Identifier | undefined, node: CallExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
                 if (checker.isPipeCall(node)) {

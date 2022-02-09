@@ -797,7 +797,8 @@ namespace ts {
             getInstantiatedTsPlusSignature,
             getIndexAccessExpressionCache: () => indexAccessExpressionCache,
             resolveStaticExtension,
-            getUnresolvedStaticExtension
+            getUnresolvedStaticExtension,
+            isTsPlusMacroCall
             // TSPLUS EXTENSION END
         };
 

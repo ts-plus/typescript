@@ -4585,6 +4585,7 @@ namespace ts {
         getIndexAccessExpressionCache(): ESMap<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>
         resolveStaticExtension(unresolved: TsPlusUnresolvedStaticExtension): Type | undefined
         getUnresolvedStaticExtension(targetType: Type, name: string): TsPlusUnresolvedStaticExtension | undefined
+        isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
     }
 
     /* @internal */
