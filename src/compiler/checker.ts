@@ -846,6 +846,12 @@ namespace ts {
             symbols.forEach((target) => {
                 if (typeSymbolCache.has(target)) {
                     typeSymbolCache.get(target)!.forEach((typeSymbol) => {
+                        const _unresolvedStatics = staticUnresolvedCache.get(typeSymbol);
+                        if (_unresolvedStatics) {
+                            _unresolvedStatics.forEach((extension) => {
+                                resolveStaticExtension(extension)
+                            })
+                        }
                         const _staticFunctions = staticFunctionCache.get(typeSymbol);
                         if (_staticFunctions) {
                             _staticFunctions.forEach((v, k) => {
