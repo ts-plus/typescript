@@ -851,6 +851,7 @@ namespace ts {
                             _unresolvedStatics.forEach((extension) => {
                                 resolveStaticExtension(extension)
                             })
+                            staticUnresolvedCache.delete(typeSymbol)
                         }
                         const _staticFunctions = staticFunctionCache.get(typeSymbol);
                         if (_staticFunctions) {
@@ -43532,6 +43533,7 @@ namespace ts {
             typeSymbolCache.clear();
             staticFunctionCache.clear();
             staticValueCache.clear();
+            staticUnresolvedCache.clear();
             identityCache.clear();
             getterCache.clear();
             callCache.clear();
