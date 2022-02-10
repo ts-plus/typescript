@@ -6,6 +6,7 @@ import { LazyArgument } from "../../utils/LazyArgument.js";
  * Imports a synchronous side-effect into a pure value
  *
  * @tsplus static ets/EffectOps succeed
+ * @tsplus static ets/EffectAspects succeed
  */
 export function succeedWith<A>(effect: LazyArgument<A>, __tsplusTrace?: string): Effect<unknown, never, A> {
     return T.succeedWith(effect, __tsplusTrace);

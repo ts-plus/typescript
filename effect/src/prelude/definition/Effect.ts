@@ -1,14 +1,24 @@
-import * as T from "@effect-ts/core/Effect";
+import * as _ from "@effect-ts/core/Effect";
 
 /**
  * @tsplus type ets/Effect
  */
-export interface Effect<R, E, A> extends T.Effect<R, E, A> { }
+export interface Effect<R, E, A> extends _.Effect<R, E, A> { }
 /**
  * @tsplus type ets/EffectOps
  */
 export interface EffectOps { }
 export const Effect: EffectOps = {};
+
+/**
+ * @tsplus type ets/EffectAspects
+ */
+export interface EffectAspects { }
+
+/**
+ * @tsplus static ets/EffectOps pipe
+ */
+export const T: EffectAspects = {}
 
 /**
  * @tsplus unify ets/Effect
