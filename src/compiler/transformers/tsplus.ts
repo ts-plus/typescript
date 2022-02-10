@@ -91,8 +91,8 @@ namespace ts {
                             return visitPropertyAccessExpression(source, node as PropertyAccessExpression, visitor(source, traceInScope), context);
                         case SyntaxKind.CallExpression:
                             return visitCallExpressionOrFluentCallExpression(source, traceInScope, node as CallExpression, visitor(source, traceInScope), context);
-                        case SyntaxKind.VariableStatement:
-                            return visitVariableStatement(source, node as VariableStatement, visitor(source, traceInScope), context)
+                        case SyntaxKind.VariableDeclaration:
+                            return visitVariableDeclaration(source, node as VariableDeclaration, visitor(source, traceInScope), context)
                         default:
                             return visitEachChild(node, visitor(source, traceInScope), context);
                     }
@@ -161,7 +161,7 @@ namespace ts {
                     if (staticValueExtension) {
                         return getPathOfExtension(context.factory, importer, staticValueExtension, source);
                     }
-                    
+
                     const getterExtension = checker.getGetterExtension(expressionType, node.name.escapedText.toString());
 
                     if (getterExtension) {
@@ -174,11 +174,36 @@ namespace ts {
                 }
                 return visitEachChild(node, visitor, context);
             }
-            function visitVariableStatement(_source: SourceFile, node: VariableStatement, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
-                if (node.declarationList && node.declarationList.declarations.length > 0) {
-                    const declaration = node.declarationList.declarations[0]
-                    if(declaration.initializer && checker.isTsPlusMacroCall(declaration.initializer, 'pipeable') && isIdentifier(declaration.name)) {
-                        return transformPipeable(declaration as VariableDeclaration & { name: Identifier, initializer: CallExpression })
+            function visitVariableDeclaration(_source: SourceFile, node: VariableDeclaration, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
+                if (node.initializer && checker.isTsPlusMacroCall(node.initializer, 'pipeable') && isIdentifier(node.name)) {
+                    const targetType = checker.getTypeAtLocation(node.initializer.arguments[0])
+                    if (targetType.symbol && targetType.symbol.valueDeclaration && isFunctionLikeDeclaration(targetType.symbol.valueDeclaration)) {
+                        const signatureDeclaration = targetType.symbol.valueDeclaration
+                        return factory.updateVariableDeclaration(
+                            node,
+                            node.name,
+                            undefined,
+                            undefined,
+                            factory.createArrowFunction(
+                                undefined,
+                                undefined,
+                                signatureDeclaration.parameters.slice(1, signatureDeclaration.parameters.length),
+                                undefined,
+                                undefined,
+                                factory.createArrowFunction(
+                                    undefined,
+                                    undefined,
+                                    [signatureDeclaration.parameters[0]],
+                                    undefined,
+                                    undefined,
+                                    factory.createCallExpression(
+                                        node.initializer.arguments[0],
+                                        undefined,
+                                        map(signatureDeclaration.parameters, (pdecl) => pdecl.name as Identifier)
+                                    )
+                                )
+                            )
+                        )
                     }
                 }
                 return ts.visitEachChild(node, visitor, context)
@@ -194,55 +219,6 @@ namespace ts {
                             factory.createCallExpression(memberNode, undefined, [currentNode]),
                         args[0]!
                     )
-            }
-            function transformPipeable(node: VariableDeclaration & { name: Identifier, initializer: CallExpression }): Node {
-                const type = checker.getTypeAtLocation(node)
-                const signatures = checker.getSignaturesOfType(type, SignatureKind.Call)
-                if (signatures.length) {
-                    const signature = signatures[0]
-                    const signatureDeclaration = checker.signatureToSignatureDeclaration(
-                        signature,
-                        SyntaxKind.FunctionDeclaration,
-                        undefined,
-                        undefined
-                    )
-                    if (signatureDeclaration && signatureDeclaration.type && isFunctionTypeNode(signatureDeclaration.type)) {
-                        const returnType = signatureDeclaration.type
-                        return factory.createVariableStatement(
-                            [factory.createModifier(SyntaxKind.ExportKeyword)],
-                            factory.createVariableDeclarationList([
-                                factory.createVariableDeclaration(
-                                    node.name,
-                                    undefined,
-                                    undefined,
-                                    factory.createArrowFunction(
-                                        undefined,
-                                        signatureDeclaration.typeParameters,
-                                        signatureDeclaration.parameters,
-                                        signatureDeclaration.type,
-                                        undefined,
-                                        factory.createArrowFunction(
-                                            undefined,
-                                            returnType.typeParameters,
-                                            returnType.parameters,
-                                            returnType.type,
-                                            undefined,
-                                            factory.createCallExpression(
-                                                node.initializer.arguments[0],
-                                                undefined,
-                                                [
-                                                    ...map(signatureDeclaration.type.parameters, (pdecl) => pdecl.name as Identifier),
-                                                    ...map(signatureDeclaration.parameters, (pdecl) => pdecl.name as Identifier)
-                                                ]
-                                            )
-                                        )
-                                    )
-                                )
-                            ])
-                        )
-                    }
-                }
-                return node;
             }
             function visitCallExpressionOrFluentCallExpression(source: SourceFile, traceInScope: Identifier | undefined, node: CallExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
                 if (checker.isPipeCall(node)) {
@@ -287,7 +263,7 @@ namespace ts {
                             if (!targetSignature || !isTsPlusSignature(targetSignature)) {
                                 throw new Error("BUG: No applicable signature found for fluent extension");
                             }
-                            
+
                             const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
                             return factory.updateCallExpression(
                                 visited as CallExpression,
