@@ -1004,9 +1004,9 @@ namespace ts {
             visitNode(node, visitor);
             return used;
         }
-        function partitionTypeParametersForPipeable(dataFirst: FunctionDeclaration): [TypeParameterDeclaration[], TypeParameterDeclaration[]] {
+        function partitionTypeParametersForPipeable(dataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression): [TypeParameterDeclaration[], TypeParameterDeclaration[]] {
             if (!dataFirst.typeParameters) {
-                return [[], []]
+                return [[], []];
             }
             const left: TypeParameterDeclaration[] = [];
             const right: TypeParameterDeclaration[] = [];
@@ -1018,7 +1018,7 @@ namespace ts {
                             used = true;
                         }
                     }
-                })
+                });
                 if (used) {
                     left.push(param);
                 }
@@ -1026,58 +1026,59 @@ namespace ts {
                     right.push(param);
                 }
             });
-            return [left, right]
+            return [left, right];
         }
-        function generatePipeable(dataFirst: FunctionDeclaration): Type {
-            const returnExpression = createSyntheticExpression(dataFirst, getReturnTypeOfSignature(
-                getSignaturesOfType(getTypeOfNode(dataFirst), SignatureKind.Call)[0]!
-            ));
-            const [paramsFirst, paramsSecond] = partitionTypeParametersForPipeable(dataFirst);
-            const returnFunction = factory.createFunctionExpression(
-                undefined,
-                undefined,
-                undefined,
-                paramsSecond,
-                [dataFirst.parameters[0]],
-                undefined,
-                factory.createBlock(
-                    [factory.createReturnStatement(returnExpression)],
-                    true
-                )
-            );
-            setParent(returnFunction.body, returnFunction);
-            setParent((returnFunction.body as Block).statements[0], returnFunction.body);
-            const returnFunctionSymbol = createSymbol(
-                SymbolFlags.Function,
-                InternalSymbolName.Function
-            );
-            returnFunction.symbol = returnFunctionSymbol;
-            returnFunctionSymbol.declarations = [returnFunction];
-            returnFunctionSymbol.valueDeclaration = returnFunction;
-            const pipeable = factory.createFunctionDeclaration(
-                undefined,
-                [factory.createModifier(ts.SyntaxKind.DeclareKeyword)],
-                undefined,
-                dataFirst.name,
-                paramsFirst,
-                dataFirst.parameters.slice(1, dataFirst.parameters.length),
-                undefined,
-                factory.createBlock(
-                    [factory.createReturnStatement(returnFunction)],
-                    true
-                )
-            );
-            setParent(returnFunction, pipeable);
-            setParent(pipeable.body, pipeable);
-            setParent((pipeable.body as Block).statements[0], pipeable.body);
-            const pipeableSymbol = createSymbol(
-                SymbolFlags.Function,
-                InternalSymbolName.Function
-            );
-            pipeable.symbol = pipeableSymbol;
-            pipeableSymbol.declarations = [pipeable];
-            setParent(pipeable, dataFirst.parent);
-            return getTypeOfNode(pipeable);
+        function generatePipeable(dataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression): Type | undefined {
+            const signatures = getSignaturesOfType(getTypeOfNode(dataFirst), SignatureKind.Call)
+            if (signatures.length > 0) {
+                const returnExpression = createSyntheticExpression(dataFirst, getReturnTypeOfSignature(signatures[0]))
+                const [paramsFirst, paramsSecond] = partitionTypeParametersForPipeable(dataFirst);
+                const returnFunction = factory.createFunctionExpression(
+                    undefined,
+                    undefined,
+                    undefined,
+                    paramsSecond,
+                    [dataFirst.parameters[0]],
+                    undefined,
+                    factory.createBlock(
+                        [factory.createReturnStatement(returnExpression)],
+                        true
+                    )
+                );
+                setParent(returnFunction.body, returnFunction);
+                setParent((returnFunction.body).statements[0], returnFunction.body);
+                const returnFunctionSymbol = createSymbol(
+                    SymbolFlags.Function,
+                    InternalSymbolName.Function
+                );
+                returnFunction.symbol = returnFunctionSymbol;
+                returnFunctionSymbol.declarations = [returnFunction];
+                returnFunctionSymbol.valueDeclaration = returnFunction;
+                const pipeable = factory.createFunctionDeclaration(
+                    undefined,
+                    [factory.createModifier(SyntaxKind.DeclareKeyword)],
+                    undefined,
+                    dataFirst.name,
+                    paramsFirst,
+                    dataFirst.parameters.slice(1, dataFirst.parameters.length),
+                    undefined,
+                    factory.createBlock(
+                        [factory.createReturnStatement(returnFunction)],
+                        true
+                    )
+                );
+                setParent(returnFunction, pipeable);
+                setParent(pipeable.body, pipeable);
+                setParent((pipeable.body as Block).statements[0], pipeable.body);
+                const pipeableSymbol = createSymbol(
+                    SymbolFlags.Function,
+                    InternalSymbolName.Function
+                );
+                pipeable.symbol = pipeableSymbol;
+                pipeableSymbol.declarations = [pipeable];
+                setParent(pipeable, dataFirst.parent);
+                return getTypeOfNode(pipeable);
+            }
         }
         function isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K> {
             if (!isCallExpression(node)) {
@@ -31767,16 +31768,26 @@ namespace ts {
             }
         }
 
+        // TSPLUS EXTENSION START
         function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
             const checked = checkCallExpressionOriginal(node, checkMode);
             if (isTsPlusMacroCall(node, "pipeable") && !isErrorType(checked)) {
-                const declaration = getTypeOfNode(node.arguments[0]).symbol.declarations?.find((_) => isFunctionDeclaration(_)) as FunctionDeclaration | undefined;
-                if (declaration) {
-                    return generatePipeable(declaration);
+                if (node.arguments.length > 0) {
+                    const dataFirstSymbol = getTypeOfNode(node.arguments[0]).symbol;
+                    if (dataFirstSymbol && dataFirstSymbol.declarations) {
+                        const dataFirstDeclaration = find(dataFirstSymbol.declarations, (decl): decl is FunctionDeclaration | ArrowFunction | FunctionExpression => isFunctionDeclaration(decl) || isArrowFunction(decl) || isFunctionExpression(decl))
+                        if (dataFirstDeclaration) {
+                            const type = generatePipeable(dataFirstDeclaration);
+                            if (type) {
+                                return type;
+                            }
+                        }
+                    }
                 }
             }
             return checked;
         }
+        // TSPLUS EXTENSION END
 
         /**
          * Syntactically and semantically checks a call or new expression.

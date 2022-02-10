@@ -208,30 +208,36 @@ namespace ts {
                     )
                     if (signatureDeclaration && signatureDeclaration.type && isFunctionTypeNode(signatureDeclaration.type)) {
                         const returnType = signatureDeclaration.type
-                        return factory.createFunctionDeclaration(
-                            undefined,
+                        return factory.createVariableStatement(
                             [factory.createModifier(SyntaxKind.ExportKeyword)],
-                            undefined,
-                            node.name,
-                            signatureDeclaration.typeParameters,
-                            signatureDeclaration.parameters,
-                            signatureDeclaration.type,
-                            factory.createBlock([
-                                factory.createReturnStatement(factory.createArrowFunction(
+                            factory.createVariableDeclarationList([
+                                factory.createVariableDeclaration(
+                                    node.name,
                                     undefined,
-                                    returnType.typeParameters,
-                                    returnType.parameters,
-                                    returnType.type,
                                     undefined,
-                                    factory.createCallExpression(
-                                        node.initializer.arguments[0],
+                                    factory.createArrowFunction(
                                         undefined,
-                                        [
-                                            ...map(signatureDeclaration.type.parameters, (pdecl) => pdecl.name as Identifier),
-                                            ...map(signatureDeclaration.parameters, (pdecl) => pdecl.name as Identifier)
-                                        ]
+                                        signatureDeclaration.typeParameters,
+                                        signatureDeclaration.parameters,
+                                        signatureDeclaration.type,
+                                        undefined,
+                                        factory.createArrowFunction(
+                                            undefined,
+                                            returnType.typeParameters,
+                                            returnType.parameters,
+                                            returnType.type,
+                                            undefined,
+                                            factory.createCallExpression(
+                                                node.initializer.arguments[0],
+                                                undefined,
+                                                [
+                                                    ...map(signatureDeclaration.type.parameters, (pdecl) => pdecl.name as Identifier),
+                                                    ...map(signatureDeclaration.parameters, (pdecl) => pdecl.name as Identifier)
+                                                ]
+                                            )
+                                        )
                                     )
-                                ))
+                                )
                             ])
                         )
                     }

@@ -3325,7 +3325,7 @@ namespace ts {
         tsPlusResolvedSignatures: TsPlusSignature[];
     }
 
-    export type VariableDeclarationWithFunction = VariableDeclaration & { name: Identifier, initializer: ArrowFunction | FunctionExpression };
+    export type VariableDeclarationWithFunction = Omit<VariableDeclaration, "name" | "initializer"> & { name: Identifier, initializer: ArrowFunction | FunctionExpression };
 
     export interface TsPlusUnresolvedStaticSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.UnresolvedStatic
