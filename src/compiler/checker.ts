@@ -43515,7 +43515,11 @@ namespace ts {
             const tag = collectTsPlusTypeTags(declaration)[0];
             if (tag) {
                 const type = getTypeOfNode(declaration);
-                const typeTag = tag.comment.replace(/^type /, "");
+                const [_, typeTag] = tag.comment.split(" ");
+                if (!typeTag)  {
+                    error(declaration, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                    return;
+                }
                 if (type.symbol) {
                     addToTypeSymbolCache(type.symbol, typeTag, "after");
                 }
@@ -43539,6 +43543,10 @@ namespace ts {
             const staticTags = collectTsPlusStaticTags(statement);
             for (const staticTag of staticTags) {
                 const [, target, name] = staticTag.comment.split(" ");
+                if (!target || !name) {
+                    error(statement, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
+                    return;
+                }
                 const declaration = statement.declarationList.declarations[0];
                 const symbol = getSymbolAtLocation(declaration.name);
                 if (symbol) {
@@ -43564,6 +43572,10 @@ namespace ts {
                     const fluentTags = collectTsPlusFluentTags(declaration);
                     for (const fluentTag of fluentTags) {
                         const [, target, name] = fluentTag.comment.split(" ");
+                        if (!target || !name) {
+                            error(statement, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name);
+                            return;
+                        }
                         if (!fluentTempCache.has(target)) {
                             fluentTempCache.set(target, new Map());
                         }
@@ -43595,6 +43607,10 @@ namespace ts {
                     const getterTags = collectTsPlusGetterTags(declaration);
                     for (const getterTag of getterTags) {
                         const [, target, name] = getterTag.comment.split(" ");
+                        if (!target || !name) {
+                            error(statement, Diagnostics.Annotation_of_a_getter_extension_must_have_the_form_tsplus_getter_typename_name);
+                            return;
+                        }
                         if (!getterCache.has(target)) {
                             getterCache.set(target, new Map())
                         }
@@ -43621,6 +43637,10 @@ namespace ts {
                     const symbol = getSymbolAtLocation(declaration.name)
                     if (symbol) {
                         const [, target, name] = operatorTag.comment.split(" ");
+                        if (!target || !name) {
+                            error(declaration, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol);
+                            return;
+                        }
                         if (!operatorCache.has(target)) {
                             operatorCache.set(target, new Map());
                         }
@@ -43639,6 +43659,10 @@ namespace ts {
                 const fluentTags = collectTsPlusFluentTags(declaration);
                 for (const fluentTag of fluentTags) {
                     const [, target, name] = fluentTag.comment.split(" ");
+                    if (!target || !name) {
+                        error(declaration, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name);
+                        return;
+                    }
                     if (!fluentTempCache.has(target)) {
                         fluentTempCache.set(target, new Map());
                     }
@@ -43660,6 +43684,10 @@ namespace ts {
                 const getterTags = collectTsPlusGetterTags(declaration);
                 for (const getterTag of getterTags) {
                     const [, target, name] = getterTag.comment.split(" ");
+                    if (!target || !name) {
+                        error(declaration, Diagnostics.Annotation_of_a_getter_extension_must_have_the_form_tsplus_getter_typename_name);
+                        return;
+                    }
                     if (!getterCache.has(target)) {
                         getterCache.set(target, new Map());
                     }
@@ -43677,6 +43705,10 @@ namespace ts {
                 const staticTags = collectTsPlusStaticTags(declaration);
                 for (const staticTag of staticTags) {
                     const [, target, name] = staticTag.comment.split(" ");
+                    if (!target || !name) {
+                        error(declaration, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
+                        return;
+                    }
                     if (!staticFunctionCache.has(target)) {
                         staticFunctionCache.set(target, new Map());
                     }
@@ -43694,15 +43726,23 @@ namespace ts {
                 const unifyTags = collectTsPlusUnifyTags(declaration);
                 for (const unifyTag of unifyTags) {
                     const [, target] = unifyTag.comment.split(" ");
+                    if (!target) {
+                        error(declaration, Diagnostics.Annotation_of_a_unify_extension_must_have_the_form_tsplus_unify_typename);
+                        return;
+                    }
                     identityCache.set(target, declaration);
                 }
             }
         }
         function tryCacheTsPlusIndexFunction(declaration: FunctionDeclaration) {
             if(declaration.name && isIdentifier(declaration.name)) {
-                const unifyTags = collectTsPlusIndexTags(declaration);
-                for (const unifyTag of unifyTags) {
-                    const [, target] = unifyTag.comment.split(" ");
+                const indexTags = collectTsPlusIndexTags(declaration);
+                for (const indexTag of indexTags) {
+                    const [, target] = indexTag.comment.split(" ");
+                    if (!target) {
+                        error(declaration, Diagnostics.Annotation_of_an_index_extension_must_have_the_form_tsplus_index_typename);
+                        return;
+                    }
                     indexCache.set(target, {
                         declaration,
                         definition: getSourceFileOfNode(declaration),
