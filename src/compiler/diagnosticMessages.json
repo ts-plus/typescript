@@ -7279,5 +7279,33 @@
     "'Pipeable' macro is only allowed in variable declarations.": {
         "category": "Error",
         "code": 50005
+    },
+    "Annotation of a static extension must have the form '@tsplus static [typename] [name]'.": {
+        "category": "Error",
+        "code": 50006
+    },
+    "Annotation of a fluent extension must have the form '@tsplus fluent [typename] [name]'.": {
+        "category": "Error",
+        "code": 50007
+    },
+    "Annotation of a getter extension must have the form '@tsplus getter [typename] [name]'.": {
+        "category": "Error",
+        "code": 50008
+    },
+    "Annotation of an operator extension must have the form '@tsplus operator [typename] [symbol]'.": {
+        "category": "Error",
+        "code": 50009
+    },
+    "Annotation of a type extension must have the form '@tsplus type [typename]'.": {
+        "category": "Error",
+        "code": 50010
+    },
+    "Annotation of a unify extension must have the form '@tsplus unify [typename]'.": {
+        "category": "Error",
+        "code": 50011
+    },
+    "Annotation of an index extension must have the form '@tsplus index [typename]'.": {
+        "category": "Error",
+        "code": 50012
     }
 }
