@@ -3316,7 +3316,13 @@ namespace ts {
         StaticValue = "TsPlusStaticValueSymbol",
         UnresolvedStatic = "TsPlusUnresolvedStatic",
         Getter = "TsPlusGetterSymbol",
-        GetterVariable = "TsPlusGetterVariableSymbol"
+        GetterVariable = "TsPlusGetterVariableSymbol",
+        Pipeable = "TsPlusPipeableSymbol"
+    }
+
+    export interface TsPlusPipeableSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.Pipeable;
+        tsPlusDeclaration: VariableDeclaration;
     }
 
     export interface TsPlusFluentSymbol extends TransientSymbol {
@@ -3366,7 +3372,8 @@ namespace ts {
         | TsPlusStaticFunctionSymbol
         | TsPlusStaticValueSymbol
         | TsPlusGetterSymbol
-        | TsPlusGetterVariableSymbol;
+        | TsPlusGetterVariableSymbol
+        | TsPlusPipeableSymbol;
 
     export interface TsPlusFluentExtension {
         patched: Symbol;
