@@ -42,7 +42,7 @@ namespace ts.GoToDefinition {
         // TSPLUS EXTENSION BEGIN
         let symbol: Symbol | undefined;
 
-        if(isPropertyAccessExpression(parent)) {
+        if (isPropertyAccessExpression(parent)) {
             const nodeType = typeChecker.getTypeAtLocation(node);
             if(nodeType.symbol && isTsPlusSymbol(nodeType.symbol)) {
                 if (parent.parent && isCallLikeExpression(parent.parent)) {
@@ -103,13 +103,21 @@ namespace ts.GoToDefinition {
             return concatenate(fileReferenceDefinition, getDefinitionInfoForIndexSignatures(node, typeChecker));
         }
 
-        const calledDeclaration = tryGetSignatureDeclaration(typeChecker, node);
+        // TSPLUS EXTENSION BEGIN
+        let calledDeclaration = tryGetSignatureDeclaration(typeChecker, node);
+        if (calledDeclaration && calledDeclaration.symbol && isTsPlusSymbol(calledDeclaration.symbol) && calledDeclaration.symbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+            // We have determined that this is a call of a Pipeable macro, which is a synthetic declaration (has no real position).
+            // To go to the real definition, clear the callDeclaration to skip trying to get the definition info from the signature
+            calledDeclaration = undefined;
+        }
+        // TSPLUS EXTENSION END
+
         // Don't go to the component constructor definition for a JSX element, just go to the component definition.
         if (calledDeclaration && !(isJsxOpeningLikeElement(node.parent) && isConstructorLike(calledDeclaration))) {
             const sigInfo = createDefinitionFromSignatureDeclaration(typeChecker, calledDeclaration);
             // For a function, if this is the original function definition, return just sigInfo.
             // If this is the original constructor definition, parent is the class.
-            if (typeChecker.getRootSymbols(symbol).some(s => symbolMatchesSignature(s, calledDeclaration))) {
+            if (typeChecker.getRootSymbols(symbol).some(s => symbolMatchesSignature(s, calledDeclaration!))) {
                 return [sigInfo];
             }
             else {

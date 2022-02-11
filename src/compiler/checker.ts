@@ -1038,7 +1038,7 @@ namespace ts {
             });
             return [left, right];
         }
-        function generatePipeable(dataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression): Type | undefined {
+        function generatePipeable(declarationNode: VariableDeclaration, dataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression): Type | undefined {
             const signatures = getSignaturesOfType(getTypeOfNode(dataFirst), SignatureKind.Call)
             if (signatures.length > 0) {
                 const returnExpression = createSyntheticExpression(dataFirst, getReturnTypeOfSignature(signatures[0]))
@@ -1083,10 +1083,17 @@ namespace ts {
                 const pipeableSymbol = createSymbol(
                     SymbolFlags.Function,
                     InternalSymbolName.Function
-                );
+                ) as TsPlusPipeableSymbol;
+                pipeableSymbol.tsPlusTag = TsPlusSymbolTag.Pipeable;
+                pipeableSymbol.tsPlusDeclaration = declarationNode;
                 pipeable.symbol = pipeableSymbol;
                 pipeableSymbol.declarations = [pipeable];
-                setParent(pipeable, dataFirst.parent);
+                setParent(pipeable, declarationNode);
+                const declarationSymbol = getSymbolAtLocation(declarationNode)
+                if (declarationSymbol) {
+                    declarationSymbol.declarations = [pipeable]
+                    declarationSymbol.valueDeclaration = pipeable
+                }
                 return getTypeOfNode(pipeable);
             }
         }
@@ -31846,13 +31853,13 @@ namespace ts {
         // TSPLUS EXTENSION START
         function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
             const checked = checkCallExpressionOriginal(node, checkMode);
-            if (isTsPlusMacroCall(node, "pipeable") && !isErrorType(checked)) {
+            if (isTsPlusMacroCall(node, "pipeable") && isVariableDeclaration(node.parent) && !isErrorType(checked)) {
                 if (node.arguments.length > 0) {
                     const dataFirstSymbol = getTypeOfNode(node.arguments[0]).symbol;
                     if (dataFirstSymbol && dataFirstSymbol.declarations) {
                         const dataFirstDeclaration = find(dataFirstSymbol.declarations, (decl): decl is FunctionDeclaration | ArrowFunction | FunctionExpression => isFunctionDeclaration(decl) || isArrowFunction(decl) || isFunctionExpression(decl))
                         if (dataFirstDeclaration) {
-                            const type = generatePipeable(dataFirstDeclaration);
+                            const type = generatePipeable(node.parent, dataFirstDeclaration);
                             if (type) {
                                 return type;
                             }
@@ -45804,6 +45811,9 @@ namespace ts {
                 if (isCallLikeExpression(node)) {
                     const signature = checker.getResolvedSignature(node)
                     if (signature && signature.declaration) {
+                        if (isTsPlusSymbol(signature.declaration.symbol) && signature.declaration.symbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                            return signature.declaration.symbol.tsPlusDeclaration
+                        }
                         return signature.declaration
                     }
                 }
