@@ -31853,7 +31853,11 @@ namespace ts {
         // TSPLUS EXTENSION START
         function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
             const checked = checkCallExpressionOriginal(node, checkMode);
-            if (isTsPlusMacroCall(node, "pipeable") && isVariableDeclaration(node.parent) && !isErrorType(checked)) {
+            if (isTsPlusMacroCall(node, "pipeable") && !isErrorType(checked)) {
+                if (!isVariableDeclaration(node.parent)) {
+                  error(node, Diagnostics.Pipeable_macro_is_only_allowed_in_variable_declarations);
+                  return checked;
+                }
                 if (node.arguments.length > 0) {
                     const dataFirstSymbol = getTypeOfNode(node.arguments[0]).symbol;
                     if (dataFirstSymbol && dataFirstSymbol.declarations) {

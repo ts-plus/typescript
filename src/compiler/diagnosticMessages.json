@@ -7275,5 +7275,9 @@
     "Values of type 'any' are not allowed in lazy function arguments, if the behaviour is intended use an arrow function.": {
         "category": "Error",
         "code": 50004
+    },
+    "'Pipeable' macro is only allowed in variable declarations.": {
+        "category": "Error",
+        "code": 50005
     }
 }
