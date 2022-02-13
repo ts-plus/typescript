@@ -31303,22 +31303,38 @@ namespace ts {
             // but we are not including call signatures that may have been added to the Object or
             // Function interface, since they have none by default. This is a bit of a leap of faith
             // that the user will not add any.
-            
+
             let callSignatures = getSignaturesOfType(apparentType, SignatureKind.Call);
 
             // TSPLUS EXTENSION START
             if (callSignatures.length === 0) {
-                const unresolvedCallExtension = getUnresolvedStaticExtension(apparentType, "__call");
+                if (isClassCompanionReference(node.expression)) {
+                    const unresolvedCallExtension = getUnresolvedStaticCompanionExtension(apparentType, "__call");
 
-                if (unresolvedCallExtension) {
-                    resolveStaticExtension(unresolvedCallExtension);
+                    if (unresolvedCallExtension) {
+                        resolveStaticExtension(unresolvedCallExtension);
+                    }
+
+                    const callExtension = getStaticFunctionCompanionExtension(apparentType, "__call");
+
+                    if (callExtension) {
+                        callSignatures = Array.from(getSignaturesOfType(getTypeOfSymbol(callExtension.patched), SignatureKind.Call));
+                        callCache.set(node.expression, callExtension);
+                    }
                 }
+                else {
+                    const unresolvedCallExtension = getUnresolvedStaticExtension(apparentType, "__call");
 
-                const callExtension = getStaticFunctionExtension(apparentType, "__call");
-                
-                if (callExtension) {
-                    callSignatures = Array.from(getSignaturesOfType(getTypeOfSymbol(callExtension.patched), SignatureKind.Call));
-                    callCache.set(node.expression, callExtension);
+                    if (unresolvedCallExtension) {
+                        resolveStaticExtension(unresolvedCallExtension);
+                    }
+
+                    const callExtension = getStaticFunctionExtension(apparentType, "__call");
+
+                    if (callExtension) {
+                        callSignatures = Array.from(getSignaturesOfType(getTypeOfSymbol(callExtension.patched), SignatureKind.Call));
+                        callCache.set(node.expression, callExtension);
+                    }
                 }
             }
             // TSPLUS EXTENSION END

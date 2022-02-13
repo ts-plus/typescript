@@ -240,15 +240,29 @@ namespace ts {
                 }
                 const expressionType = checker.getTypeAtLocation(node.expression)
                 if (checker.getSignaturesOfType(expressionType, SignatureKind.Call).length === 0) {
-                    const customCall = checker.getStaticFunctionExtension(expressionType, "__call")
-                    if (customCall) {
-                        const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
-                        return factory.updateCallExpression(
-                            visited as CallExpression,
-                            getPathOfExtension(context.factory, importer, customCall, source),
-                            (visited as CallExpression).typeArguments,
-                            (visited as CallExpression).arguments
-                        );
+                    if (checker.isClassCompanionReference(node.expression)) {
+                        const customCall = checker.getStaticFunctionCompanionExtension(expressionType, "__call")
+                        if (customCall) {
+                            const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
+                            return factory.updateCallExpression(
+                                visited as CallExpression,
+                                getPathOfExtension(context.factory, importer, customCall, source),
+                                (visited as CallExpression).typeArguments,
+                                (visited as CallExpression).arguments
+                            );
+                        }
+                    }
+                    else {
+                        const customCall = checker.getStaticFunctionExtension(expressionType, "__call")
+                        if (customCall) {
+                            const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
+                            return factory.updateCallExpression(
+                                visited as CallExpression,
+                                getPathOfExtension(context.factory, importer, customCall, source),
+                                (visited as CallExpression).typeArguments,
+                                (visited as CallExpression).arguments
+                            );
+                        }
                     }
                 }
                 if (isPropertyAccessExpression(node.expression)) {

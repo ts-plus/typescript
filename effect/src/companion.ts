@@ -12,6 +12,13 @@ export function staticFn(): number {
 }
 
 /**
+ * @tsplus static AOps __call
+ */
+export function callFn(): number {
+  return 1
+}
+
+/**
  * @tsplus getter A getter
  */
 export function getterFn(): number {
@@ -34,3 +41,5 @@ const aInstance = new A();
 aInstance.fn();
 
 aInstance.getter;
+
+A()
