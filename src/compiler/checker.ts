@@ -29158,8 +29158,8 @@ namespace ts {
         // TSPLUS EXTENSION START
         function checkPropertyAccessForExtension(node: PropertyAccessExpression | QualifiedName, _left: Expression | QualifiedName, leftType: Type, right: Identifier | PrivateIdentifier, _checkMode: CheckMode | undefined) {
             const inType = getPropertiesOfType(leftType).findIndex((p) => p.escapedName === right.escapedText) !== -1;
-            const leftSymbol = getSymbolAtLocation(_left);
-            if (!inType && !!leftSymbol && leftSymbol.valueDeclaration && isClassDeclaration(leftSymbol.valueDeclaration)) {
+            const leftTypeSymbol = leftType.symbol;
+            if (!inType && !!leftTypeSymbol && leftTypeSymbol.declarations && leftTypeSymbol.declarations[0] && isClassDeclaration(leftTypeSymbol.declarations[0])) {
                 if (!isClassInstanceSide(leftType)) {
                     const staticFuncExt = getStaticFunctionCompanionExtension(leftType, right.escapedText.toString());
                     if (staticFuncExt) {
