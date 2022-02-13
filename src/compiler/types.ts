@@ -4579,9 +4579,12 @@ namespace ts {
         getExtensions(selfNode: Expression): ESMap<string, Symbol>
         getFluentExtension(target: Type, name: string): TsPlusFluentExtension | undefined
         getGetterExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
+        getGetterCompanionExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
         getStaticFunctionExtension(target: Type, name: string): TsPlusStaticFunctionExtension | undefined
         getStaticValueExtension(target: Type, name: string): TsPlusStaticValueExtension | undefined
         getOperatorExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
+        getStaticFunctionCompanionExtension(target: Type, name: string): TsPlusStaticFunctionExtension | undefined
+        getStaticValueCompanionExtension(target: Type, name: string): TsPlusStaticValueExtension | undefined
         shouldMakeLazy(signatureParam: Symbol, callArg: Type): boolean
         isPipeCall(node: CallExpression): boolean
         getCallExtension(node: Node): TsPlusStaticFunctionExtension | undefined
@@ -4593,6 +4596,7 @@ namespace ts {
         resolveStaticExtension(unresolved: TsPlusUnresolvedStaticExtension): Type | undefined
         getUnresolvedStaticExtension(targetType: Type, name: string): TsPlusUnresolvedStaticExtension | undefined
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
+        isClassCompanionReference(node: Expression): boolean
     }
 
     /* @internal */

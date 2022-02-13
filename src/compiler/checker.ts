@@ -354,6 +354,7 @@ namespace ts {
         // TSPLUS EXTENSION START
         const importAsCache = new Map<string, string>();
         const typeSymbolCache = new Map<Symbol, string[]>();
+        const companionSymbolCache = new Map<Symbol, string[]>();
         const fluentCache = new Map<string, ESMap<string, TsPlusFluentExtension>>();
         const fluentTempCache = new Map<string, ESMap<string, Set<{ signatures: readonly TsPlusSignature[], definition: SourceFile, exportName: string }>>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
@@ -791,6 +792,9 @@ namespace ts {
             getOperatorExtension,
             getStaticFunctionExtension,
             getStaticValueExtension,
+            getStaticFunctionCompanionExtension,
+            getStaticValueCompanionExtension,
+            getGetterCompanionExtension,
             getCallExtension,
             shouldMakeLazy,
             isPipeCall,
@@ -801,7 +805,8 @@ namespace ts {
             getIndexAccessExpressionCache: () => indexAccessExpressionCache,
             resolveStaticExtension,
             getUnresolvedStaticExtension,
-            isTsPlusMacroCall
+            isTsPlusMacroCall,
+            isClassCompanionReference
             // TSPLUS EXTENSION END
         };
 
@@ -848,7 +853,7 @@ namespace ts {
             const symbols = collectRelevantSymbols(targetType);
             const copy: ESMap<string, Symbol> = new Map();
             symbols.forEach((target) => {
-                if (typeSymbolCache.has(target)) {
+                if (typeSymbolCache.has(target) && !isClassCompanionReference(selfNode)) {
                     typeSymbolCache.get(target)!.forEach((typeSymbol) => {
                         const _unresolvedStatics = staticUnresolvedCache.get(typeSymbol);
                         if (_unresolvedStatics) {
@@ -885,6 +890,29 @@ namespace ts {
                             });
                         }
                     });
+                }
+                if (companionSymbolCache.has(target) && isClassCompanionReference(selfNode)) {
+                    companionSymbolCache.get(target)!.forEach((typeSymbol) => {
+                        const _unresolvedStatics = staticUnresolvedCache.get(typeSymbol);
+                        if (_unresolvedStatics) {
+                            _unresolvedStatics.forEach((extension) => {
+                                resolveStaticExtension(extension);
+                            });
+                            staticUnresolvedCache.delete(typeSymbol);
+                        }
+                        const _staticFunctions = staticFunctionCache.get(typeSymbol);
+                        if (_staticFunctions) {
+                            _staticFunctions.forEach((v, k) => {
+                                copy.set(k, v.patched)
+                            });
+                        }
+                        const _staticValues = staticValueCache.get(typeSymbol);
+                        if(_staticValues) {
+                            _staticValues.forEach((v, k) => {
+                                copy.set(k, v.patched);
+                            })
+                        }
+                    })
                 }
             })
             copy.delete("__call");
@@ -928,11 +956,49 @@ namespace ts {
                 }
             }
         }
+        function getGetterCompanionExtension(targetType: Type, name: string) {
+            const symbols = collectRelevantSymbols(targetType)
+            for (const target of symbols) {
+                if (companionSymbolCache.has(target)) {
+                    const x = companionSymbolCache.get(target)!.flatMap(
+                        (tag) => {
+                            if (getterCache.has(tag)) {
+                                const cache = getterCache.get(tag)
+                                if (cache?.has(name)) {
+                                    return [cache.get(name)!]
+                                }
+                            }
+                            return []
+                        }
+                    )
+                    return x.length > 0 ? x[x.length - 1] : undefined;
+                }
+            }
+        }
         function getStaticFunctionExtension(targetType: Type, name: string) {
             const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
+                        (tag) => {
+                            if (staticFunctionCache.has(tag)) {
+                                const cache = staticFunctionCache.get(tag)
+                                if (cache?.has(name)) {
+                                    return [cache.get(name)!]
+                                }
+                            }
+                            return []
+                        }
+                    )
+                    return x.length > 0 ? x[x.length - 1] : undefined;
+                }
+            }
+        }
+        function getStaticFunctionCompanionExtension(targetType: Type, name: string) {
+            const symbols = collectRelevantSymbols(targetType)
+            for (const target of symbols) {
+                if (companionSymbolCache.has(target)) {
+                    const x = companionSymbolCache.get(target)!.flatMap(
                         (tag) => {
                             if (staticFunctionCache.has(tag)) {
                                 const cache = staticFunctionCache.get(tag)
@@ -963,11 +1029,46 @@ namespace ts {
                 }
             }
         }
+        function getStaticValueCompanionExtension(targetType: Type, name: string) {
+            const symbols = collectRelevantSymbols(targetType);
+            for (const target of symbols) {
+                if (companionSymbolCache.has(target)) {
+                    const x = flatMap(companionSymbolCache.get(target)!, (tag) => {
+                        if (staticValueCache.has(tag)) {
+                            const cache = staticValueCache.get(tag)
+                            if (cache?.has(name)) {
+                                return [cache.get(name)!]
+                            }
+                        }
+                    });
+                    return x.length > 0 ? x[x.length - 1] : undefined;
+                }
+            }
+        }
         function getUnresolvedStaticExtension(targetType: Type, name: string) {
             const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
+                        (tag) => {
+                            if (staticUnresolvedCache.has(tag)) {
+                                const cache = staticUnresolvedCache.get(tag)
+                                if (cache?.has(name)) {
+                                    return [cache.get(name)!]
+                                }
+                            }
+                            return []
+                        }
+                    )
+                    return x.length > 0 ? x[x.length - 1] : undefined;
+                }
+            }
+        }
+        function getUnresolvedStaticCompanionExtension(targetType: Type, name: string) {
+            const symbols = collectRelevantSymbols(targetType)
+            for (const target of symbols) {
+                if (companionSymbolCache.has(target)) {
+                    const x = companionSymbolCache.get(target)!.flatMap(
                         (tag) => {
                             if (staticUnresolvedCache.has(tag)) {
                                 const cache = staticUnresolvedCache.get(tag)
@@ -5077,6 +5178,16 @@ namespace ts {
 
         function isClassInstanceSide(type: Type) {
             return !!type.symbol && !!(type.symbol.flags & SymbolFlags.Class) && (type === getDeclaredTypeOfClassOrInterface(type.symbol) || (!!(type.flags & TypeFlags.Object) && !!(getObjectFlags(type) & ObjectFlags.IsClassInstanceClone)));
+        }
+
+        function isClassCompanionReference(node: Expression): boolean {
+            const symbol = getSymbolAtLocation(node);
+            if (symbol) {
+                if (!!(symbol.flags & SymbolFlags.Class)) {
+                    return !isClassInstanceSide(getTypeOfSymbol(symbol));
+                }
+            }
+            return false;
         }
 
         function createNodeBuilder() {
@@ -29018,6 +29129,27 @@ namespace ts {
         // TSPLUS EXTENSION START
         function checkPropertyAccessForExtension(node: PropertyAccessExpression | QualifiedName, _left: Expression | QualifiedName, leftType: Type, right: Identifier | PrivateIdentifier, _checkMode: CheckMode | undefined) {
             const inType = getPropertiesOfType(leftType).findIndex((p) => p.escapedName === right.escapedText) !== -1;
+            const leftSymbol = getSymbolAtLocation(_left);
+            if (!inType && !!leftSymbol && leftSymbol.valueDeclaration && isClassDeclaration(leftSymbol.valueDeclaration)) {
+                if (!isClassInstanceSide(leftType)) {
+                    const staticFuncExt = getStaticFunctionCompanionExtension(leftType, right.escapedText.toString());
+                    if (staticFuncExt) {
+                        return getTypeOfSymbol(staticFuncExt.patched);
+                    }
+                    const staticValExt = getStaticValueCompanionExtension(leftType, right.escapedText.toString());
+                    if (staticValExt) {
+                        const type = getTypeOfSymbol(staticValExt.patched);
+                        // @ts-expect-error
+                        type.tsPlusSymbol = staticValExt.patched;
+                        return type;
+                    }
+                    const staticUnresolvedExt = getUnresolvedStaticCompanionExtension(leftType, right.escapedText.toString());
+                    if (staticUnresolvedExt) {
+                        return resolveStaticExtension(staticUnresolvedExt);
+                    }
+                    return;
+                }
+            }
             if (!inType) {
                 const fluentExt = getFluentExtension(leftType, right.escapedText.toString())
                 if (fluentExt && isCallExpression(node.parent) && node.parent.expression === node) {
@@ -43337,6 +43469,12 @@ namespace ts {
                 (tag): tag is TsPlusJSDocTypeTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("type")
             );
         }
+        function collectTsPlusCompanionTags(statement: Declaration) {
+            return getAllJSDocTags(
+                statement,
+                (tag): tag is TsPlusJSDocTypeTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("companion")
+            );
+        }
         function collectTsPlusMacroTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
@@ -43511,6 +43649,15 @@ namespace ts {
                 }
             }
         }
+        function addToCompanionSymbolCache(symbol: Symbol, tag: string) {
+            if (!companionSymbolCache.has(symbol)) {
+                companionSymbolCache.set(symbol, [])
+            }
+            const tags = companionSymbolCache.get(symbol)!
+            if (!tags.includes(tag)) {
+                tags.push(tag)
+            }
+        }
         function tryCacheTsPlusType(declaration: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration): void {
             const tag = collectTsPlusTypeTags(declaration)[0];
             if (tag) {
@@ -43536,6 +43683,16 @@ namespace ts {
                             addToTypeSymbolCache(member.aliasSymbol, typeTag, "before");
                         }
                     }
+                }
+            }
+        }
+        function tryCacheTsPlusCompanion(declaration: ClassDeclaration): void {
+            const tag = collectTsPlusCompanionTags(declaration)[0];
+            if (tag) {
+                const type = getTypeOfNode(declaration);
+                const companionTag = tag.comment.replace(/^companion /, "");
+                if (type.symbol) {
+                    addToCompanionSymbolCache(type.symbol, companionTag);
                 }
             }
         }
@@ -43757,8 +43914,12 @@ namespace ts {
                     collectTsPlusSymbols(file, statement.body.statements);
                 }
                 if(statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
-                    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement) || isClassDeclaration(statement)) {
+                    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
                         tryCacheTsPlusType(statement);
+                    }
+                    if (isClassDeclaration(statement)) {
+                        tryCacheTsPlusType(statement);
+                        tryCacheTsPlusCompanion(statement);
                     }
                     if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
                         tryCacheTsPlusStaticVariable(file, statement);
