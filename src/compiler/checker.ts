@@ -844,7 +844,7 @@ namespace ts {
             return returnArray
         }
         function getExtensions(selfNode: Expression) {
-            const targetType: Type = getTypeOfNode(selfNode);
+            const targetType: Type = getBaseConstraintOrType(getTypeOfNode(selfNode));
             const symbols = collectRelevantSymbols(targetType);
             const copy: ESMap<string, Symbol> = new Map();
             symbols.forEach((target) => {
@@ -891,7 +891,7 @@ namespace ts {
             return copy;
         }
         function getFluentExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType)
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
@@ -910,7 +910,7 @@ namespace ts {
             }
         }
         function getGetterExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType)
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
@@ -929,7 +929,7 @@ namespace ts {
             }
         }
         function getStaticFunctionExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType)
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
@@ -948,7 +948,7 @@ namespace ts {
             }
         }
         function getStaticValueExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType);
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = flatMap(typeSymbolCache.get(target)!, (tag) => {
@@ -964,7 +964,7 @@ namespace ts {
             }
         }
         function getUnresolvedStaticExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType)
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
@@ -983,7 +983,7 @@ namespace ts {
             }
         }
         function getOperatorExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType)
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(

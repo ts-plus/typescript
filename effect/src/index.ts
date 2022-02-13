@@ -70,6 +70,10 @@ const a = [1, 2, 3].map0((a) => a).getter.map0((a) => a).getter.head
 
 const x2 = Effect(0)
 
+function baseConstraint<A extends Array<unknown>>(...xs: A): unknown[] {
+  return xs.map0((a) => a)
+}
+
 function id2<A>(a: A): A { return a }
 
 const xxx2 = id2("aaa")
