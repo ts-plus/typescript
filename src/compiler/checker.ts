@@ -43690,7 +43690,11 @@ namespace ts {
             const tag = collectTsPlusCompanionTags(declaration)[0];
             if (tag) {
                 const type = getTypeOfNode(declaration);
-                const companionTag = tag.comment.replace(/^companion /, "");
+                const [_, companionTag] = tag.comment.split(" ");
+                if (!companionTag) {
+                    error(declaration, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
+                    return;
+                }
                 if (type.symbol) {
                     addToCompanionSymbolCache(type.symbol, companionTag);
                 }

@@ -7307,5 +7307,9 @@
     "Annotation of an index extension must have the form '@tsplus index [typename]'.": {
         "category": "Error",
         "code": 50012
+    },
+    "Annotation of a companion extension must have the form '@tsplus companion [typename]'.": {
+        "category": "Error",
+        "code": 50013
     }
 }
