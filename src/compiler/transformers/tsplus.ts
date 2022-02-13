@@ -150,26 +150,40 @@ namespace ts {
                 const expressionType = checker.getTypeAtLocation(node.expression);
                 const inType = checker.getPropertyOfType(expressionType, node.name.escapedText.toString());
                 if (!inType) {
-                    const staticFunctionExtension = checker.getStaticFunctionExtension(expressionType, node.name.escapedText.toString());
+                    if (checker.isClassCompanionReference(node.expression)) {
+                        const staticFunctionExtension = checker.getStaticFunctionCompanionExtension(expressionType, node.name.escapedText.toString());
 
-                    if (staticFunctionExtension) {
-                        return getPathOfExtension(context.factory, importer, staticFunctionExtension, source);
-                    }
+                        if (staticFunctionExtension) {
+                            return getPathOfExtension(context.factory, importer, staticFunctionExtension, source);
+                        }
 
-                    const staticValueExtension = checker.getStaticValueExtension(expressionType, node.name.escapedText.toString());
+                        const staticValueExtension = checker.getStaticValueCompanionExtension(expressionType, node.name.escapedText.toString());
 
-                    if (staticValueExtension) {
-                        return getPathOfExtension(context.factory, importer, staticValueExtension, source);
-                    }
+                        if (staticValueExtension) {
+                            return getPathOfExtension(context.factory, importer, staticValueExtension, source);
+                        }
+                    } else {
+                        const staticFunctionExtension = checker.getStaticFunctionExtension(expressionType, node.name.escapedText.toString());
 
-                    const getterExtension = checker.getGetterExtension(expressionType, node.name.escapedText.toString());
+                        if (staticFunctionExtension) {
+                            return getPathOfExtension(context.factory, importer, staticFunctionExtension, source);
+                        }
 
-                    if (getterExtension) {
-                        return factory.createCallExpression(
-                            getPathOfExtension(context.factory, importer, getterExtension, source),
-                            void 0,
-                            [visitNode(node.expression, visitor)]
-                        );
+                        const staticValueExtension = checker.getStaticValueExtension(expressionType, node.name.escapedText.toString());
+
+                        if (staticValueExtension) {
+                            return getPathOfExtension(context.factory, importer, staticValueExtension, source);
+                        }
+
+                        const getterExtension = checker.getGetterExtension(expressionType, node.name.escapedText.toString());
+
+                        if (getterExtension) {
+                            return factory.createCallExpression(
+                                getPathOfExtension(context.factory, importer, getterExtension, source),
+                                void 0,
+                                [visitNode(node.expression, visitor)]
+                            );
+                        }
                     }
                 }
                 return visitEachChild(node, visitor, context);
