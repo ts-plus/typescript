@@ -5187,10 +5187,12 @@ namespace ts {
             return !!type.symbol && !!(type.symbol.flags & SymbolFlags.Class) && (type === getDeclaredTypeOfClassOrInterface(type.symbol) || (!!(type.flags & TypeFlags.Object) && !!(getObjectFlags(type) & ObjectFlags.IsClassInstanceClone)));
         }
 
-        function isClassCompanionReference(node: Expression): boolean {
+        function isClassCompanionReference(node: Expression | QualifiedName): boolean {
             const symbol = getSymbolAtLocation(node);
             if (symbol) {
-                if (!!(symbol.flags & SymbolFlags.Class)) {
+                const type = getTypeOfSymbol(symbol);
+                const typeSymbol = type.symbol;
+                if (typeSymbol && !!(typeSymbol.flags & SymbolFlags.Class)) {
                     return !isClassInstanceSide(getTypeOfSymbol(symbol));
                 }
             }
@@ -29158,26 +29160,23 @@ namespace ts {
         // TSPLUS EXTENSION START
         function checkPropertyAccessForExtension(node: PropertyAccessExpression | QualifiedName, _left: Expression | QualifiedName, leftType: Type, right: Identifier | PrivateIdentifier, _checkMode: CheckMode | undefined) {
             const inType = getPropertiesOfType(leftType).findIndex((p) => p.escapedName === right.escapedText) !== -1;
-            const leftTypeSymbol = leftType.symbol;
-            if (!inType && !!leftTypeSymbol && leftTypeSymbol.declarations && leftTypeSymbol.declarations[0] && isClassDeclaration(leftTypeSymbol.declarations[0])) {
-                if (!isClassInstanceSide(leftType)) {
-                    const staticFuncExt = getStaticFunctionCompanionExtension(leftType, right.escapedText.toString());
-                    if (staticFuncExt) {
-                        return getTypeOfSymbol(staticFuncExt.patched);
-                    }
-                    const staticValExt = getStaticValueCompanionExtension(leftType, right.escapedText.toString());
-                    if (staticValExt) {
-                        const type = getTypeOfSymbol(staticValExt.patched);
-                        // @ts-expect-error
-                        type.tsPlusSymbol = staticValExt.patched;
-                        return type;
-                    }
-                    const staticUnresolvedExt = getUnresolvedStaticCompanionExtension(leftType, right.escapedText.toString());
-                    if (staticUnresolvedExt) {
-                        return resolveStaticExtension(staticUnresolvedExt);
-                    }
-                    return;
+            if (!inType && isClassCompanionReference(_left)) {
+                const staticFuncExt = getStaticFunctionCompanionExtension(leftType, right.escapedText.toString());
+                if (staticFuncExt) {
+                    return getTypeOfSymbol(staticFuncExt.patched);
                 }
+                const staticValExt = getStaticValueCompanionExtension(leftType, right.escapedText.toString());
+                if (staticValExt) {
+                    const type = getTypeOfSymbol(staticValExt.patched);
+                    // @ts-expect-error
+                    type.tsPlusSymbol = staticValExt.patched;
+                    return type;
+                }
+                const staticUnresolvedExt = getUnresolvedStaticCompanionExtension(leftType, right.escapedText.toString());
+                if (staticUnresolvedExt) {
+                    return resolveStaticExtension(staticUnresolvedExt);
+                }
+                return;
             }
             if (!inType) {
                 const fluentExt = getFluentExtension(leftType, right.escapedText.toString())
