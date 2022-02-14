@@ -1,9 +1,6 @@
 import { Effect } from "./prelude.js";
 import { Maybe } from "./prelude.js";
 import { Nothing } from "./prelude/definition/Maybe.js";
-import { A } from "./companion.js";
-
-A.static();
 
 export const isPositive = (n: number) =>
   n > 0 ? Maybe.just("positive") : Maybe.nothing();

@@ -5187,17 +5187,17 @@ namespace ts {
             return !!type.symbol && !!(type.symbol.flags & SymbolFlags.Class) && (type === getDeclaredTypeOfClassOrInterface(type.symbol) || (!!(type.flags & TypeFlags.Object) && !!(getObjectFlags(type) & ObjectFlags.IsClassInstanceClone)));
         }
 
+        // TSPLUS EXTENSION START
         function isClassCompanionReference(node: Expression | QualifiedName): boolean {
             const symbol = getSymbolAtLocation(node);
             if (symbol) {
                 const type = getTypeOfSymbol(symbol);
-                const typeSymbol = type.symbol;
-                if (typeSymbol && !!(typeSymbol.flags & SymbolFlags.Class)) {
-                    return !isClassInstanceSide(getTypeOfSymbol(symbol));
-                }
+                // test if type is a constructor object
+                return !!(getObjectFlags(type) & ObjectFlags.Anonymous && type.symbol && type.symbol.flags & SymbolFlags.Class);
             }
             return false;
         }
+        // TSPLUS EXTENSION END
 
         function createNodeBuilder() {
             return {
