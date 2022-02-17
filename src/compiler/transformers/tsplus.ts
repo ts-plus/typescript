@@ -239,6 +239,10 @@ namespace ts {
                     return optimisePipe(visitNodes(node.arguments, visitor), context.factory)
                 }
                 const expressionType = checker.getTypeAtLocation(node.expression)
+                // Avoid transforming super call as __call extension
+                if (isSuperCall(node)) {
+                    return visitCallExpression(source, traceInScope, node, visitor, context);
+                }
                 if (checker.getSignaturesOfType(expressionType, SignatureKind.Call).length === 0) {
                     if (checker.isClassCompanionReference(node.expression)) {
                         const customCall = checker.getStaticFunctionCompanionExtension(expressionType, "__call")
