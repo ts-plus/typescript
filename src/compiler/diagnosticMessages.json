@@ -7343,5 +7343,25 @@
     "Annotation of a companion extension must have the form '@tsplus companion [typename]'.": {
         "category": "Error",
         "code": 50013
+    },
+    "Annotation of a macro must have the form '@tsplus macro [name]'.": {
+        "category": "Error",
+        "code": 50014
+    },
+    "The argument of an 'identity' macro must not be a spread element.": {
+        "category": "Error",
+        "code": 50015
+    },
+    "Function annotated with 'identity' macro must have one argument.": {
+        "category": "Error",
+        "code": 50016
+    },
+    "Declaration annotated with 'identity' macro must be a function.": {
+        "category": "Error",
+        "code": 50017
+    },
+    "Declaration annotated with 'remove' macro must be a function.": {
+        "category": "Error",
+        "code": 50018
     }
 }

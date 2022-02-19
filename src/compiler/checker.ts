@@ -32051,6 +32051,14 @@ namespace ts {
                     }
                 }
             }
+            if (isTsPlusMacroCall(node, "identity") && !isErrorType(checked)) {
+                if (node.arguments.length === 1) {
+                    if (isSpreadArgument(node.arguments[0])) {
+                        error(node.arguments[0], Diagnostics.The_argument_of_an_identity_macro_must_not_be_a_spread_element);
+                        return checked;
+                    }
+                }
+            }
             return checked;
         }
         // TSPLUS EXTENSION END
@@ -44034,6 +44042,42 @@ namespace ts {
                 }
             }
         }
+        function checkTsPlusMacroAnnotations(declaration: VariableDeclaration | FunctionDeclaration): void {
+            const macroTags = collectTsPlusMacroTags(declaration);
+            for (const tag of macroTags) {
+                const [, name] = tag.comment.split(" ");
+                if (!name) {
+                    error(declaration, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
+                    return;
+                }
+                if (name === "identity") {
+                    if (isVariableDeclaration(declaration)) {
+                        if (!declaration.initializer || !isFunctionExpressionOrArrowFunction(declaration.initializer)) {
+                            error(declaration, Diagnostics.Declaration_annotated_with_identity_macro_must_be_a_function);
+                            return;
+                        }
+                        if (declaration.initializer.parameters.length === 0 || declaration.initializer.parameters.length > 1) {
+                            error(declaration, Diagnostics.Function_annotated_with_identity_macro_must_have_one_argument);
+                            return;
+                        }
+                    }
+                    else {
+                        if (declaration.parameters.length === 0 || declaration.parameters.length > 1) {
+                            error(declaration, Diagnostics.Function_annotated_with_identity_macro_must_have_one_argument);
+                            return;
+                        }
+                    }
+                }
+                if (name === "remove") {
+                    if (isVariableDeclaration(declaration)) {
+                        if (!declaration.initializer || !isFunctionExpressionOrArrowFunction(declaration.initializer)) {
+                            error(declaration, Diagnostics.Declaration_annotated_with_remove_macro_must_be_a_function);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
         function collectTsPlusSymbols(file: SourceFile, statements: NodeArray<Statement>): void {
             for (const statement of statements) {
                 if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
@@ -44060,6 +44104,12 @@ namespace ts {
                         tryCacheTsPlusUnifyFunction(statement);
                         tryCacheTsPlusIndexFunction(statement);
                     }
+                }
+                if (isFunctionDeclaration(statement)) {
+                    checkTsPlusMacroAnnotations(statement);
+                }
+                if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                    checkTsPlusMacroAnnotations(statement.declarationList.declarations[0]);
                 }
             }
         }

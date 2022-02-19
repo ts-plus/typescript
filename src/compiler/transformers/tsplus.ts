@@ -234,9 +234,24 @@ namespace ts {
                         args[0]!
                     )
             }
+            function optimizeIdentity(
+                node: CallExpression,
+            ): Expression {
+                if (node.arguments.length === 1 && !isSpreadElement(node.arguments[0])) {
+                    return node.arguments[0];
+                } else {
+                    return node;
+                }
+            }
             function visitCallExpressionOrFluentCallExpression(source: SourceFile, traceInScope: Identifier | undefined, node: CallExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
                 if (checker.isPipeCall(node)) {
                     return optimisePipe(visitNodes(node.arguments, visitor), context.factory)
+                }
+                if (checker.isTsPlusMacroCall(node, "identity")) {
+                    return optimizeIdentity(visitEachChild(node, visitor, context));
+                }
+                if (checker.isTsPlusMacroCall(node, "remove")) {
+                    return factory.createVoidZero()
                 }
                 const expressionType = checker.getTypeAtLocation(node.expression)
                 // Avoid transforming super call as __call extension
