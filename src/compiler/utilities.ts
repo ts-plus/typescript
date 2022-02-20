@@ -4745,11 +4745,15 @@ namespace ts {
 
     }
 
-    export function writeCommentRange(text: string, lineMap: readonly number[], writer: EmitTextWriter, commentPos: number, commentEnd: number, newLine: string) {
+    export function writeCommentRange(text: string, lineMap: readonly number[], writer: EmitTextWriter, commentPos: number, commentEnd: number, newLine: string, sourceFile?: SourceFile) {
         if (text.charCodeAt(commentPos + 1) === CharacterCodes.asterisk) {
             const firstCommentLineAndCharacter = computeLineAndCharacterOfPosition(lineMap, commentPos);
             const lineCount = lineMap.length;
             let firstCommentLineIndent: number | undefined;
+            let spacesToEmit = 0
+            let scannedTsPlusComments = 0
+            const numberOfTsPlusComments = (text.substring(commentPos, commentEnd).match(/@tsplus (fluent|static|getter|operator|index)/g) || []).length;
+
             for (let pos = commentPos, currentLine = firstCommentLineAndCharacter.line; pos < commentEnd; currentLine++) {
                 const nextLineStart = (currentLine + 1) === lineCount
                     ? text.length + 1
@@ -4778,7 +4782,7 @@ namespace ts {
                     //            More right indented comment */                  --4 = 8 - 4 + 11
                     //     class c { }
                     // }
-                    const spacesToEmit = currentWriterIndentSpacing - firstCommentLineIndent + calculateIndent(text, pos, nextLineStart);
+                    spacesToEmit = currentWriterIndentSpacing - firstCommentLineIndent + calculateIndent(text, pos, nextLineStart);
                     if (spacesToEmit > 0) {
                         let numberOfSingleSpacesToEmit = spacesToEmit % getIndentSize();
                         const indentSizeSpaceString = getIndentString((spacesToEmit - numberOfSingleSpacesToEmit) / getIndentSize());
@@ -4800,6 +4804,27 @@ namespace ts {
 
                 // Write the comment line text
                 writeTrimmedCurrentLine(text, commentEnd, writer, newLine, pos, nextLineStart);
+
+                const end = Math.min(commentEnd, nextLineStart - 1);
+                const currentLineText = trimString(text.substring(pos, end));
+                const tsplus = currentLineText.match(/tsplus (fluent|static|getter|operator|index)/)
+                
+                if (tsplus && sourceFile) {
+                    scannedTsPlusComments++;
+                    if (scannedTsPlusComments === numberOfTsPlusComments) {
+                        if (spacesToEmit > 0) {
+                            let numberOfSingleSpacesToEmit = spacesToEmit % getIndentSize();
+                            const indentSizeSpaceString = getIndentString((spacesToEmit - numberOfSingleSpacesToEmit) / getIndentSize());
+                            writer.rawWrite(indentSizeSpaceString);
+                            while (numberOfSingleSpacesToEmit) {
+                                writer.rawWrite(" ");
+                                numberOfSingleSpacesToEmit--;
+                            }
+                        }
+                        writer.writeComment(`* @tsplus location ${sourceFile.fileName}`);
+                        writer.writeLine();    
+                    }
+                }
 
                 pos = nextLineStart;
             }

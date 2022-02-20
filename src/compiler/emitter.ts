@@ -5415,7 +5415,7 @@ namespace ts {
         function writeSynthesizedComment(comment: SynthesizedComment) {
             const text = formatSynthesizedComment(comment);
             const lineMap = comment.kind === SyntaxKind.MultiLineCommentTrivia ? computeLineStarts(text) : undefined;
-            writeCommentRange(text, lineMap!, writer, 0, text.length, newLine);
+            writeCommentRange(text, lineMap!, writer, 0, text.length, newLine, currentSourceFile);
         }
 
         function formatSynthesizedComment(comment: SynthesizedComment) {
@@ -5531,7 +5531,7 @@ namespace ts {
 
             // Leading comments are emitted at /*leading comment1 */space/*leading comment*/space
             emitPos(commentPos);
-            writeCommentRange(currentSourceFile!.text, getCurrentLineMap(), writer, commentPos, commentEnd, newLine);
+            writeCommentRange(currentSourceFile!.text, getCurrentLineMap(), writer, commentPos, commentEnd, newLine, currentSourceFile);
             emitPos(commentEnd);
 
             if (hasTrailingNewLine) {
@@ -5562,7 +5562,7 @@ namespace ts {
             }
 
             emitPos(commentPos);
-            writeCommentRange(currentSourceFile!.text, getCurrentLineMap(), writer, commentPos, commentEnd, newLine);
+            writeCommentRange(currentSourceFile!.text, getCurrentLineMap(), writer, commentPos, commentEnd, newLine, currentSourceFile);
             emitPos(commentEnd);
 
             if (hasTrailingNewLine) {
@@ -5583,7 +5583,7 @@ namespace ts {
             // trailing comments of a position are emitted at /*trailing comment1 */space/*trailing comment*/space
 
             emitPos(commentPos);
-            writeCommentRange(currentSourceFile!.text, getCurrentLineMap(), writer, commentPos, commentEnd, newLine);
+            writeCommentRange(currentSourceFile!.text, getCurrentLineMap(), writer, commentPos, commentEnd, newLine, currentSourceFile);
             emitPos(commentEnd);
 
             if (kind === SyntaxKind.SingleLineCommentTrivia) {
@@ -5595,7 +5595,7 @@ namespace ts {
             // trailing comments of a position are emitted at /*trailing comment1 */space/*trailing comment*/space
 
             emitPos(commentPos);
-            writeCommentRange(currentSourceFile!.text, getCurrentLineMap(), writer, commentPos, commentEnd, newLine);
+            writeCommentRange(currentSourceFile!.text, getCurrentLineMap(), writer, commentPos, commentEnd, newLine, currentSourceFile);
             emitPos(commentEnd);
 
             if (hasTrailingNewLine) {
@@ -5657,7 +5657,7 @@ namespace ts {
         function emitComment(text: string, lineMap: number[], writer: EmitTextWriter, commentPos: number, commentEnd: number, newLine: string) {
             if (!shouldWriteComment(currentSourceFile!.text, commentPos)) return;
             emitPos(commentPos);
-            writeCommentRange(text, lineMap, writer, commentPos, commentEnd, newLine);
+            writeCommentRange(text, lineMap, writer, commentPos, commentEnd, newLine, currentSourceFile);
             emitPos(commentEnd);
         }
 
