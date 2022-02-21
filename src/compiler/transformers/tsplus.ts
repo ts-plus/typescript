@@ -236,21 +236,78 @@ namespace ts {
                 }
                 return ts.visitEachChild(node, visitor, context)
             }
-            function optimizePipeable(symbol: TsPlusPipeableSymbol, originalCall: CallExpression, args: Expression[], source: SourceFile) {
+            function createDataFirstCall(call: CallExpression, args: Expression[], definition: SourceFile, exportName: string, source: SourceFile) {
                 return factory.updateCallExpression(
-                    originalCall,
+                    call,
                     getPathOfExtension(
                         factory,
                         importer,
                         {
-                            definition: symbol.tsPlusSourceFile,
-                            exportName: symbol.tsPlusExportName
+                            definition,
+                            exportName 
                         },
                         source
                     ),
                     undefined,
                     args
                 )
+            }
+            function tryOptimizePipeableCall(call: CallExpression, selfArg: Expression, restArgs: readonly Expression[], source: SourceFile) {
+                const original = getOriginalNode(call);
+                if (isCallExpression(original) && isIdentifier(original.expression)) {
+                    const identifierType = checker.getTypeAtLocation(original.expression);
+                    const identifierSymbol = identifierType.symbol;
+                    if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
+                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                            const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol)
+                            if (fluentExtension) {
+                                const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type));
+                                if (signature) {
+                                    return createDataFirstCall(original, [selfArg, ...restArgs], signature.signatures[0].tsPlusFile, signature.signatures[0].tsPlusExportName, source);
+                                }
+                            }
+                        }
+                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                            return createDataFirstCall(original, [selfArg, ...restArgs], identifierSymbol.tsPlusSourceFile, identifierSymbol.tsPlusExportName, source)
+                        }
+                    }
+                }
+                if (isCallExpression(original) && isPropertyAccessExpression(original.expression) && isIdentifier(original.expression.name)) {
+                    const identifierType = checker.getTypeAtLocation(original.expression.name);
+                    const identifierSymbol = identifierType.symbol;
+                    if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
+                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                            const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol)
+                            if (fluentExtension) {
+                                const synthesizedFluentCall = factory.createCallExpression(
+                                    factory.createPropertyAccessExpression(
+                                        selfArg,
+                                        original.expression.name
+                                    ),
+                                    undefined,
+                                    restArgs
+                                )
+                                const resolvedSignature = checker.getResolvedSignature(synthesizedFluentCall);
+                                if (resolvedSignature) {
+                                    resolvedSignature;
+                                    return
+                                }
+                            }
+                        }
+                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                            return createDataFirstCall(original, [selfArg, ...restArgs], identifierSymbol.tsPlusSourceFile, identifierSymbol.tsPlusExportName, source)
+                        }
+                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.StaticFunction) {
+                            const declType = checker.getTypeAtLocation(identifierSymbol.tsPlusDeclaration.name!)
+                            const declSym = declType.symbol;
+                            if (declSym && isTsPlusSymbol(declSym)) {
+                                if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                                    return createDataFirstCall(original, [selfArg, ...restArgs], declSym.tsPlusSourceFile, declSym.tsPlusExportName, source)
+                                }
+                            }
+                        }
+                    }
+                }
             }
             function optimisePipe(
                 args: NodeArray<ts.Expression>,
@@ -261,30 +318,10 @@ namespace ts {
                     .slice(1)
                     .reduce(
                         (currentNode, memberNode) => {
-                            const original = getOriginalNode(memberNode);
-                            if (isCallExpression(original) && isIdentifier(original.expression)) {
-                                const identifierType = checker.getTypeAtLocation(original.expression);
-                                const identifierSymbol = identifierType.symbol;
-                                if (identifierSymbol && isTsPlusSymbol(identifierSymbol) && identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
-                                    return optimizePipeable(identifierSymbol, original, [currentNode, ...original.arguments], source)
-                                }
-                            }
-                            if (isCallExpression(original) && isPropertyAccessExpression(original.expression) && isIdentifier(original.expression.name)) {
-                                const identifierType = checker.getTypeAtLocation(original.expression.name);
-                                const identifierSymbol = identifierType.symbol;
-                                if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
-                                    if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
-                                        return optimizePipeable(identifierSymbol, original, [currentNode, ...original.arguments], source)
-                                    }
-                                    if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.StaticFunction) {
-                                        const declType = checker.getTypeAtLocation(identifierSymbol.tsPlusDeclaration.name!)
-                                        const declSym = declType.symbol;
-                                        if (declSym && isTsPlusSymbol(declSym)) {
-                                            if (declSym.tsPlusTag === TsPlusSymbolTag.Pipeable) {
-                                                return optimizePipeable(declSym, original, [currentNode, ...original.arguments], source)
-                                            }
-                                        }
-                                    }
+                            if (isCallExpression(memberNode)) {
+                                const optimized = tryOptimizePipeableCall(memberNode, currentNode, memberNode.arguments, source);
+                                if (optimized) {
+                                    return optimized;
                                 }
                             }
                             return factory.createCallExpression(memberNode, undefined, [currentNode]);
@@ -311,28 +348,10 @@ namespace ts {
                 if (checker.isTsPlusMacroCall(node, "remove")) {
                     return factory.createVoidZero()
                 }
-                if (isCallExpression(node.expression) && isIdentifier(node.expression.expression)) {
-                    const identifierSymbol = checker.getSymbolAtLocation(node.expression)
-                    if (identifierSymbol) {
-                        if (isTsPlusSymbol(identifierSymbol) && identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
-                            const dataFirstDeclaration = (identifierSymbol as TsPlusPipeableSymbol).tsPlusDataFirst;
-                            if (isFunctionDeclaration(dataFirstDeclaration)) {
-                                return factory.updateCallExpression(
-                                    node,
-                                    getPathOfExtension(
-                                        factory,
-                                        importer,
-                                        {
-                                            definition: (identifierSymbol as TsPlusPipeableSymbol).tsPlusSourceFile,
-                                            exportName: (identifierSymbol as TsPlusPipeableSymbol).tsPlusExportName
-                                        },
-                                        source
-                                    ),
-                                    undefined,
-                                    [...node.expression.arguments, ...node.arguments]
-                                )
-                            }
-                        }
+                if (node.arguments.length === 1 && isCallExpression(node.expression)) {
+                    const optimizedPipeable = tryOptimizePipeableCall(node.expression, visitNode(node.arguments[0], visitor), visitNodes(node.expression.arguments, visitor), source);
+                    if (optimizedPipeable) {
+                        return optimizedPipeable;
                     }
                 }
                 const expressionType = checker.getTypeAtLocation(node.expression)
@@ -373,7 +392,7 @@ namespace ts {
                         const fluentExtension = checker.getFluentExtension(innerExpressionType, (node.expression as PropertyAccessExpression).name.escapedText.toString());
 
                         if (fluentExtension) {
-                            let targetSignature: Signature = fluentExtension.signatures[0];
+                            let targetSignature: TsPlusSignature = fluentExtension.signatures[0];
 
                             if (fluentExtension.signatures.length > 1) {
                                 const resolvedSignature = checker.getResolvedSignature(node);
@@ -392,14 +411,27 @@ namespace ts {
                             if (!targetSignature || !isTsPlusSignature(targetSignature)) {
                                 throw new Error("BUG: No applicable signature found for fluent extension");
                             }
-
                             const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
-                            return factory.updateCallExpression(
-                                visited as CallExpression,
-                                getPathOfExtension(context.factory, importer, { definition: targetSignature.tsPlusFile, exportName: targetSignature.tsPlusExportName }, source),
-                                (visited as CallExpression).typeArguments,
-                                [((visited as CallExpression).expression as PropertyAccessExpression).expression, ...(visited as CallExpression).arguments]
-                            );
+                            if (targetSignature.tsPlusPipeable) {
+                                return factory.updateCallExpression(
+                                    visited,
+                                    factory.createCallExpression(
+                                        getPathOfExtension(context.factory, importer, { definition: targetSignature.tsPlusFile, exportName: targetSignature.tsPlusExportName }, source),
+                                        undefined,
+                                        visited.arguments
+                                    ),
+                                    undefined,
+                                    [(visited.expression as PropertyAccessExpression).expression]
+                                )
+                            }
+                            else {
+                                return factory.updateCallExpression(
+                                    visited as CallExpression,
+                                    getPathOfExtension(context.factory, importer, { definition: targetSignature.tsPlusFile, exportName: targetSignature.tsPlusExportName }, source),
+                                    (visited as CallExpression).typeArguments,
+                                    [((visited as CallExpression).expression as PropertyAccessExpression).expression, ...(visited as CallExpression).arguments]
+                                );
+                            }
                         }
                     }
                 }

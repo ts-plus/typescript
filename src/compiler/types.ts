@@ -3318,11 +3318,20 @@ namespace ts {
         UnresolvedStatic = "TsPlusUnresolvedStatic",
         Getter = "TsPlusGetterSymbol",
         GetterVariable = "TsPlusGetterVariableSymbol",
+        PipeableMacro = "TsPlusPipeableMacroSymbol",
         Pipeable = "TsPlusPipeableSymbol"
     }
 
     export interface TsPlusPipeableSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.Pipeable;
+        tsPlusDeclaration: FunctionDeclaration | VariableDeclarationWithFunction;
+        tsPlusDataFirstType: Type;
+        tsPlusTypeName: string;
+        tsPlusName: string;
+    }
+
+    export interface TsPlusPipeableMacroSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.PipeableMacro;
         tsPlusDeclaration: VariableDeclaration;
         tsPlusDataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression;
         tsPlusSourceFile: SourceFile;
@@ -3377,10 +3386,12 @@ namespace ts {
         | TsPlusStaticValueSymbol
         | TsPlusGetterSymbol
         | TsPlusGetterVariableSymbol
+        | TsPlusPipeableMacroSymbol
         | TsPlusPipeableSymbol;
 
     export interface TsPlusFluentExtension {
         patched: Symbol;
+        types: { type: Type, signatures: readonly TsPlusSignature[] }[];
         signatures: readonly TsPlusSignature[];
     }
 
@@ -4609,6 +4620,8 @@ namespace ts {
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isClassCompanionReference(node: Expression): boolean
         collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocExtensionTag[]
+        getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableSymbol): TsPlusFluentExtension | undefined
+        resolveCall(node: CallLikeExpression, signatures: readonly Signature[], candidatesOutArray: Signature[] | undefined, checkMode: CheckMode, callChainFlags: SignatureFlags, fallbackError?: DiagnosticMessage): Signature
     }
 
     /* @internal */
