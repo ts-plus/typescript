@@ -222,15 +222,59 @@ namespace ts {
                 }
                 return ts.visitEachChild(node, visitor, context)
             }
+            function optimizePipeable(symbol: TsPlusPipeableSymbol, originalCall: CallExpression, args: Expression[], source: SourceFile) {
+                return factory.updateCallExpression(
+                    originalCall,
+                    getPathOfExtension(
+                        factory,
+                        importer,
+                        {
+                            definition: symbol.tsPlusSourceFile,
+                            exportName: symbol.tsPlusExportName
+                        },
+                        source
+                    ),
+                    undefined,
+                    args
+                )
+            }
             function optimisePipe(
                 args: NodeArray<ts.Expression>,
-                factory: ts.NodeFactory
+                factory: ts.NodeFactory,
+                source: SourceFile
             ): ts.Expression {
                 return args
                     .slice(1)
                     .reduce(
-                        (currentNode, memberNode) =>
-                            factory.createCallExpression(memberNode, undefined, [currentNode]),
+                        (currentNode, memberNode) => {
+                            const original = getOriginalNode(memberNode);
+                            if (isCallExpression(original) && isIdentifier(original.expression)) {
+                                const identifierType = checker.getTypeAtLocation(original.expression);
+                                const identifierSymbol = identifierType.symbol;
+                                if (identifierSymbol && isTsPlusSymbol(identifierSymbol) && identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                                    return optimizePipeable(identifierSymbol, original, [currentNode, ...original.arguments], source)
+                                }
+                            }
+                            if (isCallExpression(original) && isPropertyAccessExpression(original.expression) && isIdentifier(original.expression.name)) {
+                                const identifierType = checker.getTypeAtLocation(original.expression.name);
+                                const identifierSymbol = identifierType.symbol;
+                                if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
+                                    if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                                        return optimizePipeable(identifierSymbol, original, [currentNode, ...original.arguments], source)
+                                    }
+                                    if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.StaticFunction) {
+                                        const declType = checker.getTypeAtLocation(identifierSymbol.tsPlusDeclaration.name!)
+                                        const declSym = declType.symbol;
+                                        if (declSym && isTsPlusSymbol(declSym)) {
+                                            if (declSym.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                                                return optimizePipeable(declSym, original, [currentNode, ...original.arguments], source)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            return factory.createCallExpression(memberNode, undefined, [currentNode]);
+                        },
                         args[0]!
                     )
             }
@@ -245,13 +289,37 @@ namespace ts {
             }
             function visitCallExpressionOrFluentCallExpression(source: SourceFile, traceInScope: Identifier | undefined, node: CallExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
                 if (checker.isPipeCall(node)) {
-                    return optimisePipe(visitNodes(node.arguments, visitor), context.factory)
+                    return optimisePipe(visitNodes(node.arguments, visitor), context.factory, source);
                 }
                 if (checker.isTsPlusMacroCall(node, "identity")) {
                     return optimizeIdentity(visitEachChild(node, visitor, context));
                 }
                 if (checker.isTsPlusMacroCall(node, "remove")) {
                     return factory.createVoidZero()
+                }
+                if (isCallExpression(node.expression) && isIdentifier(node.expression.expression)) {
+                    const identifierSymbol = checker.getSymbolAtLocation(node.expression)
+                    if (identifierSymbol) {
+                        if (isTsPlusSymbol(identifierSymbol) && identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                            const dataFirstDeclaration = (identifierSymbol as TsPlusPipeableSymbol).tsPlusDataFirst;
+                            if (isFunctionDeclaration(dataFirstDeclaration)) {
+                                return factory.updateCallExpression(
+                                    node,
+                                    getPathOfExtension(
+                                        factory,
+                                        importer,
+                                        {
+                                            definition: (identifierSymbol as TsPlusPipeableSymbol).tsPlusSourceFile,
+                                            exportName: (identifierSymbol as TsPlusPipeableSymbol).tsPlusExportName
+                                        },
+                                        source
+                                    ),
+                                    undefined,
+                                    [...node.expression.arguments, ...node.arguments]
+                                )
+                            }
+                        }
+                    }
                 }
                 const expressionType = checker.getTypeAtLocation(node.expression)
                 // Avoid transforming super call as __call extension

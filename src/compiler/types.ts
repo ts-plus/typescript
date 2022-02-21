@@ -3324,6 +3324,9 @@ namespace ts {
     export interface TsPlusPipeableSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.Pipeable;
         tsPlusDeclaration: VariableDeclaration;
+        tsPlusDataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression;
+        tsPlusSourceFile: SourceFile;
+        tsPlusExportName: string;
     }
 
     export interface TsPlusFluentSymbol extends TransientSymbol {

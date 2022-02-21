@@ -1187,6 +1187,9 @@ namespace ts {
                 ) as TsPlusPipeableSymbol;
                 pipeableSymbol.tsPlusTag = TsPlusSymbolTag.Pipeable;
                 pipeableSymbol.tsPlusDeclaration = declarationNode;
+                pipeableSymbol.tsPlusDataFirst = dataFirst;
+                pipeableSymbol.tsPlusSourceFile = getSourceFileOfNode(dataFirst);
+                pipeableSymbol.tsPlusExportName = dataFirst.name!.escapedText.toString();
                 pipeable.symbol = pipeableSymbol;
                 pipeableSymbol.declarations = [pipeable];
                 setParent(pipeable, declarationNode);

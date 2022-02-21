@@ -13,7 +13,7 @@ export const bind = Pipeable(bind_);
 
 export const ok = pipe(
   T.succeed(0),
-  T.chain(n => T.succeed(n + 1))
+  T.chain((n) => Effect(n + 1))
 );
 
 /**
