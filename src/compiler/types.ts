@@ -3402,6 +3402,12 @@ namespace ts {
         exportName: string;
     }
 
+    export interface TsPlusPipeableExtension {
+        patched: Symbol;
+        definition: SourceFile;
+        exportName: string;
+    }
+
     export interface TsPlusType extends Type {
         tsPlusSymbol: TsPlusSymbol;
     }
@@ -3410,6 +3416,7 @@ namespace ts {
         tsPlusTag: "TsPlusSignature";
         tsPlusFile: SourceFile;
         tsPlusExportName: string;
+        tsPlusPipeable?: boolean
     }
 
     export interface JSDocLink extends Node {
