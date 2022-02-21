@@ -806,7 +806,8 @@ namespace ts {
             resolveStaticExtension,
             getUnresolvedStaticExtension,
             isTsPlusMacroCall,
-            isClassCompanionReference
+            isClassCompanionReference,
+            collectTsPlusFluentTags,
             // TSPLUS EXTENSION END
         };
 

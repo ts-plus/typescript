@@ -91,8 +91,10 @@ namespace ts {
                             return visitPropertyAccessExpression(source, node as PropertyAccessExpression, visitor(source, traceInScope), context);
                         case SyntaxKind.CallExpression:
                             return visitCallExpressionOrFluentCallExpression(source, traceInScope, node as CallExpression, visitor(source, traceInScope), context);
-                        case SyntaxKind.VariableDeclaration:
-                            return visitVariableDeclaration(source, node as VariableDeclaration, visitor(source, traceInScope), context)
+                        case SyntaxKind.VariableStatement:
+                            return visitVariableStatement(source, node as VariableStatement, visitor(source, traceInScope), context)
+                        // case SyntaxKind.VariableDeclaration:
+                        //     return visitVariableDeclaration(source, node as VariableDeclaration, visitor(source, traceInScope), context)
                         default:
                             return visitEachChild(node, visitor(source, traceInScope), context);
                     }
@@ -188,36 +190,48 @@ namespace ts {
                 }
                 return visitEachChild(node, visitor, context);
             }
-            function visitVariableDeclaration(_source: SourceFile, node: VariableDeclaration, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
-                if (node.initializer && checker.isTsPlusMacroCall(node.initializer, 'pipeable') && isIdentifier(node.name)) {
-                    const targetType = checker.getTypeAtLocation(node.initializer.arguments[0])
-                    if (targetType.symbol && targetType.symbol.valueDeclaration && isFunctionLikeDeclaration(targetType.symbol.valueDeclaration)) {
-                        const signatureDeclaration = targetType.symbol.valueDeclaration
-                        return factory.updateVariableDeclaration(
-                            node,
-                            node.name,
-                            undefined,
-                            undefined,
-                            factory.createArrowFunction(
-                                undefined,
-                                undefined,
-                                signatureDeclaration.parameters.slice(1, signatureDeclaration.parameters.length),
+            function visitVariableStatement(_source: SourceFile, node: VariableStatement, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
+                if (node.declarationList.declarations.length > 0) {
+                    const declaration = node.declarationList.declarations[0];
+                    if (declaration.initializer && checker.isTsPlusMacroCall(declaration.initializer, 'pipeable') && isIdentifier(declaration.name)) {
+                        const targetType = checker.getTypeAtLocation(declaration.initializer.arguments[0])
+                        if (targetType.symbol && targetType.symbol.valueDeclaration && isFunctionLikeDeclaration(targetType.symbol.valueDeclaration)) {
+                            const signatureDeclaration = targetType.symbol.valueDeclaration
+                            let updatedDeclaration = factory.updateVariableDeclaration(
+                                declaration,
+                                declaration.name,
                                 undefined,
                                 undefined,
                                 factory.createArrowFunction(
                                     undefined,
                                     undefined,
-                                    [signatureDeclaration.parameters[0]],
+                                    signatureDeclaration.parameters.slice(1, signatureDeclaration.parameters.length),
                                     undefined,
                                     undefined,
-                                    factory.createCallExpression(
-                                        node.initializer.arguments[0],
+                                    factory.createArrowFunction(
                                         undefined,
-                                        map(signatureDeclaration.parameters, (pdecl) => pdecl.name as Identifier)
+                                        undefined,
+                                        [signatureDeclaration.parameters[0]],
+                                        undefined,
+                                        undefined,
+                                        factory.createCallExpression(
+                                            declaration.initializer.arguments[0],
+                                            undefined,
+                                            map(signatureDeclaration.parameters, (pdecl) => pdecl.name as Identifier)
+                                        )
                                     )
                                 )
                             )
-                        )
+                            let updatedStatement = factory.updateVariableStatement(
+                                node,
+                                node.modifiers,
+                                factory.updateVariableDeclarationList(
+                                    node.declarationList,
+                                    [updatedDeclaration]
+                                )
+                            )
+                            return updatedStatement;
+                        }
                     }
                 }
                 return ts.visitEachChild(node, visitor, context)

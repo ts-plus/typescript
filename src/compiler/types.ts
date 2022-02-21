@@ -4608,6 +4608,7 @@ namespace ts {
         getUnresolvedStaticExtension(targetType: Type, name: string): TsPlusUnresolvedStaticExtension | undefined
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isClassCompanionReference(node: Expression): boolean
+        collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocExtensionTag[]
     }
 
     /* @internal */
@@ -7038,6 +7039,7 @@ namespace ts {
         helpers?: EmitHelper[];                  // Emit helpers for the node
         startsOnNewLine?: boolean;               // If the node should begin on a new line
         snippetElement?: SnippetElement;         // Snippet element of the node
+        tsPlusPipeableComment?: boolean;
     }
 
     /* @internal */
