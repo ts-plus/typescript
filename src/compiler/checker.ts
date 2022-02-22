@@ -838,7 +838,10 @@ namespace ts {
             return false
         }
         function getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableSymbol) {
-            return fluentCache.get(symbol.tsPlusTypeName)?.get(symbol.tsPlusName)
+            const extension = fluentCache.get(symbol.tsPlusTypeName)?.get(symbol.tsPlusName);
+            if (extension && every(extension.signatures, (sig) => !sig.tsPlusPipeable)) {
+                return extension;
+            }
         }
         function collectRelevantSymbols(target: Type) {
             const relevant: Set<Symbol> = new Set();
