@@ -1,7 +1,6 @@
 import { Effect, T } from "../definition/Effect";
 import { bind_ } from "../operations/bind";
 import { chain_ } from "../operations/flatMap.js";
-import * as ChainModule from "../operations/flatMap.js";
 
 /**
  * @tsplus static ets/EffectAspects chain

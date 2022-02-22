@@ -7362,5 +7362,17 @@
     "Declaration annotated with 'remove' macro must be a function.": {
         "category": "Error",
         "code": 50018
+    },
+    "Invalid declaration annotated as 'pipeable'.": {
+        "category": "Error",
+        "code": 50019
+    },
+    "Annotation of a pipeable extension must have the form '@tsplus pipeable [typename] [name]'.": {
+        "category": "Error",
+        "code": 50020
+    },
+    "Declaration annotated as 'pipeable' is not assignable to its corresponding fluent declaration.": {
+        "category": "Error",
+        "code": 50021
     }
 }
