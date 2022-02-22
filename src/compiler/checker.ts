@@ -1108,6 +1108,12 @@ namespace ts {
                 }
             }
         }
+        function isPipeableExtension(type: Type): boolean {
+            if (type.symbol) {
+                return isTsPlusSymbol(type.symbol) && (type.symbol.tsPlusTag === TsPlusSymbolTag.Pipeable || type.symbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro);
+            }
+            return false;
+        }
         function isParamUsed(param: TypeParameterDeclaration, node: Node): boolean {
             let used = false;
             const bt = getTypeOfNode(param);
@@ -25871,7 +25877,8 @@ namespace ts {
                         node.parent.expression === node &&
                         getSignaturesOfType(type, SignatureKind.Call).length === 0 &&
                         (getStaticFunctionExtension(type, "__call") != null || getUnresolvedStaticExtension(type, "__call") != null)
-                    )
+                    ) &&
+                    !isPipeableExtension(type)
                 ) {
                     markAliasReferenced(getResolvedSymbol(node), node);
                 }
@@ -43813,17 +43820,17 @@ namespace ts {
                     pipeable.body.statements,
                     (s): s is ReturnStatement & { expression: ArrowFunction } =>
                         isReturnStatement(s) && !!s.expression && isArrowFunction(s.expression)
-                )
+                );
                 if (returnStatement) {
-                    const type = getTypeOfNode(pipeable)
-                    const signatures = getSignaturesOfType(type, SignatureKind.Call)
+                    const type = getTypeOfNode(pipeable);
+                    const signatures = getSignaturesOfType(type, SignatureKind.Call);
                     const tsPlusSignatures = flatMap(signatures, (sig) => {
-                        const returnType = getReturnTypeOfSignature(sig)
+                        const returnType = getReturnTypeOfSignature(sig);
                         const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
                         return flatMap(returnSignatures, (rsig) => {
-                            const newSig = cloneSignature(sig) as TsPlusSignature
+                            const newSig = cloneSignature(sig) as TsPlusSignature;
                             newSig.parameters = [...rsig.parameters, ...sig.parameters];
-                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])]
+                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
                             newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
                             newSig.minArgumentCount = newSig.minArgumentCount + 1;
                             const newDecl = factory.updateFunctionDeclaration(
@@ -43843,11 +43850,46 @@ namespace ts {
                             const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
                             thisifiedSignature.tsPlusPipeable = true;
                             return thisifiedSignature;
-                        })
-                    }) as TsPlusSignature[]
+                        });
+                    }) as TsPlusSignature[];
                     const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
                     return [dataFirstType, tsPlusSignatures];
                 }
+            }
+            else if (pipeable.type && isFunctionTypeNode(pipeable.type)) {
+                const returnTypeNode = pipeable.type;
+                const type = getTypeOfNode(pipeable);
+                const signatures = getSignaturesOfType(type, SignatureKind.Call);
+                const tsPlusSignatures = flatMap(signatures, (sig) => {
+                    const returnType = getReturnTypeOfSignature(sig);
+                    const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
+                    return flatMap(returnSignatures, (rsig) => {
+                        const newSig = cloneSignature(sig) as TsPlusSignature;
+                        newSig.parameters = [...rsig.parameters, ...sig.parameters];
+                        newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                        newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
+                        newSig.minArgumentCount = newSig.minArgumentCount + 1;
+                        const newDecl = factory.updateFunctionDeclaration(
+                            pipeable,
+                            pipeable.decorators,
+                            pipeable.modifiers,
+                            pipeable.asteriskToken,
+                            pipeable.name,
+                            [...(returnTypeNode.typeParameters ?? []), ...(pipeable.typeParameters ?? [])],
+                            [...returnTypeNode.parameters, ...pipeable.parameters],
+                            returnTypeNode.type,
+                            undefined
+                        );
+                        newDecl.jsDoc = pipeable.jsDoc;
+                        newDecl.jsDocCache = pipeable.jsDocCache;
+                        newSig.declaration = newDecl;
+                        const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
+                        thisifiedSignature.tsPlusPipeable = true;
+                        return thisifiedSignature;
+                    });
+                }) as TsPlusSignature[];
+                const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
+                return [dataFirstType, tsPlusSignatures];
             }
             return undefined;
         }
@@ -43864,27 +43906,27 @@ namespace ts {
                         body.statements,
                         (s): s is ReturnStatement & { expression: ArrowFunction } =>
                         isReturnStatement(s) && !!s.expression && isArrowFunction(s.expression)
-                    )
+                    );
                     if (candidate) {
-                        returnFn = candidate.expression
+                        returnFn = candidate.expression;
                     }
                 }
                 else if (isArrowFunction(body)) {
                     returnFn = body;
                 }
                 if (returnFn) {
-                    const type = getTypeOfNode(pipeable)
-                    const signatures = getSignaturesOfType(type, SignatureKind.Call)
+                    const type = getTypeOfNode(pipeable);
+                    const signatures = getSignaturesOfType(type, SignatureKind.Call);
                     const tsPlusSignatures = flatMap(signatures, (sig) => {
-                        const returnType = getReturnTypeOfSignature(sig)
+                        const returnType = getReturnTypeOfSignature(sig);
                         const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
                         return flatMap(returnSignatures, (rsig) => {
-                            const newSig = cloneSignature(sig) as TsPlusSignature
+                            const newSig = cloneSignature(sig) as TsPlusSignature;
                             newSig.parameters = [...rsig.parameters, ...sig.parameters];
-                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])]
+                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
                             newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
                             newSig.minArgumentCount = newSig.minArgumentCount + 1;
-                            let newDecl: ArrowFunction | FunctionExpression | FunctionTypeNode
+                            let newDecl: ArrowFunction | FunctionExpression | FunctionTypeNode;
                             if (isArrowFunction(initializer)) {
                                 newDecl = factory.updateArrowFunction(
                                     initializer,
@@ -43914,41 +43956,40 @@ namespace ts {
                             const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
                             thisifiedSignature.tsPlusPipeable = true;
                             return thisifiedSignature;
-                        })
-                    }) as TsPlusSignature[]
+                        });
+                    }) as TsPlusSignature[];
                     const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
                     return [dataFirstType, tsPlusSignatures];
                 }
-
             }
             else {
-                const returnFn = pipeable.type.type
+                const returnFn = pipeable.type.type;
                 if (isFunctionTypeNode(returnFn)) {
-                    const type = getTypeOfNode(pipeable)
-                    const signatures = getSignaturesOfType(type, SignatureKind.Call)
+                    const type = getTypeOfNode(pipeable);
+                    const signatures = getSignaturesOfType(type, SignatureKind.Call);
                     const tsPlusSignatures = flatMap(signatures, (sig) => {
-                        const returnType = getReturnTypeOfSignature(sig)
+                        const returnType = getReturnTypeOfSignature(sig);
                         const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
                         return flatMap(returnSignatures, (rsig) => {
-                            const newSig = cloneSignature(sig) as TsPlusSignature
+                            const newSig = cloneSignature(sig) as TsPlusSignature;
                             newSig.parameters = [...rsig.parameters, ...sig.parameters];
-                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])]
+                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
                             newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
                             newSig.minArgumentCount = newSig.minArgumentCount + 1;
                             const newDecl = factory.updateFunctionTypeNode(
-                                pipeable.type as FunctionTypeNode,
-                                factory.createNodeArray([...(returnFn.typeParameters ?? []), ...((pipeable.type as FunctionTypeNode).typeParameters ?? [])]),
-                                factory.createNodeArray([...returnFn.parameters, ...(pipeable.type as FunctionTypeNode).parameters]),
+                                pipeable.type,
+                                factory.createNodeArray([...(returnFn.typeParameters ?? []), ...(pipeable.type.typeParameters ?? [])]),
+                                factory.createNodeArray([...returnFn.parameters, ...pipeable.type.parameters]),
                                 returnFn.type
-                            )
+                            );
                             newDecl.jsDoc = pipeable.jsDoc;
                             newDecl.jsDocCache = pipeable.jsDocCache;
                             newSig.declaration = newDecl;
                             const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
                             thisifiedSignature.tsPlusPipeable = true;
                             return thisifiedSignature;
-                        })
-                    }) as TsPlusSignature[]
+                        });
+                    }) as TsPlusSignature[];
                     const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
                     return [dataFirstType, tsPlusSignatures];
                 }
@@ -43957,7 +43998,7 @@ namespace ts {
         }
         function addToTypeSymbolCache(symbol: Symbol, tag: string, priority: "before" | "after") {
             if (!typeSymbolCache.has(symbol)) {
-                typeSymbolCache.set(symbol, [])
+                typeSymbolCache.set(symbol, []);
             }
             const tags = typeSymbolCache.get(symbol)!
             if (!tags.includes(tag)) {
