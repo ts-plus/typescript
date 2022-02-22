@@ -266,23 +266,23 @@ namespace ts {
                     args
                 )
             }
-            function tryOptimizePipeableCall(call: CallExpression, args: Expression[], source: SourceFile) {
+            function tryGetOptimizedPipeableCall(call: CallExpression): { definition: SourceFile, exportName: string } | undefined {
                 const original = getOriginalNode(call);
                 if (isCallExpression(original) && isIdentifier(original.expression)) {
                     const identifierType = checker.getTypeAtLocation(original.expression);
                     const identifierSymbol = identifierType.symbol;
                     if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
                         if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
-                            const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol)
+                            const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
                             if (fluentExtension) {
                                 const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
                                 if (signature) {
-                                    return createDataFirstCall(original, args, signature.tsPlusFile, signature.tsPlusExportName, source);
+                                    return { definition: signature.tsPlusFile, exportName: signature.tsPlusExportName };
                                 }
                             }
                         }
                         if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
-                            return createDataFirstCall(original, args, identifierSymbol.tsPlusSourceFile, identifierSymbol.tsPlusExportName, source)
+                            return { definition: identifierSymbol.tsPlusSourceFile, exportName: identifierSymbol.tsPlusExportName };
                         }
                     }
                 }
@@ -291,35 +291,35 @@ namespace ts {
                     const identifierSymbol = identifierType.symbol;
                     if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
                         if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
-                            const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol)
+                            const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
                             if (fluentExtension) {
                                 const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
                                 if (signature) {
-                                    return createDataFirstCall(original, args, signature.tsPlusFile, signature.tsPlusExportName, source);
+                                    return { definition: signature.tsPlusFile, exportName: signature.tsPlusExportName };
                                 }
                             }
                         }
                         if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
-                            return createDataFirstCall(original, args, identifierSymbol.tsPlusSourceFile, identifierSymbol.tsPlusExportName, source)
+                            return { definition: identifierSymbol.tsPlusSourceFile, exportName: identifierSymbol.tsPlusExportName };
                         }
                         if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.StaticFunction) {
-                            const declType = checker.getTypeAtLocation(identifierSymbol.tsPlusDeclaration.name!)
+                            const declType = checker.getTypeAtLocation(identifierSymbol.tsPlusDeclaration.name!);
                             const declSym = declType.symbol;
                             if (declSym && isTsPlusSymbol(declSym)) {
                                 if (declSym.tsPlusTag === TsPlusSymbolTag.Pipeable) {
-                                    const fluentExtension = checker.getFluentExtensionForPipeableSymbol(declSym)
+                                    const fluentExtension = checker.getFluentExtensionForPipeableSymbol(declSym);
                                     if (fluentExtension) {
                                         const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(declSym.tsPlusDataFirstType, type))?.signatures[0];
                                         if (signature) {
                                             if (isExpressionWithReferencedImport(call.expression)) {
                                                 importer.remove(call.expression.tsPlusReferencedImport);
                                             }
-                                            return createDataFirstCall(original, args, signature.tsPlusFile, signature.tsPlusExportName, source);
+                                            return { definition: signature.tsPlusFile, exportName: signature.tsPlusExportName };
                                         }
                                     }
                                 }
                                 if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
-                                    return createDataFirstCall(original, args, declSym.tsPlusSourceFile, declSym.tsPlusExportName, source)
+                                    return { definition: declSym.tsPlusSourceFile, exportName: declSym.tsPlusExportName };
                                 }
                             }
                         }
@@ -327,19 +327,19 @@ namespace ts {
                 }
             }
             function optimizePipe(
-                args: NodeArray<ts.Expression>,
-                factory: ts.NodeFactory,
+                args: NodeArray<Expression>,
+                factory: NodeFactory,
                 source: SourceFile
-            ): ts.Expression {
+            ): Expression {
                 return reduceLeft(args.slice(1), (accumulatedCall, pipeArg) => {
                     if (isCallExpression(pipeArg)) {
-                        const optimized = tryOptimizePipeableCall(pipeArg, [accumulatedCall, ...pipeArg.arguments], source);
+                        const optimized = tryGetOptimizedPipeableCall(pipeArg);
                         if (optimized) {
-                            return optimized;
+                            return createDataFirstCall(getOriginalNode(pipeArg) as CallExpression, [accumulatedCall, ...pipeArg.arguments], optimized.definition, optimized.exportName, source);
                         }
                     }
                     return factory.createCallExpression(pipeArg, undefined, [accumulatedCall]);
-                }, args[0]!)
+                }, args[0]!);
             }
             function optimizeIdentity(
                 node: CallExpression,
@@ -361,13 +361,15 @@ namespace ts {
                     return factory.createVoidZero()
                 }
                 if (node.arguments.length === 1 && isCallExpression(node.expression)) {
-                    const optimizedPipeable = tryOptimizePipeableCall(
-                        node.expression,
-                        [visitNode(node.arguments[0], visitor), ...visitNodes(node.expression.arguments, visitor)],
-                        source
-                    );
+                    const optimizedPipeable = tryGetOptimizedPipeableCall(node.expression);
                     if (optimizedPipeable) {
-                        return optimizedPipeable;
+                        return createDataFirstCall(
+                            node.expression,
+                            [visitNode(node.arguments[0], visitor), ...visitNodes(node.expression.arguments, visitor)],
+                            optimizedPipeable.definition,
+                            optimizedPipeable.exportName,
+                            source
+                        );
                     }
                 }
                 const expressionType = checker.getTypeAtLocation(node.expression)
