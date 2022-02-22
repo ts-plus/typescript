@@ -43807,8 +43807,8 @@ namespace ts {
         function augmentPipeableIdentifierSymbol(identifier: Identifier, target: string, _exportName: string, name: string, dataFirstType: Type, declaration: FunctionDeclaration | VariableDeclarationWithFunction) {
             const identifierType = getTypeOfNode(identifier);
             if (identifierType.symbol) {
-                (identifierType.symbol as TsPlusPipeableSymbol).tsPlusDeclaration = declaration;
                 (identifierType.symbol as TsPlusPipeableSymbol).tsPlusTag = TsPlusSymbolTag.Pipeable;
+                (identifierType.symbol as TsPlusPipeableSymbol).tsPlusDeclaration = declaration;
                 (identifierType.symbol as TsPlusPipeableSymbol).tsPlusTypeName = target;
                 (identifierType.symbol as TsPlusPipeableSymbol).tsPlusName = name;
                 (identifierType.symbol as TsPlusPipeableSymbol).tsPlusDataFirstType = dataFirstType;
@@ -43852,7 +43852,7 @@ namespace ts {
                             return thisifiedSignature;
                         });
                     }) as TsPlusSignature[];
-                    const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
+                    const dataFirstType = createAnonymousType(undefined, emptySymbols, tsPlusSignatures, [], []);
                     return [dataFirstType, tsPlusSignatures];
                 }
             }
@@ -43888,7 +43888,7 @@ namespace ts {
                         return thisifiedSignature;
                     });
                 }) as TsPlusSignature[];
-                const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
+                const dataFirstType = createAnonymousType(undefined, emptySymbols, tsPlusSignatures, [], []);
                 return [dataFirstType, tsPlusSignatures];
             }
             return undefined;
