@@ -2,13 +2,29 @@
 namespace ts {
     class TsPlusImporter {
         readonly imports: ESMap<string, Identifier> = new Map();
+        readonly refCount: ESMap<string, number> = new Map();
         constructor(readonly factory: NodeFactory) { }
 
         get(path: string): Identifier {
             if (!this.imports.has(path)) {
                 this.imports.set(path, this.factory.createUniqueName("tsplus_module"));
             }
+            this.refCount.set(path, (this.refCount.get(path) ?? 0) + 1);
             return this.imports.get(path)!;
+        }
+
+        remove(path: string): void {
+            if (!this.imports.has(path)) {
+                return;
+            }
+            const refCount = this.refCount.get(path)!;
+            if (refCount - 1 === 0) {
+                this.imports.delete(path);
+                this.refCount.delete(path);
+            }
+            else {
+                this.refCount.set(path, refCount - 1);
+            }
         }
     }
     export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
@@ -220,7 +236,7 @@ namespace ts {
                                     )
                                 )
                             )
-                            let updatedStatement = factory.updateVariableStatement(
+                            const updatedStatement = factory.updateVariableStatement(
                                 node,
                                 node.modifiers,
                                 factory.updateVariableDeclarationList(
@@ -295,6 +311,9 @@ namespace ts {
                                     if (fluentExtension) {
                                         const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(declSym.tsPlusDataFirstType, type))?.signatures[0];
                                         if (signature) {
+                                            if (isExpressionWithReferencedImport(call.expression)) {
+                                                importer.remove(call.expression.tsPlusReferencedImport);
+                                            }
                                             return createDataFirstCall(original, args, signature.tsPlusFile, signature.tsPlusExportName, source);
                                         }
                                     }
@@ -482,13 +501,24 @@ namespace ts {
             if (source.fileName === extension.definition.fileName) {
                 return factory.createIdentifier(extension.exportName);
             }
+            const path = extension.definition.isDeclarationFile ? checker.getGlobalImport(extension.definition) : checker.getLocalImport(source, extension.definition)
 
-            const id = importer.get(extension.definition.isDeclarationFile ? checker.getGlobalImport(extension.definition) : checker.getLocalImport(source, extension.definition));
+            const id = importer.get(path);
 
-            return factory.createPropertyAccessExpression(
+            const node = factory.createPropertyAccessExpression(
                 id,
                 factory.createIdentifier(extension.exportName)
-            )
+            );
+
+            (node as ExpressionWithReferencedImport<PropertyAccessExpression>).tsPlusReferencedImport = path;
+            return node;
         }
     }
+
+    type ExpressionWithReferencedImport<T extends Expression = Expression> = T & { tsPlusReferencedImport: string };
+
+    function isExpressionWithReferencedImport(node: Expression): node is ExpressionWithReferencedImport {
+        return !!(node as ExpressionWithReferencedImport).tsPlusReferencedImport;
+    }
+
 }
