@@ -1,0 +1,7 @@
+{
+  "name": "@tsplus-test/package2",
+  "type": "module",
+  "dependencies": {
+    "@tsplus-test/package1": "*"
+  }
+}

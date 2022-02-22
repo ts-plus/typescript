@@ -1164,6 +1164,7 @@ namespace ts {
                 );
                 setParent(returnFunction.body, returnFunction);
                 setParent((returnFunction.body).statements[0], returnFunction.body);
+                returnFunction.locals = createSymbolTable();
                 const returnFunctionSymbol = createSymbol(
                     SymbolFlags.Function,
                     InternalSymbolName.Function
@@ -1187,6 +1188,7 @@ namespace ts {
                 setParent(returnFunction, pipeable);
                 setParent(pipeable.body, pipeable);
                 setParent((pipeable.body as Block).statements[0], pipeable.body);
+                pipeable.locals = createSymbolTable();
                 const pipeableSymbol = createSymbol(
                     SymbolFlags.Function,
                     InternalSymbolName.Function
@@ -5231,7 +5233,9 @@ namespace ts {
             };
 
             function withContext<T>(enclosingDeclaration: Node | undefined, flags: NodeBuilderFlags | undefined, tracker: SymbolTracker | undefined, cb: (context: NodeBuilderContext) => T): T | undefined {
-                Debug.assert(enclosingDeclaration === undefined || (enclosingDeclaration.flags & NodeFlags.Synthesized) === 0);
+                // TSPLUS EXTENSION START
+                Debug.assert(enclosingDeclaration === undefined || (!!enclosingDeclaration.parent?.symbol && isTsPlusSymbol(enclosingDeclaration.parent.symbol)) || (enclosingDeclaration.flags & NodeFlags.Synthesized) === 0);
+                // TSPLUS EXTENSION END
                 const context: NodeBuilderContext = {
                     enclosingDeclaration,
                     flags: flags || NodeBuilderFlags.None,
@@ -43847,71 +43851,107 @@ namespace ts {
             }
             return undefined;
         }
-        function getTsPlusFluentSignatureForPipeableVariableDeclaration(file: SourceFile, exportName: string, pipeable: VariableDeclarationWithFunction): [Type, TsPlusSignature[]] | undefined {
-            const initializer = pipeable.initializer;
-            const body = initializer.body;
-            let returnFn: ArrowFunction | undefined;
-            if (isBlock(body)) {
-                const candidate = find(
-                    body.statements,
-                    (s): s is ReturnStatement & { expression: ArrowFunction } =>
-                    isReturnStatement(s) && !!s.expression && isArrowFunction(s.expression)
-                )
-                if (candidate) {
-                    returnFn = candidate.expression
+        function isVairableDeclarationWithFunction(node: VariableDeclaration): node is VariableDeclarationWithFunction {
+            return isIdentifier(node.name) && !!node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer));
+        }
+        function getTsPlusFluentSignatureForPipeableVariableDeclaration(file: SourceFile, exportName: string, pipeable: VariableDeclarationWithFunction | VariableDeclarationWithFunctionType): [Type, TsPlusSignature[]] | undefined {
+            if (isVairableDeclarationWithFunction(pipeable)) {
+                const initializer = pipeable.initializer;
+                const body = initializer.body;
+                let returnFn: ArrowFunction | FunctionTypeNode | undefined;
+                if (isBlock(body)) {
+                    const candidate = find(
+                        body.statements,
+                        (s): s is ReturnStatement & { expression: ArrowFunction } =>
+                        isReturnStatement(s) && !!s.expression && isArrowFunction(s.expression)
+                    )
+                    if (candidate) {
+                        returnFn = candidate.expression
+                    }
                 }
-            }
-            else {
-                if (isArrowFunction(body)) {
+                else if (isArrowFunction(body)) {
                     returnFn = body;
                 }
+                if (returnFn) {
+                    const type = getTypeOfNode(pipeable)
+                    const signatures = getSignaturesOfType(type, SignatureKind.Call)
+                    const tsPlusSignatures = flatMap(signatures, (sig) => {
+                        const returnType = getReturnTypeOfSignature(sig)
+                        const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
+                        return flatMap(returnSignatures, (rsig) => {
+                            const newSig = cloneSignature(sig) as TsPlusSignature
+                            newSig.parameters = [...rsig.parameters, ...sig.parameters];
+                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])]
+                            newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
+                            newSig.minArgumentCount = newSig.minArgumentCount + 1;
+                            let newDecl: ArrowFunction | FunctionExpression | FunctionTypeNode
+                            if (isArrowFunction(initializer)) {
+                                newDecl = factory.updateArrowFunction(
+                                    initializer,
+                                    pipeable.modifiers,
+                                    [...(returnFn!.typeParameters ?? []), ...(initializer.typeParameters ?? [])],
+                                    [...returnFn!.parameters, ...initializer.parameters],
+                                    returnFn!.type,
+                                    initializer.equalsGreaterThanToken,
+                                    factory.createBlock([])
+                                );
+                            }
+                            else {
+                                newDecl = factory.updateFunctionExpression(
+                                    initializer,
+                                    initializer.modifiers,
+                                    initializer.asteriskToken,
+                                    initializer.name,
+                                    [...(returnFn!.typeParameters ?? []), ...(initializer.typeParameters ?? [])],
+                                    [...returnFn!.parameters, ...initializer.parameters],
+                                    returnFn!.type,
+                                    factory.createBlock([])
+                                );
+                            }
+                            newDecl.jsDoc = pipeable.jsDoc;
+                            newDecl.jsDocCache = pipeable.jsDocCache;
+                            newSig.declaration = newDecl;
+                            const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
+                            thisifiedSignature.tsPlusPipeable = true;
+                            return thisifiedSignature;
+                        })
+                    }) as TsPlusSignature[]
+                    const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
+                    return [dataFirstType, tsPlusSignatures];
+                }
+
             }
-            if (returnFn) {
-                const type = getTypeOfNode(pipeable)
-                const signatures = getSignaturesOfType(type, SignatureKind.Call)
-                const tsPlusSignatures = flatMap(signatures, (sig) => {
-                    const returnType = getReturnTypeOfSignature(sig)
-                    const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
-                    return flatMap(returnSignatures, (rsig) => {
-                        const newSig = cloneSignature(sig) as TsPlusSignature
-                        newSig.parameters = [...rsig.parameters, ...sig.parameters];
-                        newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])]
-                        newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
-                        newSig.minArgumentCount = newSig.minArgumentCount + 1;
-                        let newDecl: ArrowFunction | FunctionExpression
-                        if (isArrowFunction(initializer)) {
-                            newDecl = factory.updateArrowFunction(
-                                initializer,
-                                pipeable.modifiers,
-                                [...(returnFn!.typeParameters ?? []), ...(initializer.typeParameters ?? [])],
-                                [...returnFn!.parameters, ...initializer.parameters],
-                                returnFn!.type,
-                                initializer.equalsGreaterThanToken,
-                                factory.createBlock([])
-                            );
-                        }
-                        else {
-                            newDecl = factory.updateFunctionExpression(
-                                initializer,
-                                initializer.modifiers,
-                                initializer.asteriskToken,
-                                initializer.name,
-                                [...(returnFn!.typeParameters ?? []), ...(initializer.typeParameters ?? [])],
-                                [...returnFn!.parameters, ...initializer.parameters],
-                                returnFn!.type,
-                                factory.createBlock([])
-                            );
-                        }
-                        newDecl.jsDoc = pipeable.jsDoc;
-                        newDecl.jsDocCache = pipeable.jsDocCache;
-                        newSig.declaration = newDecl;
-                        const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
-                        thisifiedSignature.tsPlusPipeable = true;
-                        return thisifiedSignature;
-                    })
-                }) as TsPlusSignature[]
-                const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
-                return [dataFirstType, tsPlusSignatures];
+            else {
+                const returnFn = pipeable.type.type
+                if (isFunctionTypeNode(returnFn)) {
+                    const type = getTypeOfNode(pipeable)
+                    const signatures = getSignaturesOfType(type, SignatureKind.Call)
+                    const tsPlusSignatures = flatMap(signatures, (sig) => {
+                        const returnType = getReturnTypeOfSignature(sig)
+                        const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
+                        return flatMap(returnSignatures, (rsig) => {
+                            const newSig = cloneSignature(sig) as TsPlusSignature
+                            newSig.parameters = [...rsig.parameters, ...sig.parameters];
+                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])]
+                            newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
+                            newSig.minArgumentCount = newSig.minArgumentCount + 1;
+                            const newDecl = factory.updateFunctionTypeNode(
+                                pipeable.type as FunctionTypeNode,
+                                factory.createNodeArray([...(returnFn.typeParameters ?? []), ...((pipeable.type as FunctionTypeNode).typeParameters ?? [])]),
+                                factory.createNodeArray([...returnFn.parameters, ...(pipeable.type as FunctionTypeNode).parameters]),
+                                returnFn.type
+                            )
+                            newDecl.jsDoc = pipeable.jsDoc;
+                            newDecl.jsDocCache = pipeable.jsDocCache;
+                            newSig.declaration = newDecl;
+                            const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
+                            thisifiedSignature.tsPlusPipeable = true;
+                            return thisifiedSignature;
+                        })
+                    }) as TsPlusSignature[]
+                    const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
+                    return [dataFirstType, tsPlusSignatures];
+                }
             }
             return undefined;
         }
@@ -44156,7 +44196,13 @@ namespace ts {
         function tryCacheTsPlusPipeableVariable(file: SourceFile, statement: VariableStatement) {
             if (statement.declarationList.declarations.length === 1) {
                 const declaration = statement.declarationList.declarations[0];
-                if(isIdentifier(declaration.name) && declaration.initializer && (isArrowFunction(declaration.initializer) || isFunctionExpression(declaration.initializer))) {
+                if(
+                    isIdentifier(declaration.name) &&
+                    (
+                        (declaration.initializer && (isArrowFunction(declaration.initializer) || isFunctionExpression(declaration.initializer))) ||
+                        (declaration.type && isFunctionTypeNode(declaration.type))
+                    )
+                ) {
                     const pipeableTags = collectTsPlusPipeableTags(declaration);
                     for (const pipeableTag of pipeableTags) {
                         const [, target, name] = pipeableTag.comment.split(" ");
@@ -44166,7 +44212,7 @@ namespace ts {
                         const typeAndSignatures = getTsPlusFluentSignatureForPipeableVariableDeclaration(
                             file,
                             declaration.name.escapedText.toString(),
-                            declaration as VariableDeclarationWithFunction
+                            declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType
                         )
                         if(typeAndSignatures) {
                             const [type, signatures] = typeAndSignatures;

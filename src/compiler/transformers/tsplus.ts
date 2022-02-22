@@ -93,8 +93,6 @@ namespace ts {
                             return visitCallExpressionOrFluentCallExpression(source, traceInScope, node as CallExpression, visitor(source, traceInScope), context);
                         case SyntaxKind.VariableStatement:
                             return visitVariableStatement(source, node as VariableStatement, visitor(source, traceInScope), context)
-                        // case SyntaxKind.VariableDeclaration:
-                        //     return visitVariableDeclaration(source, node as VariableDeclaration, visitor(source, traceInScope), context)
                         default:
                             return visitEachChild(node, visitor(source, traceInScope), context);
                     }
@@ -252,7 +250,7 @@ namespace ts {
                     args
                 )
             }
-            function tryOptimizePipeableCall(call: CallExpression, selfArg: Expression, restArgs: readonly Expression[], source: SourceFile) {
+            function tryOptimizePipeableCall(call: CallExpression, args: Expression[], source: SourceFile) {
                 const original = getOriginalNode(call);
                 if (isCallExpression(original) && isIdentifier(original.expression)) {
                     const identifierType = checker.getTypeAtLocation(original.expression);
@@ -261,14 +259,14 @@ namespace ts {
                         if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
                             const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol)
                             if (fluentExtension) {
-                                const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type));
+                                const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
                                 if (signature) {
-                                    return createDataFirstCall(original, [selfArg, ...restArgs], signature.signatures[0].tsPlusFile, signature.signatures[0].tsPlusExportName, source);
+                                    return createDataFirstCall(original, args, signature.tsPlusFile, signature.tsPlusExportName, source);
                                 }
                             }
                         }
                         if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
-                            return createDataFirstCall(original, [selfArg, ...restArgs], identifierSymbol.tsPlusSourceFile, identifierSymbol.tsPlusExportName, source)
+                            return createDataFirstCall(original, args, identifierSymbol.tsPlusSourceFile, identifierSymbol.tsPlusExportName, source)
                         }
                     }
                 }
@@ -279,55 +277,50 @@ namespace ts {
                         if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
                             const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol)
                             if (fluentExtension) {
-                                const synthesizedFluentCall = factory.createCallExpression(
-                                    factory.createPropertyAccessExpression(
-                                        selfArg,
-                                        original.expression.name
-                                    ),
-                                    undefined,
-                                    restArgs
-                                )
-                                const resolvedSignature = checker.getResolvedSignature(synthesizedFluentCall);
-                                if (resolvedSignature) {
-                                    resolvedSignature;
-                                    return
+                                const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
+                                if (signature) {
+                                    return createDataFirstCall(original, args, signature.tsPlusFile, signature.tsPlusExportName, source);
                                 }
                             }
                         }
                         if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
-                            return createDataFirstCall(original, [selfArg, ...restArgs], identifierSymbol.tsPlusSourceFile, identifierSymbol.tsPlusExportName, source)
+                            return createDataFirstCall(original, args, identifierSymbol.tsPlusSourceFile, identifierSymbol.tsPlusExportName, source)
                         }
                         if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.StaticFunction) {
                             const declType = checker.getTypeAtLocation(identifierSymbol.tsPlusDeclaration.name!)
                             const declSym = declType.symbol;
                             if (declSym && isTsPlusSymbol(declSym)) {
+                                if (declSym.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                                    const fluentExtension = checker.getFluentExtensionForPipeableSymbol(declSym)
+                                    if (fluentExtension) {
+                                        const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(declSym.tsPlusDataFirstType, type))?.signatures[0];
+                                        if (signature) {
+                                            return createDataFirstCall(original, args, signature.tsPlusFile, signature.tsPlusExportName, source);
+                                        }
+                                    }
+                                }
                                 if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
-                                    return createDataFirstCall(original, [selfArg, ...restArgs], declSym.tsPlusSourceFile, declSym.tsPlusExportName, source)
+                                    return createDataFirstCall(original, args, declSym.tsPlusSourceFile, declSym.tsPlusExportName, source)
                                 }
                             }
                         }
                     }
                 }
             }
-            function optimisePipe(
+            function optimizePipe(
                 args: NodeArray<ts.Expression>,
                 factory: ts.NodeFactory,
                 source: SourceFile
             ): ts.Expression {
-                return args
-                    .slice(1)
-                    .reduce(
-                        (currentNode, memberNode) => {
-                            if (isCallExpression(memberNode)) {
-                                const optimized = tryOptimizePipeableCall(memberNode, currentNode, memberNode.arguments, source);
-                                if (optimized) {
-                                    return optimized;
-                                }
-                            }
-                            return factory.createCallExpression(memberNode, undefined, [currentNode]);
-                        },
-                        args[0]!
-                    )
+                return reduceLeft(args.slice(1), (accumulatedCall, pipeArg) => {
+                    if (isCallExpression(pipeArg)) {
+                        const optimized = tryOptimizePipeableCall(pipeArg, [accumulatedCall, ...pipeArg.arguments], source);
+                        if (optimized) {
+                            return optimized;
+                        }
+                    }
+                    return factory.createCallExpression(pipeArg, undefined, [accumulatedCall]);
+                }, args[0]!)
             }
             function optimizeIdentity(
                 node: CallExpression,
@@ -340,7 +333,7 @@ namespace ts {
             }
             function visitCallExpressionOrFluentCallExpression(source: SourceFile, traceInScope: Identifier | undefined, node: CallExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
                 if (checker.isPipeCall(node)) {
-                    return optimisePipe(visitNodes(node.arguments, visitor), context.factory, source);
+                    return optimizePipe(visitNodes(node.arguments, visitor), context.factory, source);
                 }
                 if (checker.isTsPlusMacroCall(node, "identity")) {
                     return optimizeIdentity(visitEachChild(node, visitor, context));
@@ -349,7 +342,11 @@ namespace ts {
                     return factory.createVoidZero()
                 }
                 if (node.arguments.length === 1 && isCallExpression(node.expression)) {
-                    const optimizedPipeable = tryOptimizePipeableCall(node.expression, visitNode(node.arguments[0], visitor), visitNodes(node.expression.arguments, visitor), source);
+                    const optimizedPipeable = tryOptimizePipeableCall(
+                        node.expression,
+                        [visitNode(node.arguments[0], visitor), ...visitNodes(node.expression.arguments, visitor)],
+                        source
+                    );
                     if (optimizedPipeable) {
                         return optimizedPipeable;
                     }
