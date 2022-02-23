@@ -29343,7 +29343,17 @@ namespace ts {
             //   1. if 'isolatedModules' is enabled, because the const enum value will not be inlined, and
             //   2. if 'preserveConstEnums' is enabled and the expression is itself an export, e.g. `export = Foo.Bar.Baz`.
             if (isIdentifier(left) && parentSymbol && (compilerOptions.isolatedModules || !(prop && isConstEnumOrConstEnumOnlyModule(prop)) || shouldPreserveConstEnums(compilerOptions) && isExportOrExportExpression(node))) {
-                markAliasReferenced(parentSymbol, node);
+                // TSPLUS EXTENSION START
+                if (isIdentifier(right) && prop) {
+                    const rightType = getTypeOfSymbol(prop);
+                    if (!isTransformablePipeableExtension(rightType)) {
+                        markAliasReferenced(parentSymbol, node);
+                    }
+                }
+                else {
+                // TSPLUS EXTENSION END
+                    markAliasReferenced(parentSymbol, node);
+                }
             }
 
             let propType: Type;
