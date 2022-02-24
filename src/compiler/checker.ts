@@ -29345,8 +29345,8 @@ namespace ts {
             if (isIdentifier(left) && parentSymbol && (compilerOptions.isolatedModules || !(prop && isConstEnumOrConstEnumOnlyModule(prop)) || shouldPreserveConstEnums(compilerOptions) && isExportOrExportExpression(node))) {
                 // TSPLUS EXTENSION START
                 if (isIdentifier(right) && prop) {
-                    const rightType = getTypeOfSymbol(prop);
-                    if (!isTransformablePipeableExtension(rightType)) {
+                    const propLinks = getSymbolLinks(prop);
+                    if (propLinks.type && !isTransformablePipeableExtension(propLinks.type)) {
                         markAliasReferenced(parentSymbol, node);
                     }
                 }
