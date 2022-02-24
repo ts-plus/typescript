@@ -1234,10 +1234,10 @@ namespace ts {
             if (!isCallExpression(node)) {
                 return false;
             }
-            const typeOfExpression = getTypeOfNode(node.expression);
-            if (typeOfExpression.symbol && typeOfExpression.symbol.valueDeclaration) {
+            const symbol = getSymbolAtLocation(node.expression);
+            if (symbol && symbol.valueDeclaration) {
                 return getAllJSDocTags(
-                    typeOfExpression.symbol.valueDeclaration,
+                    symbol.valueDeclaration,
                     (_): _ is JSDocTag => _.tagName.escapedText === "tsplus" && _.comment === `macro ${macro}`
                 ).length > 0;
             }
