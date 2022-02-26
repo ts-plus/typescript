@@ -29238,7 +29238,7 @@ namespace ts {
                 }
             }
         }
-        function recheckPipeableFluentExtension(typeName: string, funcName: string) {
+        function checkFluentPipeableAgreement(typeName: string, funcName: string) {
             if (!fluentCache.has(typeName)) {
                 return;
             }
@@ -29278,7 +29278,6 @@ namespace ts {
                     if (!map.has(name)) {
                         const symbol = createTsPlusFluentSymbol(name, signatures);
                         map.set(name, { patched: createSymbolWithType(symbol, type), signatures, types: [{ type, signatures }] });
-                        recheckPipeableFluentExtension(target, name);
                     }
                     else {
                         const extension = map.get(name)!;
@@ -29289,8 +29288,7 @@ namespace ts {
                         const allSignatures: TsPlusSignature[] = signatures.concat(extension.signatures);
                         const symbol = createTsPlusFluentSymbol(name, allSignatures);
                         const newType = createAnonymousType(symbol, emptySymbols, allSignatures, [], []);
-                        map.set(name, { patched: createSymbolWithType(symbol, newType), signatures: allSignatures, types })
-                        recheckPipeableFluentExtension(target, name);
+                        map.set(name, { patched: createSymbolWithType(symbol, newType), signatures: allSignatures, types });
                     }
                 }
             })
@@ -29298,7 +29296,7 @@ namespace ts {
                 fluentUnresolvedCache.get(target)!.delete(name);
             }
             if (map.has(name)) {
-                return getTypeOfSymbol(map.get(name)!.patched)
+                return getTypeOfSymbol(map.get(name)!.patched);
             }
         }
         function resolveStaticExtension(unresolved: TsPlusUnresolvedStaticExtension): Type | undefined {
@@ -29308,15 +29306,15 @@ namespace ts {
                 if (!staticFunctionCache.has(target)) {
                     staticFunctionCache.set(target, new Map());
                 }
-                const map = staticFunctionCache.get(target)!
-                const symbol = getSymbolAtLocation(declaration.name)
+                const map = staticFunctionCache.get(target)!;
+                const symbol = getSymbolAtLocation(declaration.name);
                 if (symbol) {
-                    const patched = getTsPlusStaticSymbolForCallSignatures(definition, exportName, name, declaration, callSignatures)
+                    const patched = getTsPlusStaticSymbolForCallSignatures(definition, exportName, name, declaration, callSignatures);
                     map.set(name, {
                         patched,
                         definition,
                         exportName
-                    })
+                    });
                     staticUnresolvedCache.get(target)?.delete(name);
                     return getTypeOfSymbol(patched);
                 }
@@ -29333,7 +29331,7 @@ namespace ts {
                         patched,
                         definition,
                         exportName
-                    })
+                    });
                     staticUnresolvedCache.get(target)?.delete(name);
                     return getTypeOfSymbol(patched);
                 }
@@ -44565,8 +44563,9 @@ namespace ts {
                 const cache = fluentCache.get(typeName)!;
                 map.forEach((member, funcName) => {
                     if (unresolvedCache.has(funcName)) {
-                        // Don't add the pipeable's fluent signature to the fluent cache if there are unresolved fluent
-                        // extensions with the same name
+                        // Resolve fluent extension so signature mismatch errors can be reported
+                        resolveFluentExtension(unresolvedCache.get(funcName)!);
+                        checkFluentPipeableAgreement(typeName, funcName);
                         return;
                     }
                     const symbol = createTsPlusFluentSymbol(funcName, member.signatures as TsPlusSignature[]);
