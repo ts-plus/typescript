@@ -355,14 +355,13 @@ namespace ts {
         const typeSymbolCache = new Map<Symbol, string[]>();
         const companionSymbolCache = new Map<Symbol, string[]>();
         const fluentCache = new Map<string, ESMap<string, TsPlusFluentExtension>>();
-        const fluentTempCache = new Map<string, ESMap<string, Set<{ type: Type, signatures: readonly TsPlusSignature[], definition: SourceFile, exportName: string }>>>();
         const fluentUnresolvedCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
         const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
         const staticFunctionCache = new Map<string, ESMap<string, TsPlusStaticFunctionExtension>>()
         const staticValueCache = new Map<string, ESMap<string, TsPlusStaticValueExtension>>();
         const staticUnresolvedCache = new Map<string, ESMap<string, TsPlusUnresolvedStaticExtension>>();
-        const pipeableTempCache = new Map<string, ESMap<string, { declaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType, type: Type, signatures: readonly TsPlusSignature[], definition: SourceFile, exportName: string }>>();
+        const pipeableCache = new Map<string, ESMap<string, { declaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType, type: Type, signatures: readonly TsPlusSignature[], definition: SourceFile, exportName: string }>>();
         const identityCache = new Map<string, FunctionDeclaration>();
         const callCache = new Map<Node, TsPlusStaticFunctionExtension>();
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
@@ -29240,15 +29239,15 @@ namespace ts {
                 }
             }
         }
-        function recheckPipeableFluentExtension(declaration: Declaration, typeName: string, funcName: string) {
+        function recheckPipeableFluentExtension(typeName: string, funcName: string) {
             if (!fluentCache.has(typeName)) {
                 return;
             }
-            if (!pipeableTempCache.has(typeName)) {
+            if (!pipeableCache.has(typeName)) {
                 return;
             }
             const fluentMap = fluentCache.get(typeName)!;
-            const pipeableMap = pipeableTempCache.get(typeName)!;
+            const pipeableMap = pipeableCache.get(typeName)!;
             if (!fluentMap.has(funcName)) {
                 return;
             }
@@ -29261,7 +29260,7 @@ namespace ts {
                 return;
             }
             else {
-                error(declaration, Diagnostics.Declaration_annotated_as_pipeable_is_not_assignable_to_its_corresponding_fluent_declaration);
+                error(pipeableExtension.declaration, Diagnostics.Declaration_annotated_as_pipeable_is_not_assignable_to_its_corresponding_fluent_declaration);
                 return;
             }
         }
@@ -29280,7 +29279,7 @@ namespace ts {
                     if (!map.has(name)) {
                         const symbol = createTsPlusFluentSymbol(name, signatures);
                         map.set(name, { patched: createSymbolWithType(symbol, type), signatures, types: [{ type, signatures }] });
-                        recheckPipeableFluentExtension(declaration, target, name);
+                        recheckPipeableFluentExtension(target, name);
                     }
                     else {
                         const extension = map.get(name)!;
@@ -29292,12 +29291,12 @@ namespace ts {
                         const symbol = createTsPlusFluentSymbol(name, allSignatures);
                         const newType = createAnonymousType(symbol, emptySymbols, allSignatures, [], []);
                         map.set(name, { patched: createSymbolWithType(symbol, newType), signatures: allSignatures, types })
-                        recheckPipeableFluentExtension(declaration, target, name);
+                        recheckPipeableFluentExtension(target, name);
                     }
                 }
             })
-            if (fluentTempCache.has(target)) {
-                fluentTempCache.get(target)!.delete(name);
+            if (fluentUnresolvedCache.has(target)) {
+                fluentUnresolvedCache.get(target)!.delete(name);
             }
             if (map.has(name)) {
                 return getTypeOfSymbol(map.get(name)!.patched)
@@ -44313,10 +44312,10 @@ namespace ts {
                     const typeAndSignatures = getTsPlusFluentSignatureForPipeableFunction(file, declaration.name.escapedText.toString(), name, declaration);
                     if (typeAndSignatures) {
                         const [type, signatures] = typeAndSignatures;
-                        if (!pipeableTempCache.has(target)) {
-                            pipeableTempCache.set(target, new Map());
+                        if (!pipeableCache.has(target)) {
+                            pipeableCache.set(target, new Map());
                         }
-                        const map = pipeableTempCache.get(target)!;
+                        const map = pipeableCache.get(target)!;
                         map.set(name, {
                             declaration,
                             type,
@@ -44357,8 +44356,8 @@ namespace ts {
                             error(declaration, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
                             return;
                         }
-                        if (!pipeableTempCache.has(target)) {
-                            pipeableTempCache.set(target, new Map());
+                        if (!pipeableCache.has(target)) {
+                            pipeableCache.set(target, new Map());
                         }
                         const typeAndSignatures = getTsPlusFluentSignatureForPipeableVariableDeclaration(
                             file,
@@ -44368,7 +44367,7 @@ namespace ts {
                         )
                         if(typeAndSignatures) {
                             const [type, signatures] = typeAndSignatures;
-                            const map = pipeableTempCache.get(target)!;
+                            const map = pipeableCache.get(target)!;
                             map.set(name, {
                                 declaration: declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType,
                                 type,
@@ -44540,7 +44539,7 @@ namespace ts {
         }
         function initTsPlusTypeChecker() {
             fluentCache.clear();
-            fluentTempCache.clear();
+            fluentUnresolvedCache.clear();
             operatorCache.clear();
             typeSymbolCache.clear();
             staticFunctionCache.clear();
@@ -44551,12 +44550,12 @@ namespace ts {
             callCache.clear();
             indexCache.clear();
             indexAccessExpressionCache.clear();
-            pipeableTempCache.clear();
+            pipeableCache.clear();
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);
             }
 
-            pipeableTempCache.forEach((map, typeName) => {
+            pipeableCache.forEach((map, typeName) => {
                 if (!fluentUnresolvedCache.has(typeName)) {
                     fluentUnresolvedCache.set(typeName, new Map());
                 }
