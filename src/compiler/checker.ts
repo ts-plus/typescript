@@ -837,6 +837,12 @@ namespace ts {
             return false
         }
         function getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol) {
+            if (fluentUnresolvedCache.has(symbol.tsPlusTypeName)) {
+                const map = fluentUnresolvedCache.get(symbol.tsPlusTypeName)!;
+                if (map.has(symbol.tsPlusName)) {
+                    resolveFluentExtension(map.get(symbol.tsPlusName)!);
+                }
+            }
             const extension = fluentCache.get(symbol.tsPlusTypeName)?.get(symbol.tsPlusName);
             if (extension && every(extension.signatures, (sig) => !sig.tsPlusPipeable)) {
                 return extension;
@@ -44550,39 +44556,20 @@ namespace ts {
                 collectTsPlusSymbols(file, file.statements);
             }
 
-            fluentTempCache.forEach((map, typeName) => {
-                if (!fluentCache.has(typeName)) {
-                    fluentCache.set(typeName, new Map());
-                }
-                const cache = fluentCache.get(typeName)!;
-                map.forEach((members, funcName) => {
-                    const types: { type: Type, signatures: readonly TsPlusSignature[] }[] = [];
-                    const signatures: TsPlusSignature[] = [];
-                    members.forEach((cached) => {
-                        signatures.push(...cached.signatures);
-                        types.push({ type: cached.type, signatures: cached.signatures });
-                    });
-                    const symbol = createTsPlusFluentSymbol(funcName, signatures);
-                    const type = createAnonymousType(symbol, emptySymbols, signatures, [], []);
-                    cache.set(funcName, { patched: createSymbolWithType(symbol, type), signatures, types });
-                });
-            });
-
             pipeableTempCache.forEach((map, typeName) => {
+                if (!fluentUnresolvedCache.has(typeName)) {
+                    fluentUnresolvedCache.set(typeName, new Map());
+                }
+                const unresolvedCache = fluentUnresolvedCache.get(typeName)!;
                 if (!fluentCache.has(typeName)) {
                     fluentCache.set(typeName, new Map());
                 }
                 const cache = fluentCache.get(typeName)!;
                 map.forEach((member, funcName) => {
-                    if (cache.has(funcName)) {
-                        const fluentExtension = cache.get(funcName)!;
-                        if (some(fluentExtension.types, ({ type: fluentType }) => isTypeAssignableTo(member.type, fluentType))) {
-                            return;
-                        }
-                        else {
-                            error(member.declaration, Diagnostics.Declaration_annotated_as_pipeable_is_not_assignable_to_its_corresponding_fluent_declaration);
-                            return;
-                        }
+                    if (unresolvedCache.has(funcName)) {
+                        // Don't add the pipeable's fluent signature to the fluent cache if there are unresolved fluent
+                        // extensions with the same name
+                        return;
                     }
                     const symbol = createTsPlusFluentSymbol(funcName, member.signatures as TsPlusSignature[]);
                     const type = createAnonymousType(symbol, emptySymbols, member.signatures, [], []);
