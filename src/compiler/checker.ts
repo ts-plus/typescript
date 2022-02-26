@@ -804,14 +804,11 @@ namespace ts {
             getTextOfBinaryOp,
             getInstantiatedTsPlusSignature,
             getIndexAccessExpressionCache: () => indexAccessExpressionCache,
-            resolveStaticExtension,
-            getUnresolvedStaticExtension,
             isTsPlusMacroCall,
             isClassCompanionReference,
             collectTsPlusFluentTags,
             getFluentExtensionForPipeableSymbol,
-            resolveCall,
-            getUnresolvedFluentExtension,
+            resolveCall
             // TSPLUS EXTENSION END
         };
 
@@ -869,9 +866,16 @@ namespace ts {
                         const _unresolvedStatics = staticUnresolvedCache.get(typeSymbol);
                         if (_unresolvedStatics) {
                             _unresolvedStatics.forEach((extension) => {
-                                resolveStaticExtension(extension)
-                            })
-                            staticUnresolvedCache.delete(typeSymbol)
+                                resolveStaticExtension(extension);
+                            });
+                            staticUnresolvedCache.delete(typeSymbol);
+                        }
+                        const _unresolvedFluents = fluentUnresolvedCache.get(typeSymbol);
+                        if (_unresolvedFluents) {
+                            _unresolvedFluents.forEach((extension) => {
+                                resolveFluentExtension(extension);
+                            });
+                            fluentUnresolvedCache.delete(typeSymbol);
                         }
                         const _staticFunctions = staticFunctionCache.get(typeSymbol);
                         if (_staticFunctions) {
@@ -938,30 +942,11 @@ namespace ts {
                             if (fluentUnresolvedCache.has(tag)) {
                                 const cache = fluentUnresolvedCache.get(tag);
                                 if (cache?.has(name)) {
-                                    resolveFluentExtension(cache!.get(name)!)
+                                    resolveFluentExtension(cache.get(name)!)
                                 }
                             }
                             if (fluentCache.has(tag)) {
                                 const cache = fluentCache.get(tag)
-                                if (cache?.has(name)) {
-                                    return [cache.get(name)!]
-                                }
-                            }
-                            return []
-                        }
-                    )
-                    return x.length > 0 ? x[x.length - 1] : undefined;
-                }
-            }
-        }
-        function getUnresolvedFluentExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
-            for (const target of symbols) {
-                if (typeSymbolCache.has(target)) {
-                    const x = typeSymbolCache.get(target)!.flatMap(
-                        (tag) => {
-                            if (fluentUnresolvedCache.has(tag)) {
-                                const cache = fluentUnresolvedCache.get(tag)
                                 if (cache?.has(name)) {
                                     return [cache.get(name)!]
                                 }
@@ -1017,6 +1002,12 @@ namespace ts {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
                         (tag) => {
+                            if (staticUnresolvedCache.has(tag)) {
+                                const cache = staticUnresolvedCache.get(tag);
+                                if (cache?.has(name)) {
+                                    resolveStaticExtension(cache.get(name)!)
+                                }
+                            }
                             if (staticFunctionCache.has(tag)) {
                                 const cache = staticFunctionCache.get(tag)
                                 if (cache?.has(name)) {
@@ -1036,6 +1027,12 @@ namespace ts {
                 if (companionSymbolCache.has(target)) {
                     const x = companionSymbolCache.get(target)!.flatMap(
                         (tag) => {
+                            if (staticUnresolvedCache.has(tag)) {
+                                const cache = staticUnresolvedCache.get(tag);
+                                if (cache?.has(name)) {
+                                    resolveStaticExtension(cache.get(name)!)
+                                }
+                            }
                             if (staticFunctionCache.has(tag)) {
                                 const cache = staticFunctionCache.get(tag)
                                 if (cache?.has(name)) {
@@ -1053,7 +1050,13 @@ namespace ts {
             const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
-                    const x = flatMap(typeSymbolCache.get(target)!, (tag) => {
+                    const x = flatMap(typeSymbolCache.get(target), (tag) => {
+                        if (staticUnresolvedCache.has(tag)) {
+                            const cache = staticUnresolvedCache.get(tag);
+                            if (cache?.has(name)) {
+                                resolveStaticExtension(cache.get(name)!)
+                            }
+                        }
                         if (staticValueCache.has(tag)) {
                             const cache = staticValueCache.get(tag)
                             if (cache?.has(name)) {
@@ -1069,7 +1072,13 @@ namespace ts {
             const symbols = collectRelevantSymbols(targetType);
             for (const target of symbols) {
                 if (companionSymbolCache.has(target)) {
-                    const x = flatMap(companionSymbolCache.get(target)!, (tag) => {
+                    const x = flatMap(companionSymbolCache.get(target), (tag) => {
+                        if (staticUnresolvedCache.has(tag)) {
+                            const cache = staticUnresolvedCache.get(tag);
+                            if (cache?.has(name)) {
+                                resolveStaticExtension(cache.get(name)!)
+                            }
+                        }
                         if (staticValueCache.has(tag)) {
                             const cache = staticValueCache.get(tag)
                             if (cache?.has(name)) {
@@ -1077,44 +1086,6 @@ namespace ts {
                             }
                         }
                     });
-                    return x.length > 0 ? x[x.length - 1] : undefined;
-                }
-            }
-        }
-        function getUnresolvedStaticExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
-            for (const target of symbols) {
-                if (typeSymbolCache.has(target)) {
-                    const x = typeSymbolCache.get(target)!.flatMap(
-                        (tag) => {
-                            if (staticUnresolvedCache.has(tag)) {
-                                const cache = staticUnresolvedCache.get(tag)
-                                if (cache?.has(name)) {
-                                    return [cache.get(name)!]
-                                }
-                            }
-                            return []
-                        }
-                    )
-                    return x.length > 0 ? x[x.length - 1] : undefined;
-                }
-            }
-        }
-        function getUnresolvedStaticCompanionExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType)
-            for (const target of symbols) {
-                if (companionSymbolCache.has(target)) {
-                    const x = companionSymbolCache.get(target)!.flatMap(
-                        (tag) => {
-                            if (staticUnresolvedCache.has(tag)) {
-                                const cache = staticUnresolvedCache.get(tag)
-                                if (cache?.has(name)) {
-                                    return [cache.get(name)!]
-                                }
-                            }
-                            return []
-                        }
-                    )
                     return x.length > 0 ? x[x.length - 1] : undefined;
                 }
             }
@@ -25919,7 +25890,7 @@ namespace ts {
                         isCallExpression(node.parent) &&
                         node.parent.expression === node &&
                         getSignaturesOfType(type, SignatureKind.Call).length === 0 &&
-                        (getStaticFunctionExtension(type, "__call") != null || getUnresolvedStaticExtension(type, "__call") != null)
+                        (getStaticFunctionExtension(type, "__call") != null)
                     ) &&
                     !isTransformablePipeableExtension(type)
                 ) {
@@ -29233,10 +29204,6 @@ namespace ts {
                     type.tsPlusSymbol = staticValExt.patched;
                     return type;
                 }
-                const staticUnresolvedExt = getUnresolvedStaticCompanionExtension(leftType, right.escapedText.toString());
-                if (staticUnresolvedExt) {
-                    return resolveStaticExtension(staticUnresolvedExt);
-                }
                 return;
             }
             if (!inType) {
@@ -29264,14 +29231,6 @@ namespace ts {
                     // @ts-expect-error
                     type.tsPlusSymbol = staticValExt.patched;
                     return type;
-                }
-                const staticUnresolvedExt = getUnresolvedStaticExtension(leftType, right.escapedText.toString());
-                if (staticUnresolvedExt) {
-                    return resolveStaticExtension(staticUnresolvedExt);
-                }
-                const fluentUnresolvedExt = getUnresolvedFluentExtension(leftType, right.escapedText.toString());
-                if (fluentUnresolvedExt && isCallExpression(node.parent) && node.parent.expression === node) {
-                    return resolveFluentExtension(fluentUnresolvedExt);
                 }
             }
         }
@@ -29301,7 +29260,7 @@ namespace ts {
             }
         }
         function resolveFluentExtension(unresolved: TsPlusUnresolvedFluentExtension): Type | undefined {
-            const { target, name, definition } = unresolved
+            const { target, name, definition } = unresolved;
             if (!fluentCache.has(target)) {
                 fluentCache.set(target, new Map());
             }
@@ -31483,12 +31442,6 @@ namespace ts {
             // TSPLUS EXTENSION START
             if (callSignatures.length === 0) {
                 if (isClassCompanionReference(node.expression)) {
-                    const unresolvedCallExtension = getUnresolvedStaticCompanionExtension(apparentType, "__call");
-
-                    if (unresolvedCallExtension) {
-                        resolveStaticExtension(unresolvedCallExtension);
-                    }
-
                     const callExtension = getStaticFunctionCompanionExtension(apparentType, "__call");
 
                     if (callExtension) {
@@ -31497,12 +31450,6 @@ namespace ts {
                     }
                 }
                 else {
-                    const unresolvedCallExtension = getUnresolvedStaticExtension(apparentType, "__call");
-
-                    if (unresolvedCallExtension) {
-                        resolveStaticExtension(unresolvedCallExtension);
-                    }
-
                     const callExtension = getStaticFunctionExtension(apparentType, "__call");
 
                     if (callExtension) {
@@ -44235,38 +44182,16 @@ namespace ts {
                                     declaration: declaration as VariableDeclaration & { name: Identifier },
                                     exportName: declaration.name.escapedText.toString()
                                 }])
-                            })
+                            });
                         }
                         else {
-                            const extension = map.get(name)!
+                            const extension = map.get(name)!;
                             extension.definition.add({
                                 definition: file,
                                 declaration: declaration as VariableDeclaration & { name: Identifier },
                                 exportName: declaration.name.escapedText.toString()
-                            })
+                            });
                         }
-                        // if (!fluentTempCache.has(target)) {
-                        //     fluentTempCache.set(target, new Map());
-                        // }
-                        // const typeAndSignatures = getTsPlusFluentSignaturesForVariableDeclaration(
-                        //     file,
-                        //     declaration.name.escapedText.toString(),
-                        //     (declaration as VariableDeclaration & { name: Identifier })
-                        // )
-                        // if(typeAndSignatures) {
-                        //     const [type, signatures] = typeAndSignatures
-                        //     const map = fluentTempCache.get(target)!;
-                        //     if (!map.has(name)) {
-                        //         map.set(name, new Set());
-                        //     }
-                        //     const set = map.get(name)!
-                        //     set.add({
-                        //         type,
-                        //         signatures,
-                        //         exportName: declaration.name.escapedText.toString(),
-                        //         definition: file
-                        //     })
-                        // }
                     }
                 }
             }
@@ -44283,7 +44208,7 @@ namespace ts {
                             return;
                         }
                         if (!getterCache.has(target)) {
-                            getterCache.set(target, new Map())
+                            getterCache.set(target, new Map());
                         }
                         if (!getterCache.has(target)) {
                             getterCache.set(target, new Map());
@@ -44305,7 +44230,7 @@ namespace ts {
             if(declaration.name && isIdentifier(declaration.name)) {
                 const operatorTags = collectTsPlusOperatorTags(declaration);
                 for (const operatorTag of operatorTags) {
-                    const symbol = getSymbolAtLocation(declaration.name)
+                    const symbol = getSymbolAtLocation(declaration.name);
                     if (symbol) {
                         const [, target, name] = operatorTag.comment.split(" ");
                         if (!target || !name) {
@@ -44347,31 +44272,16 @@ namespace ts {
                                 declaration,
                                 exportName: declaration.name.escapedText.toString()
                             }])
-                        })
+                        });
                     }
                     else {
-                        const extension = map.get(name)!
+                        const extension = map.get(name)!;
                         extension.definition.add({
                             definition: file,
                             declaration,
                             exportName: declaration.name.escapedText.toString()
-                        })
+                        });
                     }
-                    // if (!fluentTempCache.has(target)) {
-                    //     fluentTempCache.set(target, new Map());
-                    // }
-                    // const map = fluentTempCache.get(target)!;
-                    // if (!map.has(name)) {
-                    //     map.set(name, new Set());
-                    // }
-                    // const set = map.get(name)!
-                    // const [type, signatures] = getTsPlusFluentSignaturesForFunctionDeclaration(file, declaration.name.escapedText.toString(), declaration)
-                    // set.add({
-                    //     type,
-                    //     signatures,
-                    //     exportName: declaration.name.escapedText.toString(),
-                    //     definition: file
-                    // });
                 }
             }
         }
