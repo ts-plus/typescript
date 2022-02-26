@@ -807,7 +807,6 @@ namespace ts {
             isClassCompanionReference,
             collectTsPlusFluentTags,
             getFluentExtensionForPipeableSymbol,
-            resolveCall
             // TSPLUS EXTENSION END
         };
 
