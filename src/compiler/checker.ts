@@ -44531,6 +44531,8 @@ namespace ts {
                 });
             });
 
+            fluentUnresolvedCache.clear();
+
             pipeableCache.forEach((map, typeName) => {
                 if (!fluentCache.has(typeName)) {
                     fluentCache.set(typeName, new Map());
