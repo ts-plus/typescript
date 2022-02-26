@@ -101,7 +101,7 @@ namespace ts.SignatureHelp {
                             untracedDeclaration,
                             resolvedSignature.typeParameters,
                             resolvedSignature.thisParameter,
-                            resolvedSignature.parameters.slice(0, declaration.parameters.length - 1),
+                            resolvedSignature.parameters.slice(0, resolvedSignature.parameters.length - 1),
                             resolvedSignature.getReturnType(),
                             resolvedSignature.resolvedTypePredicate,
                             resolvedSignature.minArgumentCount,
