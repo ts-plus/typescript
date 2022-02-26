@@ -3406,6 +3406,18 @@ namespace ts {
         exportName: string;
     }
 
+    export interface TsPlusUnresolvedFluentExtensionDefinition {
+        declaration: (VariableDeclaration & { name: Identifier }) | FunctionDeclaration;
+        exportName: string;
+        definition: SourceFile;
+    }
+
+    export interface TsPlusUnresolvedFluentExtension {
+        definition: Set<TsPlusUnresolvedFluentExtensionDefinition>;
+        target: string;
+        name: string;
+    }
+
     export interface TsPlusStaticFunctionExtension {
         patched: Symbol;
         definition: SourceFile;
@@ -4619,6 +4631,7 @@ namespace ts {
         getIndexAccessExpressionCache(): ESMap<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>
         resolveStaticExtension(unresolved: TsPlusUnresolvedStaticExtension): Type | undefined
         getUnresolvedStaticExtension(targetType: Type, name: string): TsPlusUnresolvedStaticExtension | undefined
+        getUnresolvedFluentExtension(targetType: Type, name: string): TsPlusUnresolvedFluentExtension | undefined
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isClassCompanionReference(node: Expression): boolean
         collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocExtensionTag[]
