@@ -105,7 +105,12 @@ namespace ts.GoToDefinition {
 
         // TSPLUS EXTENSION BEGIN
         let calledDeclaration = tryGetSignatureDeclaration(typeChecker, node);
-        if (calledDeclaration && calledDeclaration.symbol && isTsPlusSymbol(calledDeclaration.symbol) && calledDeclaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+        if (
+            calledDeclaration &&
+            calledDeclaration.symbol &&
+            isTsPlusSymbol(calledDeclaration.symbol) &&
+            (calledDeclaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro || calledDeclaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableDeclaration)
+        ) {
             // We have determined that this is a call of a Pipeable macro, which is a synthetic declaration (has no real position).
             // To go to the real definition, clear the callDeclaration to skip trying to get the definition info from the signature
             calledDeclaration = undefined;

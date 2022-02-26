@@ -3319,12 +3319,18 @@ namespace ts {
         Getter = "TsPlusGetterSymbol",
         GetterVariable = "TsPlusGetterVariableSymbol",
         PipeableMacro = "TsPlusPipeableMacroSymbol",
-        Pipeable = "TsPlusPipeableSymbol"
+        PipeableIdentifier = "TsPlusPipeableSymbol",
+        PipeableDeclaration = "TsPlusPipeableDeclarationSymbol"
     }
 
-    export interface TsPlusPipeableSymbol extends TransientSymbol {
-        tsPlusTag: TsPlusSymbolTag.Pipeable;
-        tsPlusDeclaration: FunctionDeclaration | VariableDeclarationWithFunction;
+    export interface TsPlusPipeableDeclarationSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.PipeableDeclaration
+        tsPlusDeclaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType;
+    }
+
+    export interface TsPlusPipeableIdentifierSymbol extends TransientSymbol {
+        tsPlusTag: TsPlusSymbolTag.PipeableIdentifier;
+        tsPlusDeclaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType;
         tsPlusDataFirstType: Type;
         tsPlusTypeName: string;
         tsPlusName: string;
@@ -3389,7 +3395,8 @@ namespace ts {
         | TsPlusGetterSymbol
         | TsPlusGetterVariableSymbol
         | TsPlusPipeableMacroSymbol
-        | TsPlusPipeableSymbol;
+        | TsPlusPipeableIdentifierSymbol
+        | TsPlusPipeableDeclarationSymbol;
 
     export interface TsPlusFluentExtension {
         patched: Symbol;
@@ -4632,7 +4639,7 @@ namespace ts {
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isClassCompanionReference(node: Expression): boolean
         collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocExtensionTag[]
-        getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableSymbol): TsPlusFluentExtension | undefined
+        getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
         resolveCall(node: CallLikeExpression, signatures: readonly Signature[], candidatesOutArray: Signature[] | undefined, checkMode: CheckMode, callChainFlags: SignatureFlags, fallbackError?: DiagnosticMessage): Signature
     }
 

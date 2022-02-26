@@ -272,7 +272,7 @@ namespace ts {
                     const identifierType = checker.getTypeAtLocation(original.expression);
                     const identifierSymbol = identifierType.symbol;
                     if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
-                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
                             const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
                             if (fluentExtension) {
                                 const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
@@ -290,7 +290,7 @@ namespace ts {
                     const identifierType = checker.getTypeAtLocation(original.expression.name);
                     const identifierSymbol = identifierType.symbol;
                     if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
-                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
                             const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
                             if (fluentExtension) {
                                 const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
@@ -306,7 +306,7 @@ namespace ts {
                             const declType = checker.getTypeAtLocation(identifierSymbol.tsPlusDeclaration.name!);
                             const declSym = declType.symbol;
                             if (declSym && isTsPlusSymbol(declSym)) {
-                                if (declSym.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                                if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
                                     const fluentExtension = checker.getFluentExtensionForPipeableSymbol(declSym);
                                     if (fluentExtension) {
                                         const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(declSym.tsPlusDataFirstType, type))?.signatures[0];

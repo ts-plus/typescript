@@ -836,7 +836,7 @@ namespace ts {
             }
             return false
         }
-        function getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableSymbol) {
+        function getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol) {
             const extension = fluentCache.get(symbol.tsPlusTypeName)?.get(symbol.tsPlusName);
             if (extension && every(extension.signatures, (sig) => !sig.tsPlusPipeable)) {
                 return extension;
@@ -1112,7 +1112,7 @@ namespace ts {
         function isTransformablePipeableExtension(type: Type): boolean {
             if (type.symbol) {
                 if (isTsPlusSymbol(type.symbol)) {
-                    if (type.symbol.tsPlusTag === TsPlusSymbolTag.Pipeable) {
+                    if (type.symbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
                         const fluent = getFluentExtensionForPipeableSymbol(type.symbol);
                         if (fluent) {
                             return true;
@@ -43790,6 +43790,12 @@ namespace ts {
             symbol.tsPlusName = name;
             return symbol;
         }
+        function createTsPlusPipeableDeclarationSymbol(name: string, declaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType) {
+            const symbol = createSymbol(SymbolFlags.Function, name as __String) as TsPlusPipeableDeclarationSymbol;
+            symbol.tsPlusTag = TsPlusSymbolTag.PipeableDeclaration;
+            symbol.tsPlusDeclaration = declaration;
+            return symbol;
+        }
         function createTsPlusStaticValueSymbol(name: string, declaration: VariableDeclaration, originalSymbol: Symbol): Symbol {
             const symbol = cloneSymbol(originalSymbol) as TsPlusStaticValueSymbol;
             symbol.tsPlusTag = TsPlusSymbolTag.StaticValue;
@@ -43879,14 +43885,14 @@ namespace ts {
         function augmentPipeableIdentifierSymbol(identifier: Identifier, target: string, _exportName: string, name: string, dataFirstType: Type, declaration: FunctionDeclaration | VariableDeclarationWithFunction) {
             const identifierType = getTypeOfNode(identifier);
             if (identifierType.symbol) {
-                (identifierType.symbol as TsPlusPipeableSymbol).tsPlusTag = TsPlusSymbolTag.Pipeable;
-                (identifierType.symbol as TsPlusPipeableSymbol).tsPlusDeclaration = declaration;
-                (identifierType.symbol as TsPlusPipeableSymbol).tsPlusTypeName = target;
-                (identifierType.symbol as TsPlusPipeableSymbol).tsPlusName = name;
-                (identifierType.symbol as TsPlusPipeableSymbol).tsPlusDataFirstType = dataFirstType;
+                (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusTag = TsPlusSymbolTag.PipeableIdentifier;
+                (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusDeclaration = declaration;
+                (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusTypeName = target;
+                (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusName = name;
+                (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusDataFirstType = dataFirstType;
             }
         }
-        function getTsPlusFluentSignatureForPipeableFunction(file: SourceFile, exportName: string, pipeable: FunctionDeclaration): [Type, TsPlusSignature[]] | undefined {
+        function getTsPlusFluentSignatureForPipeableFunction(file: SourceFile, exportName: string, name: string, pipeable: FunctionDeclaration): [Type, TsPlusSignature[]] | undefined {
             if (pipeable.body) {
                 const returnStatement = find(
                     pipeable.body.statements,
@@ -43919,6 +43925,7 @@ namespace ts {
                             newDecl.jsDoc = pipeable.jsDoc;
                             newDecl.jsDocCache = pipeable.jsDocCache;
                             newSig.declaration = newDecl;
+                            newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
                             const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
                             thisifiedSignature.tsPlusPipeable = true;
                             return thisifiedSignature;
@@ -43955,6 +43962,7 @@ namespace ts {
                         newDecl.jsDoc = pipeable.jsDoc;
                         newDecl.jsDocCache = pipeable.jsDocCache;
                         newSig.declaration = newDecl;
+                        newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
                         const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
                         thisifiedSignature.tsPlusPipeable = true;
                         return thisifiedSignature;
@@ -43968,7 +43976,7 @@ namespace ts {
         function isVairableDeclarationWithFunction(node: VariableDeclaration): node is VariableDeclarationWithFunction {
             return isIdentifier(node.name) && !!node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer));
         }
-        function getTsPlusFluentSignatureForPipeableVariableDeclaration(file: SourceFile, exportName: string, pipeable: VariableDeclarationWithFunction | VariableDeclarationWithFunctionType): [Type, TsPlusSignature[]] | undefined {
+        function getTsPlusFluentSignatureForPipeableVariableDeclaration(file: SourceFile, exportName: string, name: string, pipeable: VariableDeclarationWithFunction | VariableDeclarationWithFunctionType): [Type, TsPlusSignature[]] | undefined {
             if (isVairableDeclarationWithFunction(pipeable)) {
                 const initializer = pipeable.initializer;
                 const body = initializer.body;
@@ -44025,6 +44033,7 @@ namespace ts {
                             newDecl.jsDoc = pipeable.jsDoc;
                             newDecl.jsDocCache = pipeable.jsDocCache;
                             newSig.declaration = newDecl;
+                            newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
                             const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
                             thisifiedSignature.tsPlusPipeable = true;
                             return thisifiedSignature;
@@ -44057,6 +44066,7 @@ namespace ts {
                             newDecl.jsDoc = pipeable.jsDoc;
                             newDecl.jsDocCache = pipeable.jsDocCache;
                             newSig.declaration = newDecl;
+                            newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
                             const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file);
                             thisifiedSignature.tsPlusPipeable = true;
                             return thisifiedSignature;
@@ -44294,7 +44304,7 @@ namespace ts {
                         error(declaration, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
                         return;
                     }
-                    const typeAndSignatures = getTsPlusFluentSignatureForPipeableFunction(file, declaration.name.escapedText.toString(), declaration);
+                    const typeAndSignatures = getTsPlusFluentSignatureForPipeableFunction(file, declaration.name.escapedText.toString(), name, declaration);
                     if (typeAndSignatures) {
                         const [type, signatures] = typeAndSignatures;
                         if (!pipeableTempCache.has(target)) {
@@ -44347,6 +44357,7 @@ namespace ts {
                         const typeAndSignatures = getTsPlusFluentSignatureForPipeableVariableDeclaration(
                             file,
                             declaration.name.escapedText.toString(),
+                            name,
                             declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType
                         )
                         if(typeAndSignatures) {
@@ -46630,8 +46641,14 @@ namespace ts {
             case TsPlusSymbolTag.Fluent: {
                 if (isCallLikeExpression(node)) {
                     const signature = checker.getResolvedSignature(node)
-                    if (signature && signature.declaration) {
-                        if (isTsPlusSymbol(signature.declaration.symbol) && signature.declaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                    if (signature && signature.declaration && signature.declaration.symbol) {
+                        if (
+                            isTsPlusSymbol(signature.declaration.symbol) &&
+                            (
+                                signature.declaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro ||
+                                signature.declaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableDeclaration
+                            )
+                        ) {
                             return signature.declaration.symbol.tsPlusDeclaration
                         }
                         return signature.declaration
