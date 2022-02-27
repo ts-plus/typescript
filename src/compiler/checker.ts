@@ -354,7 +354,8 @@ namespace ts {
         const importAsCache = new Map<string, string>();
         const typeSymbolCache = new Map<Symbol, string[]>();
         const companionSymbolCache = new Map<Symbol, string[]>();
-        const fluentCache = new Map<string, ESMap<string, TsPlusFluentExtension>>();
+        const resolvedFluentCache = new Map<string, ESMap<string, TsPlusFluentExtension>>();
+        const fluentCache = new Map<string, ESMap<string, () => TsPlusFluentExtension>>();
         const fluentUnresolvedCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
         const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
@@ -835,7 +836,7 @@ namespace ts {
             return false;
         }
         function getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol) {
-            const extension = fluentCache.get(symbol.tsPlusTypeName)?.get(symbol.tsPlusName);
+            const extension = fluentCache.get(symbol.tsPlusTypeName)?.get(symbol.tsPlusName)?.();
             if (extension && every(extension.signatures, (sig) => !sig.tsPlusPipeable)) {
                 return extension;
             }
@@ -883,7 +884,7 @@ namespace ts {
                         const _fluent = fluentCache.get(typeSymbol);
                         if (_fluent) {
                             _fluent.forEach((v, k) => {
-                                copy.set(k, v.patched);
+                                copy.set(k, v().patched);
                             });
                         }
                         const _getter = getterCache.get(typeSymbol);
@@ -939,7 +940,7 @@ namespace ts {
                             return []
                         }
                     )
-                    return x.length > 0 ? x[x.length - 1] : undefined;
+                    return x.length > 0 ? x[x.length - 1]() : undefined;
                 }
             }
         }
@@ -29234,7 +29235,7 @@ namespace ts {
             if (!pipeableMap.has(funcName)) {
                 return;
             }
-            const fluentExtension = fluentMap.get(funcName)!;
+            const fluentExtension = fluentMap.get(funcName)!();
             const pipeableExtension = pipeableMap.get(funcName)!;
             if (some(fluentExtension.types, ({ type: fluentType }) => isTypeAssignableTo(pipeableExtension.type, fluentType))) {
                 return;
@@ -44501,32 +44502,46 @@ namespace ts {
                 if (!fluentCache.has(typeName)) {
                     fluentCache.set(typeName, new Map());
                 }
-                const resolvedMap = fluentCache.get(typeName)!;
+                const fluentMap = fluentCache.get(typeName)!;
                 map.forEach(({ name, definition }) => {
-                    const allTypes: { type: Type, signatures: readonly TsPlusSignature[] }[] = [];
-                    const allSignatures: TsPlusSignature[] = [];
-
-                    definition.forEach(({ declaration, definition, exportName }) => {
-                        if (isFunctionDeclaration(declaration)) {
-                            const [type, signatures] = getTsPlusFluentSignaturesForFunctionDeclaration(definition, exportName, declaration);
-                            allSignatures.push(...signatures);
-                            allTypes.push({ type, signatures });
+                    fluentMap.set(name, () => {
+                        if (resolvedFluentCache.has(typeName)) {
+                            const resolvedMap = resolvedFluentCache.get(typeName)!;
+                            if (resolvedMap.has(name)) {
+                                return resolvedMap.get(name)!;
+                            }
                         }
-                        else {
-                            const typeAndSignatures = getTsPlusFluentSignaturesForVariableDeclaration(definition, exportName, declaration);
-                            if (typeAndSignatures) {
-                                const [type, signatures] = typeAndSignatures;
+                        const allTypes: { type: Type, signatures: readonly TsPlusSignature[] }[] = [];
+                        const allSignatures: TsPlusSignature[] = [];
+
+                        definition.forEach(({ declaration, definition, exportName }) => {
+                            if (isFunctionDeclaration(declaration)) {
+                                const [type, signatures] = getTsPlusFluentSignaturesForFunctionDeclaration(definition, exportName, declaration);
                                 allSignatures.push(...signatures);
                                 allTypes.push({ type, signatures });
                             }
+                            else {
+                                const typeAndSignatures = getTsPlusFluentSignaturesForVariableDeclaration(definition, exportName, declaration);
+                                if (typeAndSignatures) {
+                                    const [type, signatures] = typeAndSignatures;
+                                    allSignatures.push(...signatures);
+                                    allTypes.push({ type, signatures });
+                                }
+                            }
+                        });
+                        const symbol = createTsPlusFluentSymbol(name, allSignatures);
+                        const type = createAnonymousType(symbol, emptySymbols, allSignatures, [], []);
+                        const extension: TsPlusFluentExtension = {
+                            patched: createSymbolWithType(symbol, type),
+                            signatures: allSignatures,
+                            types: allTypes
+                        };
+                        if (!resolvedFluentCache.has(typeName)) {
+                            resolvedFluentCache.set(typeName, new Map());
                         }
-                    });
-                    const symbol = createTsPlusFluentSymbol(name, allSignatures);
-                    const type = createAnonymousType(symbol, emptySymbols, allSignatures, [], []);
-                    resolvedMap.set(name, {
-                        patched: createSymbolWithType(symbol, type),
-                        signatures: allSignatures,
-                        types: allTypes
+                        const resolvedMap = resolvedFluentCache.get(typeName)!;
+                        resolvedMap.set(name, extension);
+                        return extension;
                     });
                 });
             });
@@ -44543,18 +44558,29 @@ namespace ts {
                         checkFluentPipeableAgreement(typeName, funcName);
                         return;
                     }
-                    const symbol = createTsPlusFluentSymbol(funcName, member.signatures as TsPlusSignature[]);
-                    const type = createAnonymousType(symbol, emptySymbols, member.signatures, [], []);
-                    cache.set(
-                        funcName,
-                        {
+                    cache.set(funcName, () => {
+                        if (resolvedFluentCache.has(typeName)) {
+                            const resolvedMap = resolvedFluentCache.get(typeName)!;
+                            if (resolvedMap.has(funcName)) {
+                                return resolvedMap.get(funcName)!;
+                            }
+                        }
+                        const symbol = createTsPlusFluentSymbol(funcName, member.signatures as TsPlusSignature[]);
+                        const type = createAnonymousType(symbol, emptySymbols, member.signatures, [], []);
+                        const extension: TsPlusFluentExtension = {
                             patched: createSymbolWithType(symbol, type),
                             types: [{ type: member.type, signatures: member.signatures }],
                             signatures: member.signatures
+                        };
+                        if (!resolvedFluentCache.has(typeName)) {
+                            resolvedFluentCache.set(typeName, new Map());
                         }
-                    );
+                        const resolvedMap = resolvedFluentCache.get(typeName)!;
+                        resolvedMap.set(funcName, extension);
+                        return extension;
+                    });
                 });
-            });
+            })
         }
         // TSPLUS EXTENSION END
 
