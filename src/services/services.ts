@@ -1930,7 +1930,7 @@ namespace ts {
                     if(extensions) {
                         const type = typeChecker.getTypeAtLocation(node);
                         const name = node.parent.name.escapedText as string;
-                        const staticSymbol = typeChecker.getStaticFunctionExtension(targetType, name);
+                        const staticSymbol = typeChecker.getStaticExtension(targetType, name);
                         if(type && staticSymbol) {
                             const declaration = staticSymbol.patched.valueDeclaration;
                             if (declaration) {

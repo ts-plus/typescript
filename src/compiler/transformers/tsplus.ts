@@ -167,32 +167,17 @@ namespace ts {
                 const inType = checker.getPropertyOfType(expressionType, node.name.escapedText.toString());
                 if (!inType) {
                     if (checker.isClassCompanionReference(node.expression)) {
-                        const staticFunctionExtension = checker.getStaticFunctionCompanionExtension(expressionType, node.name.escapedText.toString());
-
-                        if (staticFunctionExtension) {
-                            return getPathOfExtension(context.factory, importer, staticFunctionExtension, source);
-                        }
-
-                        const staticValueExtension = checker.getStaticValueCompanionExtension(expressionType, node.name.escapedText.toString());
-
-                        if (staticValueExtension) {
-                            return getPathOfExtension(context.factory, importer, staticValueExtension, source);
+                        const staticExtension = checker.getStaticCompanionExtension(expressionType, node.name.escapedText.toString());
+                        if (staticExtension) {
+                            return getPathOfExtension(context.factory, importer, staticExtension, source);
                         }
                     } else {
-                        const staticFunctionExtension = checker.getStaticFunctionExtension(expressionType, node.name.escapedText.toString());
-
-                        if (staticFunctionExtension) {
-                            return getPathOfExtension(context.factory, importer, staticFunctionExtension, source);
-                        }
-
-                        const staticValueExtension = checker.getStaticValueExtension(expressionType, node.name.escapedText.toString());
-
-                        if (staticValueExtension) {
-                            return getPathOfExtension(context.factory, importer, staticValueExtension, source);
+                        const staticExtension = checker.getStaticExtension(expressionType, node.name.escapedText.toString());
+                        if (staticExtension) {
+                            return getPathOfExtension(context.factory, importer, staticExtension, source);
                         }
 
                         const getterExtension = checker.getGetterExtension(expressionType, node.name.escapedText.toString());
-
                         if (getterExtension) {
                             return factory.createCallExpression(
                                 getPathOfExtension(context.factory, importer, getterExtension, source),
@@ -379,7 +364,7 @@ namespace ts {
                 }
                 if (checker.getSignaturesOfType(expressionType, SignatureKind.Call).length === 0) {
                     if (checker.isClassCompanionReference(node.expression)) {
-                        const customCall = checker.getStaticFunctionCompanionExtension(expressionType, "__call")
+                        const customCall = checker.getStaticCompanionExtension(expressionType, "__call")
                         if (customCall) {
                             const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
                             return factory.updateCallExpression(
@@ -391,7 +376,7 @@ namespace ts {
                         }
                     }
                     else {
-                        const customCall = checker.getStaticFunctionExtension(expressionType, "__call")
+                        const customCall = checker.getStaticExtension(expressionType, "__call")
                         if (customCall) {
                             const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
                             return factory.updateCallExpression(

@@ -356,12 +356,13 @@ namespace ts {
         const companionSymbolCache = new Map<Symbol, string[]>();
         const resolvedFluentCache = new Map<string, ESMap<string, TsPlusFluentExtension>>();
         const fluentCache = new Map<string, ESMap<string, () => TsPlusFluentExtension>>();
-        const fluentUnresolvedCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
+        const unresolvedFluentCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
         const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
         const staticFunctionCache = new Map<string, ESMap<string, TsPlusStaticFunctionExtension>>()
         const staticValueCache = new Map<string, ESMap<string, TsPlusStaticValueExtension>>();
-        const staticUnresolvedCache = new Map<string, ESMap<string, TsPlusUnresolvedStaticExtension>>();
+        const staticCache = new Map<string, ESMap<string, () => TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined>>();
+        const unresolvedStaticCache = new Map<string, ESMap<string, TsPlusUnresolvedStaticExtension>>();
         const pipeableCache = new Map<string, ESMap<string, { declaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType, type: Type, signatures: readonly TsPlusSignature[], definition: SourceFile, exportName: string }>>();
         const identityCache = new Map<string, FunctionDeclaration>();
         const callCache = new Map<Node, TsPlusStaticFunctionExtension>();
@@ -791,10 +792,12 @@ namespace ts {
             getGetterExtension,
             getFluentExtension,
             getOperatorExtension,
-            getStaticFunctionExtension,
-            getStaticValueExtension,
-            getStaticFunctionCompanionExtension,
-            getStaticValueCompanionExtension,
+            getStaticExtension,
+            getStaticCompanionExtension,
+            // getStaticFunctionExtension,
+            // getStaticValueExtension,
+            // getStaticFunctionCompanionExtension,
+            // getStaticValueCompanionExtension,
             getGetterCompanionExtension,
             getCallExtension,
             shouldMakeLazy,
@@ -862,24 +865,14 @@ namespace ts {
             symbols.forEach((target) => {
                 if (typeSymbolCache.has(target) && !isClassCompanionReference(selfNode)) {
                     typeSymbolCache.get(target)!.forEach((typeSymbol) => {
-                        const _unresolvedStatics = staticUnresolvedCache.get(typeSymbol);
-                        if (_unresolvedStatics) {
-                            _unresolvedStatics.forEach((extension) => {
-                                resolveStaticExtension(extension);
+                        const _static = staticCache.get(typeSymbol);
+                        if (_static) {
+                            _static.forEach((v, k) => {
+                                const ext = v();
+                                if (ext) {
+                                    copy.set(k, ext.patched)
+                                }
                             });
-                            staticUnresolvedCache.delete(typeSymbol);
-                        }
-                        const _staticFunctions = staticFunctionCache.get(typeSymbol);
-                        if (_staticFunctions) {
-                            _staticFunctions.forEach((v, k) => {
-                                copy.set(k, v.patched)
-                            });
-                        }
-                        const _staticValues = staticValueCache.get(typeSymbol);
-                        if(_staticValues) {
-                            _staticValues.forEach((v, k) => {
-                                copy.set(k, v.patched);
-                            })
                         }
                         const _fluent = fluentCache.get(typeSymbol);
                         if (_fluent) {
@@ -900,24 +893,14 @@ namespace ts {
                 }
                 if (companionSymbolCache.has(target) && isClassCompanionReference(selfNode)) {
                     companionSymbolCache.get(target)!.forEach((typeSymbol) => {
-                        const _unresolvedStatics = staticUnresolvedCache.get(typeSymbol);
-                        if (_unresolvedStatics) {
-                            _unresolvedStatics.forEach((extension) => {
-                                resolveStaticExtension(extension);
+                        const _static = staticCache.get(typeSymbol);
+                        if (_static) {
+                            _static.forEach((v, k) => {
+                                const ext = v()
+                                if (ext) {
+                                    copy.set(k, ext.patched)
+                                }
                             });
-                            staticUnresolvedCache.delete(typeSymbol);
-                        }
-                        const _staticFunctions = staticFunctionCache.get(typeSymbol);
-                        if (_staticFunctions) {
-                            _staticFunctions.forEach((v, k) => {
-                                copy.set(k, v.patched)
-                            });
-                        }
-                        const _staticValues = staticValueCache.get(typeSymbol);
-                        if(_staticValues) {
-                            _staticValues.forEach((v, k) => {
-                                copy.set(k, v.patched);
-                            })
                         }
                     })
                 }
@@ -982,20 +965,14 @@ namespace ts {
                 }
             }
         }
-        function getStaticFunctionExtension(targetType: Type, name: string) {
+        function getStaticExtension(targetType: Type, name: string) {
             const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
                         (tag) => {
-                            if (staticUnresolvedCache.has(tag)) {
-                                const cache = staticUnresolvedCache.get(tag);
-                                if (cache?.has(name)) {
-                                    resolveStaticExtension(cache.get(name)!)
-                                }
-                            }
-                            if (staticFunctionCache.has(tag)) {
-                                const cache = staticFunctionCache.get(tag)
+                            if (staticCache.has(tag)) {
+                                const cache = staticCache.get(tag)
                                 if (cache?.has(name)) {
                                     return [cache.get(name)!]
                                 }
@@ -1003,24 +980,43 @@ namespace ts {
                             return []
                         }
                     )
-                    return x.length > 0 ? x[x.length - 1] : undefined;
+                    return x.length > 0 ? x[x.length - 1]() : undefined;
                 }
             }
         }
-        function getStaticFunctionCompanionExtension(targetType: Type, name: string) {
+        // function getStaticFunctionExtension(targetType: Type, name: string) {
+        //     const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
+        //     for (const target of symbols) {
+        //         if (typeSymbolCache.has(target)) {
+        //             const x = typeSymbolCache.get(target)!.flatMap(
+        //                 (tag) => {
+        //                     if (unresolvedStaticCache.has(tag)) {
+        //                         const cache = unresolvedStaticCache.get(tag);
+        //                         if (cache?.has(name)) {
+        //                             resolveStaticExtension(cache.get(name)!)
+        //                         }
+        //                     }
+        //                     if (staticFunctionCache.has(tag)) {
+        //                         const cache = staticFunctionCache.get(tag)
+        //                         if (cache?.has(name)) {
+        //                             return [cache.get(name)!]
+        //                         }
+        //                     }
+        //                     return []
+        //                 }
+        //             )
+        //             return x.length > 0 ? x[x.length - 1] : undefined;
+        //         }
+        //     }
+        // }
+        function getStaticCompanionExtension(targetType: Type, name: string) {
             const symbols = collectRelevantSymbols(targetType)
             for (const target of symbols) {
                 if (companionSymbolCache.has(target)) {
                     const x = companionSymbolCache.get(target)!.flatMap(
                         (tag) => {
-                            if (staticUnresolvedCache.has(tag)) {
-                                const cache = staticUnresolvedCache.get(tag);
-                                if (cache?.has(name)) {
-                                    resolveStaticExtension(cache.get(name)!)
-                                }
-                            }
-                            if (staticFunctionCache.has(tag)) {
-                                const cache = staticFunctionCache.get(tag)
+                            if (staticCache.has(tag)) {
+                                const cache = staticCache.get(tag)
                                 if (cache?.has(name)) {
                                     return [cache.get(name)!]
                                 }
@@ -1028,54 +1024,79 @@ namespace ts {
                             return []
                         }
                     )
-                    return x.length > 0 ? x[x.length - 1] : undefined;
+                    return x.length > 0 ? x[x.length - 1]() : undefined;
                 }
             }
         }
-        function getStaticValueExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
-            for (const target of symbols) {
-                if (typeSymbolCache.has(target)) {
-                    const x = flatMap(typeSymbolCache.get(target), (tag) => {
-                        if (staticUnresolvedCache.has(tag)) {
-                            const cache = staticUnresolvedCache.get(tag);
-                            if (cache?.has(name)) {
-                                resolveStaticExtension(cache.get(name)!)
-                            }
-                        }
-                        if (staticValueCache.has(tag)) {
-                            const cache = staticValueCache.get(tag)
-                            if (cache?.has(name)) {
-                                return [cache.get(name)!]
-                            }
-                        }
-                    });
-                    return x.length > 0 ? x[x.length - 1] : undefined;
-                }
-            }
-        }
-        function getStaticValueCompanionExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType);
-            for (const target of symbols) {
-                if (companionSymbolCache.has(target)) {
-                    const x = flatMap(companionSymbolCache.get(target), (tag) => {
-                        if (staticUnresolvedCache.has(tag)) {
-                            const cache = staticUnresolvedCache.get(tag);
-                            if (cache?.has(name)) {
-                                resolveStaticExtension(cache.get(name)!)
-                            }
-                        }
-                        if (staticValueCache.has(tag)) {
-                            const cache = staticValueCache.get(tag)
-                            if (cache?.has(name)) {
-                                return [cache.get(name)!]
-                            }
-                        }
-                    });
-                    return x.length > 0 ? x[x.length - 1] : undefined;
-                }
-            }
-        }
+        // function getStaticFunctionCompanionExtension(targetType: Type, name: string) {
+        //     const symbols = collectRelevantSymbols(targetType)
+        //     for (const target of symbols) {
+        //         if (companionSymbolCache.has(target)) {
+        //             const x = companionSymbolCache.get(target)!.flatMap(
+        //                 (tag) => {
+        //                     if (unresolvedStaticCache.has(tag)) {
+        //                         const cache = unresolvedStaticCache.get(tag);
+        //                         if (cache?.has(name)) {
+        //                             resolveStaticExtension(cache.get(name)!)
+        //                         }
+        //                     }
+        //                     if (staticFunctionCache.has(tag)) {
+        //                         const cache = staticFunctionCache.get(tag)
+        //                         if (cache?.has(name)) {
+        //                             return [cache.get(name)!]
+        //                         }
+        //                     }
+        //                     return []
+        //                 }
+        //             )
+        //             return x.length > 0 ? x[x.length - 1] : undefined;
+        //         }
+        //     }
+        // }
+        // function getStaticValueExtension(targetType: Type, name: string) {
+        //     const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
+        //     for (const target of symbols) {
+        //         if (typeSymbolCache.has(target)) {
+        //             const x = flatMap(typeSymbolCache.get(target), (tag) => {
+        //                 if (unresolvedStaticCache.has(tag)) {
+        //                     const cache = unresolvedStaticCache.get(tag);
+        //                     if (cache?.has(name)) {
+        //                         resolveStaticExtension(cache.get(name)!)
+        //                     }
+        //                 }
+        //                 if (staticValueCache.has(tag)) {
+        //                     const cache = staticValueCache.get(tag)
+        //                     if (cache?.has(name)) {
+        //                         return [cache.get(name)!]
+        //                     }
+        //                 }
+        //             });
+        //             return x.length > 0 ? x[x.length - 1] : undefined;
+        //         }
+        //     }
+        // }
+        // function getStaticValueCompanionExtension(targetType: Type, name: string) {
+        //     const symbols = collectRelevantSymbols(targetType);
+        //     for (const target of symbols) {
+        //         if (companionSymbolCache.has(target)) {
+        //             const x = flatMap(companionSymbolCache.get(target), (tag) => {
+        //                 if (unresolvedStaticCache.has(tag)) {
+        //                     const cache = unresolvedStaticCache.get(tag);
+        //                     if (cache?.has(name)) {
+        //                         resolveStaticExtension(cache.get(name)!)
+        //                     }
+        //                 }
+        //                 if (staticValueCache.has(tag)) {
+        //                     const cache = staticValueCache.get(tag)
+        //                     if (cache?.has(name)) {
+        //                         return [cache.get(name)!]
+        //                     }
+        //                 }
+        //             });
+        //             return x.length > 0 ? x[x.length - 1] : undefined;
+        //         }
+        //     }
+        // }
         function getOperatorExtension(targetType: Type, name: string) {
             const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
@@ -25876,7 +25897,7 @@ namespace ts {
                         isCallExpression(node.parent) &&
                         node.parent.expression === node &&
                         getSignaturesOfType(type, SignatureKind.Call).length === 0 &&
-                        (getStaticFunctionExtension(type, "__call") != null)
+                        (getStaticExtension(type, "__call") != null)
                     ) &&
                     !isTransformablePipeableExtension(type)
                 ) {
@@ -29179,16 +29200,9 @@ namespace ts {
         function checkPropertyAccessForExtension(node: PropertyAccessExpression | QualifiedName, _left: Expression | QualifiedName, leftType: Type, right: Identifier | PrivateIdentifier, _checkMode: CheckMode | undefined) {
             const inType = getPropertiesOfType(leftType).findIndex((p) => p.escapedName === right.escapedText) !== -1;
             if (!inType && isClassCompanionReference(_left)) {
-                const staticFuncExt = getStaticFunctionCompanionExtension(leftType, right.escapedText.toString());
-                if (staticFuncExt) {
-                    return getTypeOfSymbol(staticFuncExt.patched);
-                }
-                const staticValExt = getStaticValueCompanionExtension(leftType, right.escapedText.toString());
-                if (staticValExt) {
-                    const type = getTypeOfSymbol(staticValExt.patched);
-                    // @ts-expect-error
-                    type.tsPlusSymbol = staticValExt.patched;
-                    return type;
+                const staticExt = getStaticCompanionExtension(leftType, right.escapedText.toString());
+                if (staticExt) {
+                    return staticExt.type;
                 }
                 return;
             }
@@ -29207,16 +29221,9 @@ namespace ts {
                         return type;
                     }
                 }
-                const staticFuncExt = getStaticFunctionExtension(leftType, right.escapedText.toString());
-                if (staticFuncExt) {
-                    return getTypeOfSymbol(staticFuncExt.patched);
-                }
-                const staticValExt = getStaticValueExtension(leftType, right.escapedText.toString());
-                if (staticValExt) {
-                    const type = getTypeOfSymbol(staticValExt.patched);
-                    // @ts-expect-error
-                    type.tsPlusSymbol = staticValExt.patched;
-                    return type;
+                const staticExt = getStaticExtension(leftType, right.escapedText.toString());
+                if (staticExt) {
+                    return staticExt.type;
                 }
             }
         }
@@ -29243,44 +29250,6 @@ namespace ts {
             else {
                 error(pipeableExtension.declaration, Diagnostics.Declaration_annotated_as_pipeable_is_not_assignable_to_its_corresponding_fluent_declaration);
                 return;
-            }
-        }
-        function resolveStaticExtension(unresolved: TsPlusUnresolvedStaticExtension): Type | undefined {
-            const { symbol, target, declaration, name, definition, exportName } = unresolved
-            const callSignatures = getSignaturesOfType(getTypeOfSymbol(symbol), SignatureKind.Call)
-            if (callSignatures.length > 0) {
-                if (!staticFunctionCache.has(target)) {
-                    staticFunctionCache.set(target, new Map());
-                }
-                const map = staticFunctionCache.get(target)!;
-                const symbol = getSymbolAtLocation(declaration.name);
-                if (symbol) {
-                    const patched = getTsPlusStaticSymbolForCallSignatures(definition, exportName, name, declaration, callSignatures);
-                    map.set(name, {
-                        patched,
-                        definition,
-                        exportName
-                    });
-                    staticUnresolvedCache.get(target)?.delete(name);
-                    return getTypeOfSymbol(patched);
-                }
-            }
-            else {
-                if (!staticValueCache.has(target)) {
-                    staticValueCache.set(target, new Map());
-                }
-                const map = staticValueCache.get(target)!;
-                const symbol = getSymbolAtLocation(declaration.name);
-                if (symbol) {
-                    const patched = createTsPlusStaticValueSymbol(name, declaration, symbol);
-                    map.set(name, {
-                        patched,
-                        definition,
-                        exportName
-                    });
-                    staticUnresolvedCache.get(target)?.delete(name);
-                    return getTypeOfSymbol(patched);
-                }
             }
         }
         // TSPLUS EXTENSION END
@@ -31390,7 +31359,7 @@ namespace ts {
             // TSPLUS EXTENSION START
             if (callSignatures.length === 0) {
                 if (isClassCompanionReference(node.expression)) {
-                    const callExtension = getStaticFunctionCompanionExtension(apparentType, "__call");
+                    const callExtension = getStaticCompanionExtension(apparentType, "__call");
 
                     if (callExtension) {
                         callSignatures = Array.from(getSignaturesOfType(getTypeOfSymbol(callExtension.patched), SignatureKind.Call));
@@ -31398,7 +31367,7 @@ namespace ts {
                     }
                 }
                 else {
-                    const callExtension = getStaticFunctionExtension(apparentType, "__call");
+                    const callExtension = getStaticExtension(apparentType, "__call");
 
                     if (callExtension) {
                         callSignatures = Array.from(getSignaturesOfType(getTypeOfSymbol(callExtension.patched), SignatureKind.Call));
@@ -43822,7 +43791,7 @@ namespace ts {
             const methods = map(signatures, (s) => createTsPlusSignature(s, exportName, file));
             const symbol = createTsPlusStaticFunctionSymbol(name, dataFirst, methods);
             const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
-            return createSymbolWithType(symbol, final);
+            return [final, createSymbolWithType(symbol, final)] as const;
         }
         function getTsPlusStaticSymbolForCallSignatures(file: SourceFile, exportName: string, name: string, declaration: VariableDeclaration, signatures: readonly Signature[]) {
             const methods = map(signatures, (s) => createTsPlusSignature(s, exportName, file));
@@ -44101,10 +44070,10 @@ namespace ts {
                 const declaration = statement.declarationList.declarations[0];
                 const symbol = getSymbolAtLocation(declaration.name);
                 if (symbol) {
-                    if (!staticUnresolvedCache.get(target)) {
-                        staticUnresolvedCache.set(target, new Map());
+                    if (!unresolvedStaticCache.get(target)) {
+                        unresolvedStaticCache.set(target, new Map());
                     }
-                    const map = staticUnresolvedCache.get(target)!
+                    const map = unresolvedStaticCache.get(target)!
                     map.set(name, {
                         target,
                         name,
@@ -44127,10 +44096,10 @@ namespace ts {
                             error(statement, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name);
                             return;
                         }
-                        if (!fluentUnresolvedCache.has(target)) {
-                            fluentUnresolvedCache.set(target, new Map());
+                        if (!unresolvedFluentCache.has(target)) {
+                            unresolvedFluentCache.set(target, new Map());
                         }
-                        const map = fluentUnresolvedCache.get(target)!;
+                        const map = unresolvedFluentCache.get(target)!;
                         if (!map.has(name)) {
                             map.set(name, {
                                 target,
@@ -44217,10 +44186,10 @@ namespace ts {
                         error(declaration, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name);
                         return;
                     }
-                    if (!fluentUnresolvedCache.has(target)) {
-                        fluentUnresolvedCache.set(target, new Map());
+                    if (!unresolvedFluentCache.has(target)) {
+                        unresolvedFluentCache.set(target, new Map());
                     }
-                    const map = fluentUnresolvedCache.get(target)!;
+                    const map = unresolvedFluentCache.get(target)!;
                     if (!map.has(name)) {
                         map.set(name, {
                             target,
@@ -44365,14 +44334,35 @@ namespace ts {
                         error(declaration, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
                         return;
                     }
-                    if (!staticFunctionCache.has(target)) {
-                        staticFunctionCache.set(target, new Map());
+                    if (!staticCache.has(target)) {
+                        staticCache.set(target, new Map());
                     }
-                    const map = staticFunctionCache.get(target)!;
-                    map.set(name, {
-                        patched: getTsPlusStaticSymbolForFunctionDeclaration(file, declaration.name.escapedText.toString(), name, declaration),
-                        exportName: declaration.name.escapedText.toString(),
-                        definition: file
+                    const map = staticCache.get(target)!;
+                    map.set(name, () => {
+                        if (staticFunctionCache.has(target)) {
+                            const resolvedMap = staticFunctionCache.get(target)!;
+                            if (resolvedMap.has(name)) {
+                                return resolvedMap.get(name)!;
+                            }
+                        }
+                        else {
+                            staticFunctionCache.set(target, new Map());
+                        }
+                        const resolvedMap = staticFunctionCache.get(target)!;
+                        const [type, patched] = getTsPlusStaticSymbolForFunctionDeclaration(
+                            file,
+                            declaration.name!.escapedText.toString(),
+                            name,
+                            declaration
+                        );
+                        const extension = {
+                            patched,
+                            exportName: declaration.name!.escapedText.toString(),
+                            definition: file,
+                            type
+                        };
+                        resolvedMap.set(name, extension);
+                        return extension;
                     });
                 }
             }
@@ -44482,12 +44472,12 @@ namespace ts {
         }
         function initTsPlusTypeChecker() {
             fluentCache.clear();
-            fluentUnresolvedCache.clear();
+            unresolvedFluentCache.clear();
             operatorCache.clear();
             typeSymbolCache.clear();
             staticFunctionCache.clear();
             staticValueCache.clear();
-            staticUnresolvedCache.clear();
+            unresolvedStaticCache.clear();
             identityCache.clear();
             getterCache.clear();
             callCache.clear();
@@ -44498,7 +44488,74 @@ namespace ts {
                 collectTsPlusSymbols(file, file.statements);
             }
 
-            fluentUnresolvedCache.forEach((map, typeName) => {
+            unresolvedStaticCache.forEach((map, typeName) => {
+                if (!staticCache.has(typeName)) {
+                    staticCache.set(typeName, new Map());
+                }
+                const staticMap = staticCache.get(typeName)!;
+                map.forEach(({ symbol, target, declaration, name, definition, exportName }) => {
+                    staticMap.set(name, () => {
+                        const callSignatures = getSignaturesOfType(getTypeOfSymbol(symbol), SignatureKind.Call);
+                        if (callSignatures.length > 0) {
+                            if (staticFunctionCache.has(target)) {
+                                const resolvedMap = staticFunctionCache.get(target)!;
+                                if (resolvedMap.has(name)) {
+                                    return resolvedMap.get(name)!;
+                                }
+                            }
+                            else {
+                                staticFunctionCache.set(target, new Map());
+                            }
+                            const resolvedMap = staticFunctionCache.get(typeName)!;
+                            const patched = getTsPlusStaticSymbolForCallSignatures(
+                                definition,
+                                exportName,
+                                name,
+                                declaration,
+                                callSignatures
+                            )
+                            const type = getTypeOfSymbol(patched);
+                            const extension = {
+                                patched,
+                                definition,
+                                exportName,
+                                type
+                            }
+                            resolvedMap.set(name, extension);
+                            return extension;
+                        }
+                        else {
+                            if (staticValueCache.has(target)) {
+                                const resolvedMap = staticValueCache.get(target)!;
+                                if (resolvedMap.has(name)) {
+                                    return resolvedMap.get(name)!;
+                                }
+                            }
+                            else {
+                                staticValueCache.set(target, new Map());
+                            }
+                            const resolvedMap = staticValueCache.get(typeName)!;
+                            const nameSymbol = getSymbolAtLocation(declaration.name);
+                            if (nameSymbol) {
+                                const patched = createTsPlusStaticValueSymbol(name, declaration, nameSymbol);
+                                const type = getTypeOfSymbol(patched);
+                                // @ts-expect-error
+                                type.tsPlusSymbol = patched;
+                                const extension = {
+                                    patched,
+                                    definition,
+                                    exportName,
+                                    type
+                                }
+                                resolvedMap.set(name, extension);
+                                return extension;
+                            }
+                        }
+                    })
+                })
+            })
+
+            unresolvedFluentCache.forEach((map, typeName) => {
                 if (!fluentCache.has(typeName)) {
                     fluentCache.set(typeName, new Map());
                 }
@@ -44546,7 +44603,7 @@ namespace ts {
                 });
             });
 
-            fluentUnresolvedCache.clear();
+            unresolvedFluentCache.clear();
 
             pipeableCache.forEach((map, typeName) => {
                 if (!fluentCache.has(typeName)) {

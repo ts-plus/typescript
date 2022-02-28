@@ -3429,12 +3429,14 @@ namespace ts {
         patched: Symbol;
         definition: SourceFile;
         exportName: string;
+        type: Type;
     }
 
     export interface TsPlusStaticValueExtension {
         patched: Symbol;
         definition: SourceFile;
         exportName: string;
+        type: Type;
     }
 
     export interface TsPlusPipeableExtension {
@@ -4623,11 +4625,9 @@ namespace ts {
         getFluentExtension(target: Type, name: string): TsPlusFluentExtension | undefined
         getGetterExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
         getGetterCompanionExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
-        getStaticFunctionExtension(target: Type, name: string): TsPlusStaticFunctionExtension | undefined
-        getStaticValueExtension(target: Type, name: string): TsPlusStaticValueExtension | undefined
+        getStaticExtension(target: Type, name: string): TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined
+        getStaticCompanionExtension(target: Type, name: string): TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined
         getOperatorExtension(target: Type, name: string): { patched: Symbol, definition: SourceFile, exportName: string } | undefined
-        getStaticFunctionCompanionExtension(target: Type, name: string): TsPlusStaticFunctionExtension | undefined
-        getStaticValueCompanionExtension(target: Type, name: string): TsPlusStaticValueExtension | undefined
         shouldMakeLazy(signatureParam: Symbol, callArg: Type): boolean
         isPipeCall(node: CallExpression): boolean
         getCallExtension(node: Node): TsPlusStaticFunctionExtension | undefined

@@ -64,7 +64,7 @@ namespace ts.GoToDefinition {
 
                 if(extensions) {
                     const name = parent.name.escapedText.toString();
-                    const staticValueSymbol = typeChecker.getStaticValueExtension(type, name);
+                    const staticValueSymbol = typeChecker.getStaticExtension(type, name);
                     if(staticValueSymbol) {
                         // If execution gets here, it means we have a static variable extension,
                         // which needs to be treated a little differently
