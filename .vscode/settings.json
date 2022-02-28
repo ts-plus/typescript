@@ -15,6 +15,5 @@
     // "typescript.tsdk": "lib"
 
     // To use the locally built compiler, after 'npm run build':
-    "typescript.tsdk": "built/local",
-    "eslint.enable": false
+    "typescript.tsdk": "built/local"
 }

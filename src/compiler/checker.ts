@@ -43680,7 +43680,6 @@ namespace ts {
             }
             signature.parameters = signature.parameters.slice(1, signature.parameters.length);
             signature.minArgumentCount = signature.minArgumentCount - 1;
-            signature.instantiations = call.instantiations;
             return signature;
         }
         function createTsPlusFluentSymbol(name: string, signatures: TsPlusSignature[]): TsPlusFluentSymbol {
