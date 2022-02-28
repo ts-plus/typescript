@@ -794,10 +794,6 @@ namespace ts {
             getOperatorExtension,
             getStaticExtension,
             getStaticCompanionExtension,
-            // getStaticFunctionExtension,
-            // getStaticValueExtension,
-            // getStaticFunctionCompanionExtension,
-            // getStaticValueCompanionExtension,
             getGetterCompanionExtension,
             getCallExtension,
             shouldMakeLazy,
@@ -984,31 +980,6 @@ namespace ts {
                 }
             }
         }
-        // function getStaticFunctionExtension(targetType: Type, name: string) {
-        //     const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
-        //     for (const target of symbols) {
-        //         if (typeSymbolCache.has(target)) {
-        //             const x = typeSymbolCache.get(target)!.flatMap(
-        //                 (tag) => {
-        //                     if (unresolvedStaticCache.has(tag)) {
-        //                         const cache = unresolvedStaticCache.get(tag);
-        //                         if (cache?.has(name)) {
-        //                             resolveStaticExtension(cache.get(name)!)
-        //                         }
-        //                     }
-        //                     if (staticFunctionCache.has(tag)) {
-        //                         const cache = staticFunctionCache.get(tag)
-        //                         if (cache?.has(name)) {
-        //                             return [cache.get(name)!]
-        //                         }
-        //                     }
-        //                     return []
-        //                 }
-        //             )
-        //             return x.length > 0 ? x[x.length - 1] : undefined;
-        //         }
-        //     }
-        // }
         function getStaticCompanionExtension(targetType: Type, name: string) {
             const symbols = collectRelevantSymbols(targetType)
             for (const target of symbols) {
@@ -1028,75 +999,6 @@ namespace ts {
                 }
             }
         }
-        // function getStaticFunctionCompanionExtension(targetType: Type, name: string) {
-        //     const symbols = collectRelevantSymbols(targetType)
-        //     for (const target of symbols) {
-        //         if (companionSymbolCache.has(target)) {
-        //             const x = companionSymbolCache.get(target)!.flatMap(
-        //                 (tag) => {
-        //                     if (unresolvedStaticCache.has(tag)) {
-        //                         const cache = unresolvedStaticCache.get(tag);
-        //                         if (cache?.has(name)) {
-        //                             resolveStaticExtension(cache.get(name)!)
-        //                         }
-        //                     }
-        //                     if (staticFunctionCache.has(tag)) {
-        //                         const cache = staticFunctionCache.get(tag)
-        //                         if (cache?.has(name)) {
-        //                             return [cache.get(name)!]
-        //                         }
-        //                     }
-        //                     return []
-        //                 }
-        //             )
-        //             return x.length > 0 ? x[x.length - 1] : undefined;
-        //         }
-        //     }
-        // }
-        // function getStaticValueExtension(targetType: Type, name: string) {
-        //     const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
-        //     for (const target of symbols) {
-        //         if (typeSymbolCache.has(target)) {
-        //             const x = flatMap(typeSymbolCache.get(target), (tag) => {
-        //                 if (unresolvedStaticCache.has(tag)) {
-        //                     const cache = unresolvedStaticCache.get(tag);
-        //                     if (cache?.has(name)) {
-        //                         resolveStaticExtension(cache.get(name)!)
-        //                     }
-        //                 }
-        //                 if (staticValueCache.has(tag)) {
-        //                     const cache = staticValueCache.get(tag)
-        //                     if (cache?.has(name)) {
-        //                         return [cache.get(name)!]
-        //                     }
-        //                 }
-        //             });
-        //             return x.length > 0 ? x[x.length - 1] : undefined;
-        //         }
-        //     }
-        // }
-        // function getStaticValueCompanionExtension(targetType: Type, name: string) {
-        //     const symbols = collectRelevantSymbols(targetType);
-        //     for (const target of symbols) {
-        //         if (companionSymbolCache.has(target)) {
-        //             const x = flatMap(companionSymbolCache.get(target), (tag) => {
-        //                 if (unresolvedStaticCache.has(tag)) {
-        //                     const cache = unresolvedStaticCache.get(tag);
-        //                     if (cache?.has(name)) {
-        //                         resolveStaticExtension(cache.get(name)!)
-        //                     }
-        //                 }
-        //                 if (staticValueCache.has(tag)) {
-        //                     const cache = staticValueCache.get(tag)
-        //                     if (cache?.has(name)) {
-        //                         return [cache.get(name)!]
-        //                     }
-        //                 }
-        //             });
-        //             return x.length > 0 ? x[x.length - 1] : undefined;
-        //         }
-        //     }
-        // }
         function getOperatorExtension(targetType: Type, name: string) {
             const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
