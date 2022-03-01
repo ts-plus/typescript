@@ -397,8 +397,8 @@ namespace ts {
                         if (fluentExtension) {
                             let targetSignature: TsPlusSignature = fluentExtension.signatures[0];
 
+                            const resolvedSignature = checker.getResolvedSignature(node);
                             if (fluentExtension.signatures.length > 1) {
-                                const resolvedSignature = checker.getResolvedSignature(node);
                                 if (resolvedSignature) {
                                     // For signatures with type arguments, TsPlusSignature will be signature.target.
                                     // For signatures without type arguments, TsPlusSignature is the signature itself.
@@ -413,6 +413,10 @@ namespace ts {
 
                             if (!targetSignature || !isTsPlusSignature(targetSignature)) {
                                 throw new Error("BUG: No applicable signature found for fluent extension");
+                            }
+                            if (resolvedSignature && !resolvedSignature.thisParameter) {
+                                // We have a TsPlusSignature that is NOT a fluent signature, skip transforming as fluent
+                                return visitCallExpression(source, traceInScope, node, visitor, context);
                             }
                             const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
                             if (targetSignature.tsPlusPipeable) {
