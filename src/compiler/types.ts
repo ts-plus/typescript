@@ -4640,6 +4640,7 @@ namespace ts {
         isClassCompanionReference(node: Expression): boolean
         collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocExtensionTag[]
         getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
+        getPrimitiveTypeName(type: Type): string | undefined
     }
 
     /* @internal */

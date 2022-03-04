@@ -368,6 +368,11 @@ namespace ts {
         const callCache = new Map<Node, TsPlusStaticFunctionExtension>();
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
+        let __tsplusStringSymbol: Symbol;
+        let __tsplusNumberSymbol: Symbol;
+        let __tsplusBooleanSymbol: Symbol;
+        let __tsplusBigIntSymbol: Symbol;
+        let __tsplusFunctionSymbol: Symbol;
         // TSPLUS EXTENSION END
 
         // Cancellation that controls whether or not we can cancel in the middle of type checking.
@@ -807,10 +812,25 @@ namespace ts {
             isClassCompanionReference,
             collectTsPlusFluentTags,
             getFluentExtensionForPipeableSymbol,
+            getPrimitiveTypeName,
             // TSPLUS EXTENSION END
         };
 
         // TSPLUS EXTENSION BEGIN
+        function getPrimitiveTypeName(type: Type): string | undefined {
+            if (type === stringType) {
+                return "String";
+            }
+            if (type === numberType) {
+                return "Number";
+            }
+            if (type === booleanType) {
+                return "Boolean";
+            }
+            if (type === bigintType) {
+                return "BigInt";
+            }
+        }
         function isPipeCall(node: CallExpression) {
             const type = getTypeOfNode(node.expression);
             if (type.symbol) {
@@ -842,6 +862,21 @@ namespace ts {
         }
         function collectRelevantSymbols(target: Type) {
             const relevant: Set<Symbol> = new Set();
+            if (target.flags & TypeFlags.StringLike) {
+                relevant.add(__tsplusStringSymbol);
+            }
+            if (target.flags & TypeFlags.NumberLike) {
+                relevant.add(__tsplusNumberSymbol);
+            }
+            if (target.flags & TypeFlags.BooleanLike) {
+                relevant.add(__tsplusBooleanSymbol);
+            }
+            if (target.flags & TypeFlags.BigIntLike) {
+                relevant.add(__tsplusBigIntSymbol);
+            }
+            if (isFunctionType(target)) {
+                relevant.add(__tsplusFunctionSymbol);
+            }
             if (target.symbol) {
                 relevant.add(target.symbol);
             }
@@ -43928,6 +43963,21 @@ namespace ts {
                     error(declaration, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
                     return;
                 }
+                if (type === globalStringType) {
+                    addToTypeSymbolCache(__tsplusStringSymbol, typeTag, "after");
+                }
+                if (type === globalNumberType) {
+                    addToTypeSymbolCache(__tsplusNumberSymbol, typeTag, "after");
+                }
+                if (type === globalBooleanType) {
+                    addToTypeSymbolCache(__tsplusBooleanSymbol, typeTag, "after");
+                }
+                if (type === getGlobalBigIntType(false)) {
+                    addToTypeSymbolCache(__tsplusBigIntSymbol, typeTag, "after");
+                }
+                if (type === globalFunctionType) {
+                    addToTypeSymbolCache(__tsplusFunctionSymbol, typeTag, "after");
+                }
                 if (type.symbol) {
                     addToTypeSymbolCache(type.symbol, typeTag, "after");
                 }
@@ -44373,6 +44423,11 @@ namespace ts {
             }
         }
         function initTsPlusTypeChecker() {
+            __tsplusStringSymbol = createSymbol(SymbolFlags.None, "string" as __String);
+            __tsplusNumberSymbol = createSymbol(SymbolFlags.None, "number" as __String);
+            __tsplusBooleanSymbol = createSymbol(SymbolFlags.None, "boolean" as __String);
+            __tsplusBigIntSymbol = createSymbol(SymbolFlags.None, "bigint" as __String);
+            __tsplusFunctionSymbol = createSymbol(SymbolFlags.None, "function" as __String);
             fluentCache.clear();
             unresolvedFluentCache.clear();
             operatorCache.clear();
@@ -46527,27 +46582,48 @@ namespace ts {
             if (signature && signature.thisParameter) {
                 const resolvedThisType = checker.getTypeOfSymbol(signature.thisParameter)
                 if (resolvedThisType.symbol) {
-                    return unescapeLeadingUnderscores(resolvedThisType.symbol.escapedName)
+                    const typeName = unescapeLeadingUnderscores(resolvedThisType.symbol.escapedName)
+                    if (typeName === "__type") {
+                        return "Function";
+                    }
+                    return typeName;
                 } else if (resolvedThisType.aliasSymbol) {
                     return unescapeLeadingUnderscores(resolvedThisType.aliasSymbol.escapedName)
                 }
             }
         }
     }
-    export function getThisTypeNameForTsPlusSymbol(symbol: TsPlusSymbol): string {
+    export function getThisTypeNameForTsPlusSymbol(checker: TypeChecker, symbol: TsPlusSymbol): string {
         switch(symbol.tsPlusTag) {
             case TsPlusSymbolTag.Fluent: {
                 if(symbol.tsPlusResolvedSignatures[0] && symbol.tsPlusResolvedSignatures[0].thisParameter) {
-                    return getNameForType((symbol.tsPlusResolvedSignatures[0].thisParameter as TransientSymbol).type) || anon;
+                    const type = (symbol.tsPlusResolvedSignatures[0].thisParameter as TransientSymbol).type;
+                    if (type) {
+                        const typeName = getNameForType(type)
+                        if (typeName) {
+                            return typeName;
+                        }
+                        const primitiveName = checker.getPrimitiveTypeName(type)
+                        if (primitiveName) {
+                            return primitiveName;
+                        }
+                    }
                 }
                 break;
             }
             case TsPlusSymbolTag.GetterVariable:
             case TsPlusSymbolTag.Getter: {
-                return getNameForType(symbol.tsPlusSelfType) || anon;
-            }
-            case TsPlusSymbolTag.StaticFunction: {
-                // Statics do not have a `this` type
+                const typeName = getNameForType(symbol.tsPlusSelfType)
+                if (typeName) {
+                    if (typeName === "__type" && (symbol.tsPlusSelfType as ObjectType).callSignatures?.length) {
+                        return "Function";
+                    }
+                    return typeName
+                }
+                const primitiveName = checker.getPrimitiveTypeName(symbol.tsPlusSelfType)
+                if (primitiveName) {
+                    return primitiveName;
+                }
                 break;
             }
         }

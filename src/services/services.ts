@@ -1776,7 +1776,7 @@ namespace ts {
                         tsPlusSymbol = type.tsPlusSymbol;
                     }
                     if(tsPlusSymbol) {
-                        let thisTypeName = getThisTypeNameForTsPlusSymbol(tsPlusSymbol)
+                        let thisTypeName = getThisTypeNameForTsPlusSymbol(typeChecker, tsPlusSymbol)
                         if (nodeForQuickInfo.parent && nodeForQuickInfo.parent.parent) {
                             thisTypeName = getThisTypeNameForCallLikeExpression(typeChecker, nodeForQuickInfo.parent.parent) ?? thisTypeName
                         }
