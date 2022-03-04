@@ -76,7 +76,7 @@ export interface FunctionN<A extends readonly any[], B> {
 }
 
 /**
- * @tsplus fluent FunctionN flow2
+ * @tsplus fluent FunctionN flow
  */
 export function flow2<A extends readonly any[], B, C>(self: FunctionN<A, B>, f: (b: B) => C): FunctionN<A, C> {
   return (...params) => f(self(...params))
@@ -84,7 +84,7 @@ export function flow2<A extends readonly any[], B, C>(self: FunctionN<A, B>, f: 
 
 declare const ff: FunctionN<[string, number, boolean], string>
 
-ff.flow2((s) => parseInt(s))
+ff.flow((s) => parseInt(s))
 
 /**
  * @tsplus fluent object mapObject
