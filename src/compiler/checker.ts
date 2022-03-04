@@ -368,11 +368,12 @@ namespace ts {
         const callCache = new Map<Node, TsPlusStaticFunctionExtension>();
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
-        let __tsplusStringSymbol: Symbol;
-        let __tsplusNumberSymbol: Symbol;
-        let __tsplusBooleanSymbol: Symbol;
-        let __tsplusBigIntSymbol: Symbol;
-        let __tsplusFunctionSymbol: Symbol;
+        let tsplusStringPrimitiveSymbol: Symbol;
+        let tsplusNumberPrimitiveSymbol: Symbol;
+        let tsplusBooleanPrimitiveSymbol: Symbol;
+        let tsplusBigIntPrimitiveSymbol: Symbol;
+        let tsplusFunctionPrimitiveSymbol: Symbol;
+        let tsplusObjectPrimitiveSymbol: Symbol;
         // TSPLUS EXTENSION END
 
         // Cancellation that controls whether or not we can cancel in the middle of type checking.
@@ -862,21 +863,6 @@ namespace ts {
         }
         function collectRelevantSymbols(target: Type) {
             const relevant: Set<Symbol> = new Set();
-            if (target.flags & TypeFlags.StringLike) {
-                relevant.add(__tsplusStringSymbol);
-            }
-            if (target.flags & TypeFlags.NumberLike) {
-                relevant.add(__tsplusNumberSymbol);
-            }
-            if (target.flags & TypeFlags.BooleanLike) {
-                relevant.add(__tsplusBooleanSymbol);
-            }
-            if (target.flags & TypeFlags.BigIntLike) {
-                relevant.add(__tsplusBigIntSymbol);
-            }
-            if (isFunctionType(target)) {
-                relevant.add(__tsplusFunctionSymbol);
-            }
             if (target.symbol) {
                 relevant.add(target.symbol);
             }
@@ -887,6 +873,25 @@ namespace ts {
             relevant.forEach((s) => {
                 returnArray.push(s)
             })
+            // collect primitive symbols last, in case they have overridden extensions
+            if (target.flags & TypeFlags.StringLike) {
+                returnArray.push(tsplusStringPrimitiveSymbol);
+            }
+            if (target.flags & TypeFlags.NumberLike) {
+                returnArray.push(tsplusNumberPrimitiveSymbol);
+            }
+            if (target.flags & TypeFlags.BooleanLike) {
+                returnArray.push(tsplusBooleanPrimitiveSymbol);
+            }
+            if (target.flags & TypeFlags.BigIntLike) {
+                returnArray.push(tsplusBigIntPrimitiveSymbol);
+            }
+            if (isFunctionType(target)) {
+                returnArray.push(tsplusFunctionPrimitiveSymbol);
+            }
+            if (target.flags & TypeFlags.Object) {
+                returnArray.push(tsplusObjectPrimitiveSymbol);
+            }
             return returnArray
         }
         function getExtensions(selfNode: Expression) {
@@ -954,7 +959,12 @@ namespace ts {
                             return []
                         }
                     )
-                    return x.length > 0 ? x[x.length - 1]() : undefined;
+                    if (x.length === 0) {
+                        continue;
+                    }
+                    else {
+                        return x[x.length - 1]();
+                    }
                 }
             }
         }
@@ -973,7 +983,12 @@ namespace ts {
                             return []
                         }
                     )
-                    return x.length > 0 ? x[x.length - 1] : undefined;
+                    if (x.length === 0) {
+                        continue;
+                    }
+                    else {
+                        return x[x.length - 1];
+                    }
                 }
             }
         }
@@ -992,7 +1007,12 @@ namespace ts {
                             return []
                         }
                     )
-                    return x.length > 0 ? x[x.length - 1] : undefined;
+                    if (x.length === 0) {
+                        continue;
+                    }
+                    else {
+                        return x[x.length - 1];
+                    }
                 }
             }
         }
@@ -1011,7 +1031,12 @@ namespace ts {
                             return []
                         }
                     )
-                    return x.length > 0 ? x[x.length - 1]() : undefined;
+                    if (x.length === 0) {
+                        continue;
+                    }
+                    else {
+                        return x[x.length - 1]();
+                    }
                 }
             }
         }
@@ -1030,7 +1055,12 @@ namespace ts {
                             return []
                         }
                     )
-                    return x.length > 0 ? x[x.length - 1]() : undefined;
+                    if (x.length === 0) {
+                        continue;
+                    }
+                    else {
+                        return x[x.length - 1]();
+                    }
                 }
             }
         }
@@ -1049,7 +1079,12 @@ namespace ts {
                             return []
                         }
                     )
-                    return x.length > 0 ? x[x.length - 1] : undefined;
+                    if (x.length === 0) {
+                        continue;
+                    }
+                    else {
+                        return x[x.length - 1];
+                    }
                 }
             }
         }
@@ -43964,19 +43999,22 @@ namespace ts {
                     return;
                 }
                 if (type === globalStringType) {
-                    addToTypeSymbolCache(__tsplusStringSymbol, typeTag, "after");
+                    addToTypeSymbolCache(tsplusStringPrimitiveSymbol, typeTag, "after");
                 }
                 if (type === globalNumberType) {
-                    addToTypeSymbolCache(__tsplusNumberSymbol, typeTag, "after");
+                    addToTypeSymbolCache(tsplusNumberPrimitiveSymbol, typeTag, "after");
                 }
                 if (type === globalBooleanType) {
-                    addToTypeSymbolCache(__tsplusBooleanSymbol, typeTag, "after");
+                    addToTypeSymbolCache(tsplusBooleanPrimitiveSymbol, typeTag, "after");
                 }
                 if (type === getGlobalBigIntType(false)) {
-                    addToTypeSymbolCache(__tsplusBigIntSymbol, typeTag, "after");
+                    addToTypeSymbolCache(tsplusBigIntPrimitiveSymbol, typeTag, "after");
                 }
                 if (type === globalFunctionType) {
-                    addToTypeSymbolCache(__tsplusFunctionSymbol, typeTag, "after");
+                    addToTypeSymbolCache(tsplusFunctionPrimitiveSymbol, typeTag, "after");
+                }
+                if (type === globalObjectType) {
+                    addToTypeSymbolCache(tsplusObjectPrimitiveSymbol, typeTag, "after");
                 }
                 if (type.symbol) {
                     addToTypeSymbolCache(type.symbol, typeTag, "after");
@@ -44423,11 +44461,12 @@ namespace ts {
             }
         }
         function initTsPlusTypeChecker() {
-            __tsplusStringSymbol = createSymbol(SymbolFlags.None, "string" as __String);
-            __tsplusNumberSymbol = createSymbol(SymbolFlags.None, "number" as __String);
-            __tsplusBooleanSymbol = createSymbol(SymbolFlags.None, "boolean" as __String);
-            __tsplusBigIntSymbol = createSymbol(SymbolFlags.None, "bigint" as __String);
-            __tsplusFunctionSymbol = createSymbol(SymbolFlags.None, "function" as __String);
+            tsplusStringPrimitiveSymbol = createSymbol(SymbolFlags.None, "string" as __String);
+            tsplusNumberPrimitiveSymbol = createSymbol(SymbolFlags.None, "number" as __String);
+            tsplusBooleanPrimitiveSymbol = createSymbol(SymbolFlags.None, "boolean" as __String);
+            tsplusBigIntPrimitiveSymbol = createSymbol(SymbolFlags.None, "bigint" as __String);
+            tsplusFunctionPrimitiveSymbol = createSymbol(SymbolFlags.None, "function" as __String);
+            tsplusObjectPrimitiveSymbol = createSymbol(SymbolFlags.None, "object" as __String);
             fluentCache.clear();
             unresolvedFluentCache.clear();
             operatorCache.clear();
