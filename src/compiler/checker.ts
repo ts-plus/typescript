@@ -1047,9 +1047,9 @@ namespace ts {
             visitNode(node, visitor);
             return used;
         }
-        function partitionTypeParametersForPipeable(dataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression): [TypeParameterDeclaration[], TypeParameterDeclaration[]] {
+        function partitionTypeParametersForPipeable(dataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression): [TypeParameterDeclaration[] | undefined, TypeParameterDeclaration[] | undefined] {
             if (!dataFirst.typeParameters) {
-                return [[], []];
+                return [undefined, undefined];
             }
             const left: TypeParameterDeclaration[] = [];
             const right: TypeParameterDeclaration[] = [];
@@ -1069,7 +1069,10 @@ namespace ts {
                     right.push(param);
                 }
             });
-            return [left, right];
+            return [
+                left.length > 0 ? left : undefined,
+                right.length > 0 ? right : undefined
+            ];
         }
         function generatePipeable(declarationNode: VariableDeclaration, dataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression): Type | undefined {
             const signatures = getSignaturesOfType(getTypeOfNode(dataFirst), SignatureKind.Call)
