@@ -43777,7 +43777,7 @@ namespace ts {
         }
         function thisifyTsPlusSignature(call: Signature, exportName: string, file: SourceFile, reportDiagnostic: (diagnostic: DiagnosticMessage) => void) {
             const signature = createTsPlusSignature(call, exportName, file);
-            if (isSelfATupleType(signature)) {
+            if (isSelfARestParameter(signature)) {
                 reportDiagnostic(Diagnostics.The_first_parameter_of_a_fluent_function_cannot_be_a_rest_parameter);
                 return undefined;
             }
@@ -43947,7 +43947,7 @@ namespace ts {
                 if (returnStatement && returnStatement.expression.parameters.length === 1) {
                     const type = getTypeOfNode(pipeable);
                     const signatures = getSignaturesOfType(type, SignatureKind.Call);
-                    if (signatures.find(isSelfATupleType)) {
+                    if (signatures.find(isSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
@@ -43994,7 +43994,7 @@ namespace ts {
                 const tsPlusSignatures = flatMap(signatures, (sig) => {
                     const returnType = getReturnTypeOfSignature(sig);
                     const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
-                    if (signatures.find(isSelfATupleType)) {
+                    if (signatures.find(isSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
@@ -44067,7 +44067,7 @@ namespace ts {
                 if (returnFn && returnFn.parameters.length === 1) {
                     const type = getTypeOfNode(pipeable);
                     const signatures = getSignaturesOfType(type, SignatureKind.Call);
-                    if (signatures.find(isSelfATupleType)) {
+                    if (signatures.find(isSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
@@ -44125,7 +44125,7 @@ namespace ts {
                 if (isFunctionTypeNode(returnFn) && returnFn.parameters.length === 1) {
                     const type = getTypeOfNode(pipeable);
                     const signatures = getSignaturesOfType(type, SignatureKind.Call);
-                    if (signatures.find(isSelfATupleType)) {
+                    if (signatures.find(isSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
@@ -44162,14 +44162,30 @@ namespace ts {
             }
             return undefined;
         }
-        function isSelfATupleType(signature: Signature): boolean {
-            if (signature.parameters[0]) {
-                const type = getTypeOfSymbol(signature.parameters[0]);
-                if (isTupleLikeType(type)) {
-                    return true;
-                }
+        function isSelfARestParameter(signature: Signature): boolean {
+            if (
+                signature.parameters[0] &&
+                signature.parameters[0].declarations &&
+                signature.parameters[0].declarations.find((decl) => isVariableLike(decl) && isParameterDeclaration(decl) && isRestParameter(decl as ParameterDeclaration))
+            ) { 
+                return true
             }
             return false;
+        }
+        function checkFluentDeclarationValidity(declaration: FunctionDeclaration | VariableDeclaration): boolean {
+            let firstParam: ParameterDeclaration | undefined
+            if (isFunctionDeclaration(declaration)) {
+                firstParam = declaration.parameters[0]
+            }
+            else if (declaration.initializer && (isArrowFunction(declaration.initializer) || isFunctionExpression(declaration.initializer))) {
+                firstParam = declaration.initializer.parameters[0]
+            }
+
+            if (firstParam && isRestParameter(firstParam)) {
+                error(declaration, Diagnostics.The_first_parameter_of_a_fluent_function_cannot_be_a_rest_parameter);
+                return false;
+            }
+            return true;
         }
         function addToTypeSymbolCache(symbol: Symbol, tag: string, priority: "before" | "after") {
             if (!typeSymbolCache.has(symbol)) {
@@ -44301,6 +44317,11 @@ namespace ts {
                 const declaration = statement.declarationList.declarations[0];
                 if(isIdentifier(declaration.name)) {
                     const fluentTags = collectTsPlusFluentTags(declaration);
+                    if (fluentTags.length > 0) {
+                        if (!checkFluentDeclarationValidity(declaration)) {
+                            return;
+                        }
+                    }
                     for (const fluentTag of fluentTags) {
                         const [, target, name] = fluentTag.comment.split(" ");
                         if (!target || !name) {
@@ -44391,6 +44412,11 @@ namespace ts {
         function tryCacheTsPlusFluentFunction(file: SourceFile, declaration: FunctionDeclaration) {
             if(declaration.name) {
                 const fluentTags = collectTsPlusFluentTags(declaration);
+                if (fluentTags.length > 0) {
+                    if (!checkFluentDeclarationValidity(declaration)) {
+                        return;
+                    }
+                }
                 for (const fluentTag of fluentTags) {
                     const [, target, name] = fluentTag.comment.split(" ");
                     if (!target || !name) {
