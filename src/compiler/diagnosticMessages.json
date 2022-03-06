@@ -7387,11 +7387,11 @@
         "category": "Error",
         "code": 50021
     },
-    "The first parameter of a fluent function cannot be a tuple type.": {
+    "The first parameter of a fluent function cannot be a rest parameter.": {
         "category": "Error",
         "code": 50022
     },
-    "The first parameter of a 'pipeable' annotated function cannot be a tuple type.": {
+    "The first parameter of a 'pipeable' annotated function cannot be a rest parameter.": {
         "category": "Error",
         "code": 50023
     }

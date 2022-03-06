@@ -43778,7 +43778,7 @@ namespace ts {
         function thisifyTsPlusSignature(call: Signature, exportName: string, file: SourceFile, reportDiagnostic: (diagnostic: DiagnosticMessage) => void) {
             const signature = createTsPlusSignature(call, exportName, file);
             if (isSelfATupleType(signature)) {
-                reportDiagnostic(Diagnostics.The_first_parameter_of_a_fluent_function_cannot_be_a_tuple_type);
+                reportDiagnostic(Diagnostics.The_first_parameter_of_a_fluent_function_cannot_be_a_rest_parameter);
                 return undefined;
             }
             const target = signature.parameters[0];
@@ -43947,8 +43947,8 @@ namespace ts {
                 if (returnStatement && returnStatement.expression.parameters.length === 1) {
                     const type = getTypeOfNode(pipeable);
                     const signatures = getSignaturesOfType(type, SignatureKind.Call);
-                    if (signatures.findIndex(isSelfATupleType)) {
-                        error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_tuple_type);
+                    if (signatures.find(isSelfATupleType)) {
+                        error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
                     const tsPlusSignatures = flatMap(signatures, (sig) => {
@@ -43994,8 +43994,8 @@ namespace ts {
                 const tsPlusSignatures = flatMap(signatures, (sig) => {
                     const returnType = getReturnTypeOfSignature(sig);
                     const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
-                    if (signatures.findIndex(isSelfATupleType)) {
-                        error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_tuple_type);
+                    if (signatures.find(isSelfATupleType)) {
+                        error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
                     return flatMap(returnSignatures, (rsig) => {
@@ -44067,8 +44067,8 @@ namespace ts {
                 if (returnFn && returnFn.parameters.length === 1) {
                     const type = getTypeOfNode(pipeable);
                     const signatures = getSignaturesOfType(type, SignatureKind.Call);
-                    if (signatures.findIndex(isSelfATupleType)) {
-                        error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_tuple_type);
+                    if (signatures.find(isSelfATupleType)) {
+                        error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
                     const tsPlusSignatures = flatMap(signatures, (sig) => {
@@ -44125,8 +44125,8 @@ namespace ts {
                 if (isFunctionTypeNode(returnFn) && returnFn.parameters.length === 1) {
                     const type = getTypeOfNode(pipeable);
                     const signatures = getSignaturesOfType(type, SignatureKind.Call);
-                    if (signatures.findIndex(isSelfATupleType)) {
-                        error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_tuple_type);
+                    if (signatures.find(isSelfATupleType)) {
+                        error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
                     const tsPlusSignatures = flatMap(signatures, (sig) => {
