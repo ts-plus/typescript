@@ -869,7 +869,35 @@ namespace ts {
         function makeStack<A>(value: A, previous?: Stack<A>): Stack<A> {
             return { value, previous };
         }
-        function collectRelevantSymbols(target: Type) {
+        function intersectSets<A>(sets: Set<A>[]): Set<A> {
+            if (sets.length === 0) {
+                return new Set();
+            }
+            if (sets.length === 1) {
+                return sets[0];
+            }
+
+            let shortest: Set<A> | undefined;
+            for (const set of sets) {
+                if (shortest === undefined || shortest.size > set.size) {
+                    shortest = set
+                }
+            }
+
+            // copy the shortest set, so as not to iterate over and delete items from the same set
+            const out = new Set(shortest)
+
+            for (const set of sets) {
+                shortest!.forEach((a) => {
+                    if (!set.has(a)) {
+                        out.delete(a)
+                    }
+                })
+            }
+
+            return out;
+        }
+        function collectRelevantSymbolsLoop(target: Type) {
             const seen: Set<Type> = new Set();
             const relevant: Set<Symbol> = new Set();
             let stack: Stack<Type> | undefined = makeStack(target);
@@ -877,7 +905,9 @@ namespace ts {
                 const target = stack.value
                 stack = stack.previous
                 if (target.symbol) {
+                    // Add the current symbol to the return Set
                     relevant.add(target.symbol)
+                    // Check if the current type inherits other types
                     if (inheritanceSymbolCache.has(target.symbol)) {
                         const heritage = inheritanceSymbolCache.get(target.symbol)!;
                         heritage.forEach((s) => {
@@ -892,13 +922,7 @@ namespace ts {
                                             continue;
                                         }
 
-                                        if (isErrorType(type)) {
-                                            const declaredType = getDeclaredTypeOfSymbol(s);
-                                            if (!isErrorType(declaredType)) {
-                                                seen.add(declaredType)
-                                                stack = makeStack(declaredType, stack);
-                                            }
-                                        } else {
+                                        if (!isErrorType(type)) {
                                             seen.add(type);
                                             stack = makeStack(type, stack)
                                         }
@@ -909,9 +933,33 @@ namespace ts {
                     }
                 }
                 if (target.aliasSymbol) {
-                    relevant.add(target.aliasSymbol)
+                    relevant.add(target.aliasSymbol);
+                    // If the current type is a union type, add the inherited type symbols common to all members
+                    if (target.flags & TypeFlags.Union) {
+                        const types = (target as UnionType).types;
+                        const inherited: Set<Symbol>[] = []
+                        for (const member of types) {
+                            if (!seen.has(member)) {
+                                seen.add(member);
+                                inherited.push(collectRelevantSymbolsLoop(member));
+                            }
+                        }
+                        intersectSets(inherited).forEach((s) => {
+                            relevant.add(s)
+                            stack = makeStack(getTypeOfSymbol(s), stack);
+                        })
+                    }
                 }
             }
+            seen.clear();
+            return relevant;
+        }
+        /**
+         * Recursively collects the symbols associated with the given type. Index 0 is the given type's symbol,
+         * followed by subtypes, subtypes of subtypes, etc.
+         */
+        function collectRelevantSymbols(target: Type) {
+            const relevant = collectRelevantSymbolsLoop(target);
             const returnArray: Symbol[] = []
             relevant.forEach((s) => {
                 returnArray.push(s)
@@ -935,7 +983,6 @@ namespace ts {
             if (target.flags & TypeFlags.Object) {
                 returnArray.push(tsplusObjectPrimitiveSymbol);
             }
-            seen.clear();
             return returnArray
         }
         function getExtensions(selfNode: Expression) {
@@ -948,6 +995,9 @@ namespace ts {
                         const _static = staticCache.get(typeSymbol);
                         if (_static) {
                             _static.forEach((v, k) => {
+                                if (copy.has(k)) {
+                                    return;
+                                }
                                 const ext = v();
                                 if (ext) {
                                     copy.set(k, ext.patched)
@@ -957,6 +1007,9 @@ namespace ts {
                         const _fluent = fluentCache.get(typeSymbol);
                         if (_fluent) {
                             _fluent.forEach((v, k) => {
+                                if (copy.has(k)) {
+                                    return;
+                                }
                                 const extension = v()
                                 if (extension) {
                                     copy.set(k, extension.patched);
@@ -966,6 +1019,9 @@ namespace ts {
                         const _getter = getterCache.get(typeSymbol);
                         if (_getter) {
                             _getter.forEach((v, k) => {
+                                if (copy.has(k)) {
+                                    return;
+                                }
                                 const symbol = v.patched(selfNode);
                                 if (symbol) {
                                     copy.set(k, symbol);
@@ -979,6 +1035,9 @@ namespace ts {
                         const _static = staticCache.get(typeSymbol);
                         if (_static) {
                             _static.forEach((v, k) => {
+                                if (copy.has(k)) {
+                                    return;
+                                }
                                 const ext = v()
                                 if (ext) {
                                     copy.set(k, ext.patched)
