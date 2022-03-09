@@ -897,8 +897,8 @@ namespace ts {
 
             return out;
         }
-        function collectRelevantSymbolsLoop(target: Type) {
-            const seen: Set<Type> = new Set();
+        function collectRelevantSymbolsLoop(target: Type, lastSeen?: Set<Type>) {
+            const seen: Set<Type> = new Set(lastSeen);
             const relevant: Set<Symbol> = new Set();
             let stack: Stack<Type> | undefined = makeStack(target);
             while (stack) {
@@ -925,9 +925,12 @@ namespace ts {
                         const inherited: Set<Symbol>[] = []
                         for (const member of types) {
                             if (!seen.has(member)) {
-                                seen.add(member);
-                                inherited.push(collectRelevantSymbolsLoop(member));
+                                inherited.push(collectRelevantSymbolsLoop(member, seen));
                             }
+                        }
+                        // Add union members as "seen" only after the union has been collected
+                        for (const member of types) {
+                            seen.add(member);
                         }
                         intersectSets(inherited).forEach((s) => {
                             relevant.add(s)
