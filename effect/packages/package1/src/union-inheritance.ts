@@ -89,3 +89,48 @@ function subtypeTest() {
   // @ts-expect-error
   e.methodB();
 }
+
+// alias inheritance
+
+/**
+ * @tsplus type union/AA
+ */
+export interface AA {
+  readonly _AA: unique symbol;
+}
+
+/**
+ * @tsplus type union/AB
+ */
+export interface AB extends AA {
+  readonly _AB: unique symbol;
+}
+
+/**
+ * @tsplus type union/AC
+ */
+export type AC = AA
+
+export type AD = AC | AB
+
+/**
+ * @tsplus fluent union/AA methodAA
+ */
+export declare function methodAA(self: AA): void
+/**
+ * @tsplus fluent union/AB methodAB
+ */
+export declare function methodAB(self: AB): void
+/**
+ * @tsplus fluent union/AC methodAC
+ */
+export declare function methodAC(self: AC): void
+
+declare const ac: AD
+
+function aliasTest() {
+  ac.methodAA()
+  // @ts-expect-error
+  ac.methodAB()
+  ac.methodAC()
+}

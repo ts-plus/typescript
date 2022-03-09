@@ -910,30 +910,15 @@ namespace ts {
                     // Check if the current type inherits other types
                     if (inheritanceSymbolCache.has(target.symbol)) {
                         const heritage = inheritanceSymbolCache.get(target.symbol)!;
-                        heritage.forEach((s) => {
-                            if (s.declarations && s.declarations.length > 0) {
-                                for (const decl of s.declarations) {
-                                    // Exclude all declarations but interface and class declarations.
-                                    // Symbol declarations can also include other declarations, such as variable declarations
-                                    // and module declarations, which we do not want to include for inheritance
-                                    if (isInterfaceDeclaration(decl) || isClassDeclaration(decl)) {
-                                        const type = getTypeOfNode(decl);
-                                        if (seen.has(type)) {
-                                            continue;
-                                        }
-
-                                        if (!isErrorType(type)) {
-                                            seen.add(type);
-                                            stack = makeStack(type, stack)
-                                        }
-                                    }
-                                }
-                            }
-                        })
+                        heritage.forEach(addInheritedSymbol);
                     }
                 }
                 if (target.aliasSymbol) {
                     relevant.add(target.aliasSymbol);
+                    if (inheritanceSymbolCache.has(target.aliasSymbol)) {
+                        const heritage = inheritanceSymbolCache.get(target.aliasSymbol)!;
+                        heritage.forEach(addInheritedSymbol);
+                    }
                     // If the current type is a union type, add the inherited type symbols common to all members
                     if (target.flags & TypeFlags.Union) {
                         const types = (target as UnionType).types;
@@ -953,6 +938,27 @@ namespace ts {
             }
             seen.clear();
             return relevant;
+
+            function addInheritedSymbol(symbol: Symbol) {
+                if (symbol.declarations && symbol.declarations.length > 0) {
+                    for (const decl of symbol.declarations) {
+                        // Exclude all declarations but interface and class declarations.
+                        // Symbol declarations can also include other declarations, such as variable declarations
+                        // and module declarations, which we do not want to include for inheritance
+                        if (isInterfaceDeclaration(decl) || isClassDeclaration(decl)) {
+                            const type = getTypeOfNode(decl);
+                            if (seen.has(type)) {
+                                continue;
+                            }
+
+                            if (!isErrorType(type)) {
+                                seen.add(type);
+                                stack = makeStack(type, stack)
+                            }
+                        }
+                    }
+                }
+            }
         }
         /**
          * Recursively collects the symbols associated with the given type. Index 0 is the given type's symbol,
