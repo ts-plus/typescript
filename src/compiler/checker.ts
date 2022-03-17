@@ -34583,10 +34583,10 @@ namespace ts {
             if (operatorMappingEntry) {
                 const operatorOverload = getOperatorExtension(leftType, operatorMappingEntry);
                 if (operatorOverload) {
-                    const declaration = operatorOverload.patched.declarations?.find(isFunctionDeclaration);
+                    const declaration = operatorOverload.patched.declarations?.find((node) => isFunctionDeclaration(node) || isVariableDeclaration(node));
                     if (declaration) {
                         return checkTsPlusCustomCall(
-                            declaration as FunctionDeclaration,
+                            declaration as FunctionDeclaration | VariableDeclaration,
                             [left, right],
                             CheckMode.Normal,
                             (_) => diagnostics.add(_)
@@ -44701,6 +44701,33 @@ namespace ts {
                 }
             }
         }
+        function tryCacheTsPlusOperatorVariable(file: SourceFile, statement: VariableStatement) {
+            if (statement.declarationList.declarations.length === 1) {
+                const declaration = statement.declarationList.declarations[0];
+                if(isIdentifier(declaration.name)) {
+                    const operatorTags = collectTsPlusOperatorTags(declaration);
+                    for (const operatorTag of operatorTags) {
+                        const symbol = getSymbolAtLocation(declaration.name);
+                        if (symbol) {
+                            const [, target, name] = operatorTag.comment.split(" ");
+                            if (!target || !name) {
+                                error(declaration, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol);
+                                return;
+                            }
+                            if (!operatorCache.has(target)) {
+                                operatorCache.set(target, new Map());
+                            }
+                            const map = operatorCache.get(target)!;
+                            map.set(name, {
+                                patched: symbol,
+                                exportName: declaration.name.escapedText.toString(),
+                                definition: file
+                            });
+                        }
+                    }
+                }
+            }
+        }
         function tryCacheTsPlusFluentFunction(file: SourceFile, declaration: FunctionDeclaration) {
             if(declaration.name) {
                 const fluentTags = collectTsPlusFluentTags(declaration);
@@ -44976,6 +45003,7 @@ namespace ts {
                         tryCacheTsPlusCompanion(statement);
                     }
                     if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                        tryCacheTsPlusOperatorVariable(file, statement);
                         tryCacheTsPlusStaticVariable(file, statement);
                         tryCacheTsPlusFluentVariable(file, statement);
                         tryCacheTsPlusGetterVariable(file, statement);

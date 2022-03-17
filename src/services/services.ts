@@ -1908,7 +1908,14 @@ namespace ts {
                     if (operator) {
                         const extension = typeChecker.getOperatorExtension(leftType, operator);
                         if (extension) {
-                            const declaration = find(extension.patched.declarations || [], isFunctionDeclaration);
+                            const typeOfSymbol = typeChecker.getTypeOfSymbol(extension.patched)
+                            const declaration = findMap(typeChecker.getSignaturesOfType(typeOfSymbol, SignatureKind.Call) || [], (sig) => {
+                                if (sig.declaration) {
+                                    if (!isJSDocSignature(sig.declaration)) {
+                                        return sig.declaration;
+                                    }
+                                }
+                            });
                             const signature =
                                 declaration
                                     ? typeChecker.getInstantiatedTsPlusSignature(declaration, [nodeForQuickInfo.parent.left, nodeForQuickInfo.parent.right], undefined)
