@@ -68,6 +68,31 @@ export function arrayHead<A>(self: Array<A>): A | undefined {
 
 const a = [1, 2, 3].map0((a) => a).getter.map0((a) => a).getter.head
 
+
+/**
+ * @tsplus fluent Array sum
+ */
+export function sum<T extends number>(self: Array<T>): number {
+  return self.reduce((prev, cur) => prev + cur, 0)
+}
+
+/**
+* @tsplus getter Array getSum
+*/
+export function getSum<T extends number>(self: Array<T>): number {
+  return self.reduce((prev, cur) => prev + cur, 0)
+}
+
+/**
+* @tsplus fluent Array average
+*/
+export function average(self: Array<number>): number {
+  return self.sum() / self.length
+}
+
+export const arrAvg = [0, 1].average();
+export const arrSum = [0, 1].sum();
+
 const x2 = Effect(0)
 
 function baseConstraint<A extends Array<unknown>>(...xs: A): unknown[] {
@@ -121,3 +146,5 @@ const zzz2 = Effect.succeed(() => zzz)
 
 // @ts-expect-error
 const zzz3 = Effect.succeed(zzz)
+
+Effect.do.bind("0", () => Effect(0)).bind("1", () => Effect(1))

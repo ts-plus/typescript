@@ -1021,7 +1021,16 @@ namespace ts {
                                 }
                                 const extension = v()
                                 if (extension) {
-                                    copy.set(k, extension.patched);
+                                    const isValidTarget = getSignaturesOfType(getTypeOfSymbol(extension.patched), SignatureKind.Call).find((s) => {
+                                        const base = getBaseSignature(s);
+                                        if (base.thisParameter) {
+                                            return isTypeAssignableTo(targetType, getTypeOfSymbol(base.thisParameter));
+                                        }
+                                        return false;
+                                    });
+                                    if (isValidTarget) {
+                                        copy.set(k, extension.patched);
+                                    }
                                 }
                             });
                         }
