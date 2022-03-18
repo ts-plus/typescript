@@ -3464,7 +3464,8 @@ namespace ts {
         tsPlusTag: "TsPlusSignature";
         tsPlusFile: SourceFile;
         tsPlusExportName: string;
-        tsPlusPipeable?: boolean
+        tsPlusDeclaration?: Declaration;
+        tsPlusPipeable?: boolean;
     }
 
     export interface JSDocLink extends Node {

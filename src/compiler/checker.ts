@@ -44067,7 +44067,7 @@ namespace ts {
             signature.tsPlusExportName = exportName;
             return signature
         }
-        function thisifyTsPlusSignature(call: Signature, exportName: string, file: SourceFile, reportDiagnostic: (diagnostic: DiagnosticMessage) => void) {
+        function thisifyTsPlusSignature(declaration: FunctionDeclaration | VariableDeclaration, call: Signature, exportName: string, file: SourceFile, reportDiagnostic: (diagnostic: DiagnosticMessage) => void) {
             const signature = createTsPlusSignature(call, exportName, file);
             if (isSelfARestParameter(signature)) {
                 reportDiagnostic(Diagnostics.The_first_parameter_of_a_fluent_function_cannot_be_a_rest_parameter);
@@ -44086,6 +44086,7 @@ namespace ts {
             }
             signature.parameters = signature.parameters.slice(1, signature.parameters.length);
             signature.minArgumentCount = signature.minArgumentCount - 1;
+            signature.tsPlusDeclaration = declaration;
             return signature;
         }
         function createTsPlusFluentSymbol(name: string, signatures: TsPlusSignature[]): TsPlusFluentSymbol {
@@ -44155,7 +44156,7 @@ namespace ts {
             }
             const type = getTypeOfNode(dataFirst);
             const signatures = getSignaturesOfType(type, SignatureKind.Call);
-            const thisifiedSignatures = signatures.map((signature) => thisifyTsPlusSignature(signature, exportName, file, reportDiagnostic))
+            const thisifiedSignatures = signatures.map((signature) => thisifyTsPlusSignature(dataFirst, signature, exportName, file, reportDiagnostic))
             if (!isEachDefined(thisifiedSignatures)) {
                 return;
             }
@@ -44169,7 +44170,7 @@ namespace ts {
             const type = getTypeOfNode(declaration);
             const signatures = getSignaturesOfType(type, SignatureKind.Call);
             if(signatures.every((sigSymbol) => sigSymbol.parameters.every((paramSymbol) => paramSymbol.valueDeclaration && isVariableLike(paramSymbol.valueDeclaration) && isParameterDeclaration(paramSymbol.valueDeclaration)))) {
-                const thisifiedSignatures = signatures.map((signature) => thisifyTsPlusSignature(signature, exportName, file, reportDiagnostic))
+                let thisifiedSignatures = signatures.map((signature) => thisifyTsPlusSignature(declaration, signature, exportName, file, reportDiagnostic))
                 if (!isEachDefined(thisifiedSignatures)) {
                     return;
                 }
@@ -44267,7 +44268,7 @@ namespace ts {
                             newDecl.jsDocCache = pipeable.jsDocCache;
                             newSig.declaration = newDecl;
                             newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
-                            const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file, reportDiagnostic);
+                            const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
                             if (!thisifiedSignature) {
                                 return;
                             }
@@ -44311,7 +44312,7 @@ namespace ts {
                         newDecl.jsDocCache = pipeable.jsDocCache;
                         newSig.declaration = newDecl;
                         newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
-                        const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file, reportDiagnostic);
+                        const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
                         if (!thisifiedSignature) {
                             return;
                         }
@@ -44400,7 +44401,7 @@ namespace ts {
                             newDecl.jsDocCache = pipeable.jsDocCache;
                             newSig.declaration = newDecl;
                             newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
-                            const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file, reportDiagnostic);
+                            const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
                             if (!thisifiedSignature) {
                                 return;
                             }
@@ -44440,7 +44441,7 @@ namespace ts {
                             newDecl.jsDocCache = pipeable.jsDocCache;
                             newSig.declaration = newDecl;
                             newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
-                            const thisifiedSignature = thisifyTsPlusSignature(newSig, exportName, file, reportDiagnostic);
+                            const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
                             if (!thisifiedSignature) {
                                 return;
                             }
@@ -47252,7 +47253,13 @@ namespace ts {
                                 signature.declaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableDeclaration
                             )
                         ) {
-                            return signature.declaration.symbol.tsPlusDeclaration
+                            return signature.declaration.symbol.tsPlusDeclaration;
+                        }
+                        if (isFunctionLikeDeclaration(signature.declaration)) {
+                            return signature.declaration;
+                        }
+                        if (isTsPlusSignature(signature) && signature.tsPlusDeclaration) {
+                            return signature.tsPlusDeclaration;
                         }
                         return signature.declaration
                     }
