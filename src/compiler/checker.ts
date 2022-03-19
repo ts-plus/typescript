@@ -44179,8 +44179,12 @@ namespace ts {
             setParent(patchedDeclaration.name, patchedDeclaration)
             patchedDeclaration.name.tsPlusName = name;
             symbol.declarations = [patchedDeclaration];
-            symbol.valueDeclaration = patchedDeclaration;
             patchedDeclaration.jsDoc = getJSDocCommentsAndTags(declaration) as JSDoc[];
+
+            const originalSymbolLinks = getSymbolLinks(originalSymbol);
+            const symbolLinks = getSymbolLinks(symbol);
+            symbolLinks.uniqueESSymbolType = originalSymbolLinks.uniqueESSymbolType;
+
             return symbol;
         }
         function createTsPlusGetterFunctionSymbol(name: string, dataFirst: FunctionDeclaration, returnType: Type, selfType: Type) {
