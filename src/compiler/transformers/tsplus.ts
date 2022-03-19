@@ -30,6 +30,7 @@ namespace ts {
     export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
         return function (context: TransformationContext) {
             const importer = new TsPlusImporter(context.factory);
+            const localUniqueExtensionNames = new Map<string, Identifier>();
             const fileVar = factory.createUniqueName("fileName");
             let fileVarUsed = false;
             return chainBundle(context, transformSourceFile);
@@ -38,7 +39,17 @@ namespace ts {
                     return node;
                 }
 
-                const transformed = visitEachChild(node, visitor(node, void 0), context)
+                const transformed = visitEachChild(node, visitor(node, void 0), context);
+
+                const uniqueDeclarations: Statement[] = [];
+
+                const transformedWithUniqueDeclarations = visitEachChild(
+                    transformed,
+                    addUniqueLocalExtensionsVisitor(uniqueDeclarations, localUniqueExtensionNames, context),
+                    context
+                )
+
+                localUniqueExtensionNames.clear();
 
                 const imports: Statement[] = []
                 importer.imports.forEach((id, path) => {
@@ -77,7 +88,7 @@ namespace ts {
                 ] : [];
                 return context.factory.updateSourceFile(
                     transformed,
-                    [...fileVarDef, ...imports, ...transformed.statements],
+                    [...fileVarDef, ...imports, ...uniqueDeclarations, ...transformedWithUniqueDeclarations.statements],
                     transformed.isDeclarationFile,
                     transformed.referencedFiles,
                     transformed.typeReferenceDirectives,
@@ -120,7 +131,7 @@ namespace ts {
                     const expression = visitNode(node.expression, visitor(source, traceInScope))
                     const argument = visitNode(node.argumentExpression, visitor(source, traceInScope))
                     return context.factory.createCallExpression(
-                        getPathOfExtension(context.factory, importer, custom, source),
+                        getPathOfExtension(context, importer, custom, source, localUniqueExtensionNames),
                         [],
                         [expression, argument]
                     )
@@ -143,13 +154,14 @@ namespace ts {
                         params.push(traceInScope ? traceInScope : getTrace(source, node.operatorToken))
                     }
                     return context.factory.createCallExpression(
-                        getPathOfExtension(context.factory, importer, operator, source),
+                        getPathOfExtension(context, importer, operator, source, localUniqueExtensionNames),
                         [],
                         params
                     )
                 }
                 return visitEachChild(node, visitor(source, traceInScope), context)
             }
+
             function visitFunctionDeclaration(source: SourceFile, traceInScope: Identifier | undefined, node: FunctionDeclaration, context: TransformationContext): VisitResult<Node> {
                 if (node.parameters.length > 0) {
                     const last = node.parameters[node.parameters.length - 1]
@@ -169,18 +181,18 @@ namespace ts {
                     if (checker.isClassCompanionReference(node.expression)) {
                         const staticExtension = checker.getStaticCompanionExtension(expressionType, node.name.escapedText.toString());
                         if (staticExtension) {
-                            return getPathOfExtension(context.factory, importer, staticExtension, source);
+                            return getPathOfExtension(context, importer, staticExtension, source, localUniqueExtensionNames);
                         }
                     } else {
                         const staticExtension = checker.getStaticExtension(expressionType, node.name.escapedText.toString());
                         if (staticExtension) {
-                            return getPathOfExtension(context.factory, importer, staticExtension, source);
+                            return getPathOfExtension(context, importer, staticExtension, source, localUniqueExtensionNames);
                         }
 
                         const getterExtension = checker.getGetterExtension(expressionType, node.name.escapedText.toString());
                         if (getterExtension) {
                             return factory.createCallExpression(
-                                getPathOfExtension(context.factory, importer, getterExtension, source),
+                                getPathOfExtension(context, importer, getterExtension, source, localUniqueExtensionNames),
                                 void 0,
                                 [visitNode(node.expression, visitor)]
                             );
@@ -239,13 +251,14 @@ namespace ts {
                 return factory.updateCallExpression(
                     call,
                     getPathOfExtension(
-                        factory,
+                        context,
                         importer,
                         {
                             definition,
                             exportName 
                         },
-                        source
+                        source,
+                        localUniqueExtensionNames
                     ),
                     undefined,
                     args
@@ -369,7 +382,7 @@ namespace ts {
                             const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
                             return factory.updateCallExpression(
                                 visited as CallExpression,
-                                getPathOfExtension(context.factory, importer, customCall, source),
+                                getPathOfExtension(context, importer, customCall, source, localUniqueExtensionNames),
                                 (visited as CallExpression).typeArguments,
                                 (visited as CallExpression).arguments
                             );
@@ -381,7 +394,7 @@ namespace ts {
                             const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
                             return factory.updateCallExpression(
                                 visited as CallExpression,
-                                getPathOfExtension(context.factory, importer, customCall, source),
+                                getPathOfExtension(context, importer, customCall, source, localUniqueExtensionNames),
                                 (visited as CallExpression).typeArguments,
                                 (visited as CallExpression).arguments
                             );
@@ -423,7 +436,7 @@ namespace ts {
                                 return factory.updateCallExpression(
                                     visited,
                                     factory.createCallExpression(
-                                        getPathOfExtension(context.factory, importer, { definition: targetSignature.tsPlusFile, exportName: targetSignature.tsPlusExportName }, source),
+                                        getPathOfExtension(context, importer, { definition: targetSignature.tsPlusFile, exportName: targetSignature.tsPlusExportName }, source, localUniqueExtensionNames),
                                         undefined,
                                         visited.arguments
                                     ),
@@ -434,7 +447,7 @@ namespace ts {
                             else {
                                 return factory.updateCallExpression(
                                     visited as CallExpression,
-                                    getPathOfExtension(context.factory, importer, { definition: targetSignature.tsPlusFile, exportName: targetSignature.tsPlusExportName }, source),
+                                    getPathOfExtension(context, importer, { definition: targetSignature.tsPlusFile, exportName: targetSignature.tsPlusExportName }, source, localUniqueExtensionNames),
                                     (visited as CallExpression).typeArguments,
                                     [((visited as CallExpression).expression as PropertyAccessExpression).expression, ...(visited as CallExpression).arguments]
                                 );
@@ -488,9 +501,69 @@ namespace ts {
                 return visitEachChild(node, visitor, context);
             }
         }
-        function getPathOfExtension(factory: NodeFactory, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile) {
+
+        function addUniqueLocalExtensionsVisitor(hoistedStatements: Array<Statement>, localUniqueExtensionNames: ESMap<string, Identifier>, context: TransformationContext) {
+            return function (node: Node): VisitResult<Node> {
+                switch (node.kind) {
+                    case SyntaxKind.FunctionDeclaration: {
+                        const declaration = node as FunctionDeclaration
+                        if (declaration.name) {
+                            const name = declaration.name.escapedText.toString()
+                            if (localUniqueExtensionNames.has(name)) {
+                                const uniqueIdentifier = localUniqueExtensionNames.get(name)!
+                                hoistedStatements.push(
+                                    context.factory.createVariableStatement(undefined, [
+                                        context.factory.createVariableDeclaration(
+                                            uniqueIdentifier,
+                                            undefined,
+                                            undefined,
+                                            context.factory.createIdentifier(name)
+                                        )
+                                    ])
+                                )
+                            }
+                        }
+                        return node;
+                    }
+                    case SyntaxKind.VariableStatement: {
+                        const variableStatement = node as VariableStatement;
+                        const declaration = variableStatement.declarationList.declarations[0];
+                        if (declaration && declaration.name && isIdentifier(declaration.name)) {
+                            const name = declaration.name.escapedText.toString();
+                            if (localUniqueExtensionNames.has(name)) {
+                                const uniqueIdentifier = localUniqueExtensionNames.get(name)!;
+                                hoistedStatements.push(
+                                    context.factory.createVariableStatement(undefined, [
+                                        context.factory.createVariableDeclaration(uniqueIdentifier)
+                                    ])
+                                );
+                                return [
+                                    node,
+                                    context.factory.createAssignment(
+                                        uniqueIdentifier,
+                                        context.factory.createIdentifier(name)
+                                    ),
+                                ];
+                            }
+                        }
+                        return node;
+                    }
+                    default: {
+                        return node;
+                    }
+                }
+            }
+        }
+
+        function getPathOfExtension(context: TransformationContext, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile, localUniqueExtensionNames: ESMap<string, Identifier>) {
+            const factory = context.factory;
             if (source.fileName === extension.definition.fileName) {
-                return factory.createIdentifier(extension.exportName);
+                if (localUniqueExtensionNames.has(extension.exportName)) {
+                    return localUniqueExtensionNames.get(extension.exportName)!;
+                }
+                const uniqueIdentifier = factory.createUniqueName(extension.exportName);
+                localUniqueExtensionNames.set(extension.exportName, uniqueIdentifier);
+                return uniqueIdentifier;
             }
             const path = extension.definition.isDeclarationFile ? checker.getGlobalImport(extension.definition) : checker.getLocalImport(source, extension.definition)
 
