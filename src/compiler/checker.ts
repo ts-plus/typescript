@@ -1021,14 +1021,7 @@ namespace ts {
                                 }
                                 const extension = v()
                                 if (extension) {
-                                    const isValidTarget = getSignaturesOfType(getTypeOfSymbol(extension.patched), SignatureKind.Call).find((s) => {
-                                        const base = getBaseSignature(s);
-                                        if (base.thisParameter) {
-                                            return isTypeAssignableTo(targetType, getTypeOfSymbol(base.thisParameter));
-                                        }
-                                        return false;
-                                    });
-                                    if (isValidTarget) {
+                                    if (isExtensionValidForTarget(extension, targetType)) {
                                         copy.set(k, extension.patched);
                                     }
                                 }
@@ -1067,6 +1060,26 @@ namespace ts {
             })
             copy.delete("__call");
             return copy;
+        }
+        function isExtensionValidForTarget(extension: TsPlusFluentExtension, targetType: Type) {
+            return getSignaturesOfType(getTypeOfSymbol(extension.patched), SignatureKind.Call).find((candidate) => {
+                if (candidate.thisParameter) {
+                    const thisType = getTypeOfSymbol(candidate.thisParameter);
+                    if (!candidate.typeParameters) {
+                        return isTypeAssignableTo(targetType, thisType);
+                    } else {
+                        const inferenceContext = createInferenceContext(
+                            candidate.typeParameters,
+                            candidate,
+                            InferenceFlags.None
+                        );
+                        inferTypes(inferenceContext.inferences, targetType, thisType);
+                        const instantiatedThisType = instantiateType(thisType, inferenceContext.mapper);
+                        return isTypeAssignableTo(targetType, instantiatedThisType);
+                    }
+                }
+                return false;
+            });
         }
         function getFluentExtension(targetType: Type, name: string) {
             const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
@@ -29571,7 +29584,10 @@ namespace ts {
             if (!inType) {
                 const fluentExt = getFluentExtension(leftType, right.escapedText.toString())
                 if (fluentExt && isCallExpression(node.parent) && node.parent.expression === node) {
-                    return getTypeOfSymbol(fluentExt.patched)
+                    if (isExtensionValidForTarget(fluentExt, leftType)) {
+                        return getTypeOfSymbol(fluentExt.patched)
+                    }
+                    return;
                 }
                 const getterExt = getGetterExtension(leftType, right.escapedText.toString())
                 if (getterExt && isExpression(_left)) {
