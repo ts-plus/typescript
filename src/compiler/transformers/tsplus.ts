@@ -28,6 +28,8 @@ namespace ts {
         }
     }
     export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
+        const fileMap: [string, RegExp][] = getFileMap(options, host);
+        const traceMap: [string, RegExp][] = getTraceMap(options, host);
         return function (context: TransformationContext) {
             const importer = new TsPlusImporter(context.factory);
             const localUniqueExtensionNames = new Map<string, Identifier>();
@@ -77,8 +79,7 @@ namespace ts {
                                     undefined,
                                     undefined,
                                     factory.createStringLiteral(
-                                        (options.tsPlusTracingPackageName ? options.tsPlusTracingPackageName + ":" : "") +
-                                        (options.configFilePath ? getRelativePathFromFile(options.configFilePath, node.fileName, host.getCanonicalFileName).replace(/^\.(\\|\/)/, "") : node.fileName)
+                                        getTraceLocation(traceMap, node.fileName)
                                     )
                                 )
                             ],
@@ -267,7 +268,7 @@ namespace ts {
                         importer,
                         {
                             definition,
-                            exportName 
+                            exportName
                         },
                         source,
                         localUniqueExtensionNames
@@ -513,7 +514,22 @@ namespace ts {
                 localUniqueExtensionNames.set(extension.exportName, uniqueIdentifier);
                 return uniqueIdentifier;
             }
-            const path = extension.definition.isDeclarationFile ? checker.getGlobalImport(extension.definition) : checker.getLocalImport(source, extension.definition)
+
+            const def = extension.definition.locals!.get(extension.exportName as __String)!
+            let path: string | undefined;
+            for (const decl of def.declarations!) {
+                const locationTag = getAllJSDocTags(decl, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && tag.comment?.toString().startsWith("location") === true)[0];
+                if (locationTag) {
+                    const match = locationTag.comment!.toString().match(/^location "(.*)"/);
+                    if (match) {
+                        path = match[1]
+                    }
+                }
+            }
+
+            if (!path) {
+                path = getImportLocation(fileMap, extension.definition.fileName);
+            }
 
             const id = importer.get(path);
 

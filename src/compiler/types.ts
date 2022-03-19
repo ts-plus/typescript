@@ -4661,8 +4661,6 @@ namespace ts {
         /* @internal */ getTypeOnlyAliasDeclaration(symbol: Symbol): TypeOnlyAliasDeclaration | undefined;
         /* @internal */ getMemberOverrideModifierStatus(node: ClassLikeDeclaration, member: ClassElement): MemberOverrideStatus;
 
-        getGlobalImport(file: SourceFile): string
-        getLocalImport(from: SourceFile, file: SourceFile): string
         getExtensions(selfNode: Expression): ESMap<string, Symbol>
         getFluentExtension(target: Type, name: string): Type | undefined
         getGetterExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
@@ -4680,6 +4678,7 @@ namespace ts {
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isClassCompanionReference(node: Expression): boolean
         collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocFluentTag[]
+        collectTsPlusAnyValueTags(statement: Declaration): readonly (TsPlusJSDocFluentTag | TsPlusJSDocGetterTag | TsPlusJSDocOperatorTag | TsPlusJSDocStaticTag)[]
         getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
         getPrimitiveTypeName(type: Type): string | undefined
         getResolvedOperator(node: BinaryExpression): Signature | undefined
@@ -6475,8 +6474,7 @@ namespace ts {
 
         [option: string]: CompilerOptionsValue | TsConfigSourceFile | undefined;
 
-        tsPlusModuleDiscoveryLocalSuffix?: "js"
-        tsPlusTracingPackageName?: string
+        tsPlusConfig?: string
     }
 
     export interface WatchOptions {
@@ -7152,6 +7150,7 @@ namespace ts {
         snippetElement?: SnippetElement;         // Snippet element of the node
         typeNode?: TypeNode;                     // VariableDeclaration type
         tsPlusPipeableComment?: boolean;
+        tsPlusLocationComment?: boolean;
     }
 
     /* @internal */

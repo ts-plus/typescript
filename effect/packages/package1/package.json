@@ -19,8 +19,5 @@
     "dependencies": {
         "@effect-ts/core": "^0.52.1",
         "esbuild": "^0.14.12"
-    },
-    "tsplus": {
-      "typeDir": "./build/dts"
     }
 }

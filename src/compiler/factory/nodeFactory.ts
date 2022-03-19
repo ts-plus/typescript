@@ -6727,7 +6727,7 @@ namespace ts {
         // We are using `.slice()` here in case `destEmitNode.leadingComments` is pushed to later.
         if (leadingComments) {
             // TSPLUS EXTENSION START
-            if (sourceEmitNode.tsPlusPipeableComment) {
+            if (sourceEmitNode.tsPlusPipeableComment || sourceEmitNode.tsPlusLocationComment) {
                 destEmitNode.leadingComments = leadingComments.slice();
             }
             else {

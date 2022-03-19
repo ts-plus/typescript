@@ -4,8 +4,7 @@
     "outDir": "build/esm",
     "declarationDir": "build/dts",
     "declarationMap": true,
-    "tsPlusModuleDiscoveryLocalSuffix": "js",
-    "tsPlusTracingPackageName": "@package1",
+    "tsPlusConfig": "../../tsplus.config.json",
     "rootDir": "src"
   },
   "include": ["src/**/*.ts"]

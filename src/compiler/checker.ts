@@ -351,7 +351,6 @@ namespace ts {
         });
 
         // TSPLUS EXTENSION START
-        const importAsCache = new Map<string, string>();
         const typeSymbolCache = new Map<Symbol, string[]>();
         const companionSymbolCache = new Map<Symbol, string[]>();
         const resolvedFluentCache = new Map<string, ESMap<string, TsPlusFluentExtension>>();
@@ -796,8 +795,6 @@ namespace ts {
             getTypeOnlyAliasDeclaration,
             getMemberOverrideModifierStatus,
             // TSPLUS EXTENSION BEGIN
-            getGlobalImport,
-            getLocalImport,
             getExtensions,
             getGetterExtension,
             getFluentExtension,
@@ -815,6 +812,13 @@ namespace ts {
             isTsPlusMacroCall,
             isClassCompanionReference,
             collectTsPlusFluentTags,
+            collectTsPlusAnyValueTags: (statement) => [
+                ...collectTsPlusFluentTags(statement),
+                ...collectTsPlusGetterTags(statement),
+                ...collectTsPlusOperatorTags(statement),
+                ...collectTsPlusPipeableTags(statement),
+                ...collectTsPlusStaticTags(statement)
+            ],
             getFluentExtensionForPipeableSymbol,
             getPrimitiveTypeName,
             getResolvedOperator: (node) => {
@@ -44191,51 +44195,6 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION START
-        function getLocalImport(from: SourceFile, file: SourceFile) {
-            // TODO(Mike):
-            return compilerOptions.tsPlusModuleDiscoveryLocalSuffix ?
-                (getRelativePathFromFile(from.fileName, file.fileName, normalizePath).replace(/\.(ts|tsx)$/, "") + ".js") :
-                getRelativePathFromFile(from.fileName, file.fileName, normalizePath).replace(/((\/|\\)index)?\.(ts|tsx)$/, "");
-        }
-
-        function getGlobalImport(file: SourceFile) {
-            if (!host.readFile) {
-                throw new Error("unreachable")
-            }
-            if (importAsCache.has(file.fileName)) {
-                return importAsCache.get(file.fileName)!;
-            }
-            const components = getPathComponents(file.fileName);
-            for (let i = components.length - 1; i >= 1; i--) {
-                const componentsDir = components.slice(0, i);
-                const dir = getPathFromPathComponents(componentsDir);
-                const path = getPathFromPathComponents([...componentsDir, "package.json"]);
-                if (host.fileExists(path)) {
-                    try {
-                        const content = JSON.parse(host.readFile(path)!);
-                        const packageName = content.tsplus?.packageName || content.name;
-                        const typeDir = content.tsplus?.typeDir ? `${dir}/${content.tsplus?.typeDir}` : dir;
-                        if (packageName && typeDir) {
-                            // TODO(Mike): Improve this to make sure it works across systems
-                            let importAs = packageName + "/" + getRelativePathFromDirectory(
-                                typeDir,
-                                file.fileName.replace(/\/index\.d\.(ts|tsx)$/, "").replace(/\.d\.(ts|tsx)$/, ""),
-                                normalizePath
-                            );
-                            importAs = importAs.endsWith("/") ? importAs.substring(0, importAs.length - 1) : importAs;
-                            importAs = importAs.startsWith("@types") ? importAs.replace(/^@types\//, "") : importAs;
-                            importAsCache.set(file.fileName, importAs);
-                            return importAs;
-                        }
-                    } catch {
-                        //
-                    }
-                    break;
-                }
-            }
-            throw new Error("unreachable")
-        }
-
         function collectTsPlusFluentTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
@@ -44293,7 +44252,7 @@ namespace ts {
         function collectTsPlusGetterTags(statement: Node) {
             return getAllJSDocTags(
                 statement,
-                (tag): tag is TsPlusJSDocOperatorTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("getter")
+                (tag): tag is TsPlusJSDocGetterTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("getter")
             );
         }
         function parseTsPlusExtensionTag(tag: TsPlusJSDocFluentTag | TsPlusJSDocOperatorTag): TsPlusExtensionTag | undefined {

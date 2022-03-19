@@ -16,6 +16,66 @@ namespace ts {
         generatedExportSpecifiers?: ESMap<Identifier, ExportSpecifier[]>;
     }
 
+    export function getImportLocation(fileMap: [string, RegExp][], source: string) {
+        for (const [path, reg] of fileMap) {
+            if (source.match(reg)) {
+                return source.replace(reg, path)
+            }
+        }
+        throw new Error(`cannot get import path for file: ${source} (Make sure to add it in your tsplus.config.json)`)
+    }
+
+    export function getTraceLocation(traceMap: [string, RegExp][], source: string) {
+        for (const [path, reg] of traceMap) {
+            if (source.match(reg)) {
+                return source.replace(reg, path)
+            }
+        }
+        return source
+    }
+
+    export function getFileMap(options: CompilerOptions, host: CompilerHost) {
+        const fileMap: [string, RegExp][] = []
+        if (options.configFilePath && options.tsPlusConfig) {
+            const content = host.readFile(getNormalizedAbsolutePath(combinePaths(options.configFilePath, "..", options.tsPlusConfig), void 0))
+            if (content) {
+                try {
+                    const parsed = JSON.parse(content)
+                    if ("importMap" in parsed && typeof parsed["importMap"] === "object") {
+                        for (const key of Object.keys(parsed["importMap"])) {
+                            if (typeof parsed["importMap"][key] === "string") {
+                                fileMap.push([parsed["importMap"][key], new RegExp(key, "g")]);
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+        return fileMap
+    }
+    
+    export function getTraceMap(options: CompilerOptions, host: CompilerHost) {
+        const traceMap: [string, RegExp][] = []
+        if (options.configFilePath && options.tsPlusConfig) {
+            const content = host.readFile(getNormalizedAbsolutePath(combinePaths(options.configFilePath, "..", options.tsPlusConfig), void 0))
+            if (content) {
+                try {
+                    const parsed = JSON.parse(content)
+                    if ("traceMap" in parsed && typeof parsed["traceMap"] === "object") {
+                        for (const key of Object.keys(parsed["traceMap"])) {
+                            if (typeof parsed["traceMap"][key] === "string") {
+                                traceMap.push([parsed["traceMap"][key], new RegExp(key, "g")]);
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+        return traceMap
+    }
+
     function containsDefaultReference(node: NamedImportBindings | undefined) {
         if (!node) return false;
         if (!isNamedImports(node)) return false;

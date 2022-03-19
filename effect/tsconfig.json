@@ -6,6 +6,6 @@
         "strict": true,
         "declaration": true,
         "skipLibCheck": true,
-        "lib": ["ES2021"],
+        "lib": ["ES2021"]
     },
 }

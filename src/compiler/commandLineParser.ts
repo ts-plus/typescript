@@ -201,11 +201,7 @@ namespace ts {
             defaultValueDescription: false,
         },
         {
-            name: "tsPlusModuleDiscoveryLocalSuffix",
-            type: "string"
-        },
-        {
-            name: "tsPlusTracingPackageName",
+            name: "tsPlusConfig",
             type: "string"
         },
         {
