@@ -29585,6 +29585,9 @@ namespace ts {
                 const fluentExt = getFluentExtension(leftType, right.escapedText.toString())
                 if (fluentExt && isCallExpression(node.parent) && node.parent.expression === node) {
                     if (isExtensionValidForTarget(fluentExt, leftType)) {
+                        if (isIdentifier(_left)) {
+                            markAliasReferenced(getResolvedSymbol(_left), _left);
+                        }
                         return getTypeOfSymbol(fluentExt.patched)
                     }
                     return;
@@ -29593,6 +29596,9 @@ namespace ts {
                 if (getterExt && isExpression(_left)) {
                     const symbol = getterExt.patched(_left);
                     if (symbol) {
+                        if (isIdentifier(_left)) {
+                            markAliasReferenced(getResolvedSymbol(_left), _left);
+                        }
                         const type = getTypeOfSymbol(symbol);
                         // @ts-expect-error
                         type.tsPlusSymbol = symbol; // TsPlusGetterSymbol | TsPlusGetterVariableSymbol
