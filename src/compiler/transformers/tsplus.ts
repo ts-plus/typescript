@@ -120,10 +120,36 @@ namespace ts {
                             return visitCallExpressionOrFluentCallExpression(source, traceInScope, node as CallExpression, visitor(source, traceInScope), context);
                         case SyntaxKind.VariableStatement:
                             return visitVariableStatement(source, node as VariableStatement, visitor(source, traceInScope), context)
+                        case SyntaxKind.Identifier:
+                            return visitIdentifier(source, traceInScope, node as Identifier, context);
                         default:
                             return visitEachChild(node, visitor(source, traceInScope), context);
                     }
                 }
+            }
+            function isExtension(node: Node): boolean {
+                const extensionRegex = /^(static|fluent|getter|operator|index|pipeable).*/;
+                return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && extensionRegex.test(tag.comment)).length > 0;
+            }
+            function visitIdentifier(source: SourceFile, traceInScope: Identifier | undefined, node: Identifier, context: TransformationContext): Identifier {
+                if (isDeclarationName(node) && !isExportDeclaration(node.parent)) {
+                    return visitEachChild(node, visitor(source, traceInScope), context);
+                }
+                const symbol = checker.getSymbolAtLocation(node);
+                if (symbol) {
+                    if (symbol.valueDeclaration && isExtension(symbol.valueDeclaration) && getSourceFileOfNode(symbol.valueDeclaration) === source) {
+                        const name = node.escapedText.toString();
+                        if (localUniqueExtensionNames.has(name)) {
+                            return localUniqueExtensionNames.get(name)!;
+                        }
+                        else {
+                            const uniqueName = context.factory.createUniqueName(node.escapedText.toString());
+                            localUniqueExtensionNames.set(name, uniqueName);
+                            return uniqueName;
+                        }
+                    }
+                }
+                return visitEachChild(node, visitor(source, traceInScope), context);
             }
             function visitElementAccessExpression(source: SourceFile, traceInScope: Identifier | undefined, node: ElementAccessExpression, context: TransformationContext): VisitResult<Node> {
                 const custom = checker.getIndexAccessExpressionCache().get(node)
@@ -512,15 +538,24 @@ namespace ts {
                             if (localUniqueExtensionNames.has(name)) {
                                 const uniqueIdentifier = localUniqueExtensionNames.get(name)!
                                 hoistedStatements.push(
-                                    context.factory.createVariableStatement(undefined, [
-                                        context.factory.createVariableDeclaration(
-                                            uniqueIdentifier,
-                                            undefined,
-                                            undefined,
-                                            context.factory.createIdentifier(name)
-                                        )
-                                    ])
-                                )
+                                    context.factory.createVariableStatement(
+                                        [context.factory.createModifier(SyntaxKind.ExportKeyword), context.factory.createModifier(SyntaxKind.ConstKeyword)],
+                                        context.factory.createVariableDeclarationList([
+                                            context.factory.createVariableDeclaration(declaration.name, declaration.exclamationToken, undefined, uniqueIdentifier)
+                                        ], NodeFlags.Const)
+                                    )
+                                );
+                                return context.factory.updateFunctionDeclaration(
+                                    declaration,
+                                    declaration.decorators,
+                                    filter(declaration.modifiers, (mod) => mod.kind !== SyntaxKind.ExportKeyword),
+                                    declaration.asteriskToken,
+                                    uniqueIdentifier,
+                                    declaration.typeParameters,
+                                    declaration.parameters,
+                                    declaration.type,
+                                    declaration.body
+                                );
                             }
                         }
                         return node;
@@ -532,17 +567,27 @@ namespace ts {
                             const name = declaration.name.escapedText.toString();
                             if (localUniqueExtensionNames.has(name)) {
                                 const uniqueIdentifier = localUniqueExtensionNames.get(name)!;
-                                hoistedStatements.push(
-                                    context.factory.createVariableStatement(undefined, [
-                                        context.factory.createVariableDeclaration(uniqueIdentifier)
-                                    ])
-                                );
                                 return [
-                                    node,
-                                    context.factory.createAssignment(
-                                        uniqueIdentifier,
-                                        context.factory.createIdentifier(name)
+                                    context.factory.updateVariableStatement(
+                                        variableStatement,
+                                        filter(node.modifiers, (mod) => mod.kind !== SyntaxKind.ExportKeyword),
+                                        context.factory.createVariableDeclarationList([
+                                            context.factory.updateVariableDeclaration(
+                                                declaration,
+                                                uniqueIdentifier,
+                                                declaration.exclamationToken,
+                                                declaration.type,
+                                                declaration.initializer
+                                            ),
+                                            ...variableStatement.declarationList.declarations.slice(1)
+                                        ], NodeFlags.Const)
                                     ),
+                                    context.factory.createVariableStatement(
+                                        [context.factory.createModifier(SyntaxKind.ExportKeyword), context.factory.createModifier(SyntaxKind.ConstKeyword)],
+                                        context.factory.createVariableDeclarationList([
+                                            context.factory.createVariableDeclaration(declaration.name, declaration.exclamationToken, undefined, uniqueIdentifier)
+                                        ], NodeFlags.Const)
+                                    )
                                 ];
                             }
                         }

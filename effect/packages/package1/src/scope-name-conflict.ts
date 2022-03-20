@@ -23,3 +23,9 @@ function test() {
  * @tsplus static scope-name-conflict/AOps x
  */
 export const x = new A("thing")
+
+conflict('');
+
+export const y = x;
+
+export { conflict as __x }
