@@ -534,7 +534,7 @@ namespace ts {
                 switch (node.kind) {
                     case SyntaxKind.FunctionDeclaration: {
                         const declaration = node as FunctionDeclaration
-                        if (declaration.name) {
+                        if (declaration.name && declaration.body) {
                             const name = declaration.name.escapedText.toString()
                             if (localUniqueExtensionNames.has(name)) {
                                 const uniqueIdentifier = localUniqueExtensionNames.get(name)!
