@@ -798,7 +798,6 @@ namespace ts {
             getExtensions,
             getGetterExtension,
             getFluentExtension,
-            getOperatorExtension,
             getStaticExtension,
             getStaticCompanionExtension,
             getGetterCompanionExtension,
@@ -1214,30 +1213,6 @@ namespace ts {
                     }
                     else {
                         return x[x.length - 1]();
-                    }
-                }
-            }
-        }
-        function getOperatorExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
-            for (const target of symbols) {
-                if (typeSymbolCache.has(target)) {
-                    const x = typeSymbolCache.get(target)!.flatMap(
-                        (tag) => {
-                            if (operatorCache.has(tag)) {
-                                const cache = operatorCache.get(tag)
-                                if (cache?.has(name)) {
-                                    return [cache.get(name)!]
-                                }
-                            }
-                            return []
-                        }
-                    )
-                    if (x.length === 0) {
-                        continue;
-                    }
-                    else {
-                        return x[x.length - 1];
                     }
                 }
             }

@@ -1912,24 +1912,10 @@ namespace ts {
                     }
                 }
                 if (isToken(nodeForQuickInfo) && nodeForQuickInfo.parent && isBinaryExpression(nodeForQuickInfo.parent)) {
-                    const leftType = typeChecker.getTypeAtLocation(nodeForQuickInfo.parent.left);
                     const operator = typeChecker.getTextOfBinaryOp(nodeForQuickInfo.kind);
                     if (operator) {
-                        const extension = typeChecker.getOperatorExtension(leftType, operator);
-                        if (extension) {
-                            const typeOfSymbol = typeChecker.getTypeOfSymbol(extension.patched)
-                            const declaration = findMap(typeChecker.getSignaturesOfType(typeOfSymbol, SignatureKind.Call) || [], (sig) => {
-                                if (sig.declaration) {
-                                    if (!isJSDocSignature(sig.declaration)) {
-                                        return sig.declaration;
-                                    }
-                                }
-                            });
-                            const signature =
-                                declaration
-                                    ? typeChecker.getInstantiatedTsPlusSignature(declaration, [nodeForQuickInfo.parent.left, nodeForQuickInfo.parent.right], undefined)
-                                    : undefined
-                            if (declaration && signature) {
+                        const signature = typeChecker.getResolvedOperator(nodeForQuickInfo);
+                            if (signature && signature.declaration && !isJSDocSignature(signature.declaration)) {
                                 let displayParts: SymbolDisplayPart[] = [];
                                 displayParts.push(textPart("("));
                                 displayParts.push(textPart("operator"));
@@ -1940,7 +1926,7 @@ namespace ts {
                                 displayParts = displayParts.concat(
                                     typeChecker.runWithCancellationToken(
                                         cancellationToken,
-                                        (typeChecker) => getTsPlusSignatureDisplayParts(typeChecker, nodeForQuickInfo, declaration, signature)
+                                        (typeChecker) => getTsPlusSignatureDisplayParts(typeChecker, nodeForQuickInfo, signature.declaration as SignatureDeclaration, signature)
                                     )
                                 );
                                 return {
@@ -1948,11 +1934,10 @@ namespace ts {
                                     kindModifiers: ScriptElementKindModifier.none,
                                     textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
                                     displayParts,
-                                    documentation: getDocumentationComment([declaration], typeChecker),
-                                    tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
+                                    documentation: getDocumentationComment([signature.declaration], typeChecker),
+                                    tags: getJsDocTagsOfDeclarations([signature.declaration], typeChecker)
                                 };
                             }
-                        }
                     }
                 }
                 if(isPropertyAccessExpression(node.parent)) {

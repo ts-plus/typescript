@@ -82,4 +82,5 @@ export const resSync = unifiedSync(0).flatMap((n) => Sync(n + 1))
 export const resEffect = unifiedSync(0).flatMap((n) => Effect(n + 1))
 
 export const resSyncZip = Sync(0) + Sync(1)
+
 export const resEffectZip = Sync(0) + Effect(1)

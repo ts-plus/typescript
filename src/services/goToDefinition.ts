@@ -79,16 +79,9 @@ namespace ts.GoToDefinition {
             }
         }
         else if (isToken(node) && isBinaryExpression(parent)) {
-            const leftType = typeChecker.getTypeAtLocation(parent.left);
-            const operator = typeChecker.getTextOfBinaryOp(node.kind);
-            if (operator) {
-                const extension = typeChecker.getOperatorExtension(leftType, operator);
-                if (extension) {
-                    const declaration = extension.patched.valueDeclaration;
-                    if(declaration) {
-                        symbol = declaration.symbol;
-                    }
-                }
+            const extension = typeChecker.getResolvedOperator(node);
+            if (extension && extension.declaration) {
+                symbol = extension.declaration.symbol;
             }
         }
 
