@@ -4659,6 +4659,7 @@ namespace ts {
         collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocExtensionTag[]
         getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
         getPrimitiveTypeName(type: Type): string | undefined
+        getResolvedOperator(node: Node): Signature | undefined
     }
 
     /* @internal */

@@ -165,12 +165,9 @@ namespace ts {
                 return visitEachChild(node, visitor(source, traceInScope), context)
             }
             function visitBinaryExpression(source: SourceFile, traceInScope: Identifier | undefined, node: BinaryExpression, context: TransformationContext): VisitResult<Node> {
-                const leftType = checker.getTypeAtLocation(node.left);
-                const operator = checker.getOperatorExtension(leftType, getTextOfNode(node.operatorToken, false));
+                const call = checker.getResolvedOperator(node.operatorToken);
 
-                if (operator) {
-                    const type = checker.getTypeOfSymbol(operator.patched)
-                    const call = checker.getSignaturesOfType(type, SignatureKind.Call)[0];
+                if (call && call.declaration) {
                     const lastTrace = call.parameters.length > 0 ? call.parameters[call.parameters.length - 1].escapedName === "___tsplusTrace" : false
                     const params = [visitNode(node.left, visitor(source, traceInScope)), visitNode(node.right, visitor(source, traceInScope))]
                     if (checker.shouldMakeLazy(call.parameters[1], checker.getTypeAtLocation(node.right))) {
@@ -180,7 +177,10 @@ namespace ts {
                         params.push(traceInScope ? traceInScope : getTrace(source, node.operatorToken))
                     }
                     return context.factory.createCallExpression(
-                        getPathOfExtension(context, importer, operator, source, localUniqueExtensionNames),
+                        getPathOfExtension(context, importer, {
+                            definition: getSourceFileOfNode(call.declaration),
+                            exportName: call.declaration.symbol.escapedName as string
+                        }, source, localUniqueExtensionNames),
                         [],
                         params
                     )

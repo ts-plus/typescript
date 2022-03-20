@@ -1,3 +1,4 @@
+import { Tuple } from "@effect-ts/core/Collections/Immutable/Tuple";
 import * as _ from "@effect-ts/core/Sync";
 import { LazyArgument } from "../../utils/LazyArgument";
 import { Effect } from "./Effect";
@@ -32,6 +33,14 @@ export function unifySync<X extends Sync<any, any, any>>(self: X): Sync<
 > {
     return self
 }
+
+/**
+ * Sequentially zips this effect with the specified effect
+ *
+ * @tsplus operator ets/Sync +
+ * @tsplus fluent ets/Sync zip
+ */
+export declare function zip_<R, E, A, R2, E2, A2>(self: Sync<R, E, A>, that: Sync<R2, E2, A2>, __tsplusTrace?: string): Sync<R & R2, E | E2, Tuple<[A, A2]>>
 
 /**
  * Imports a synchronous side-effect into a pure value
@@ -71,3 +80,6 @@ export const unifiedSync = (n: number) => {
 
 export const resSync = unifiedSync(0).flatMap((n) => Sync(n + 1))
 export const resEffect = unifiedSync(0).flatMap((n) => Effect(n + 1))
+
+export const resSyncZip = Sync(0) + Sync(1)
+export const resEffectZip = Sync(0) + Effect(1)

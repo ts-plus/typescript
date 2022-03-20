@@ -815,6 +815,7 @@ namespace ts {
             collectTsPlusFluentTags,
             getFluentExtensionForPipeableSymbol,
             getPrimitiveTypeName,
+            getResolvedOperator: (node) => getNodeLinks(node).resolvedSignature
             // TSPLUS EXTENSION END
         };
 
@@ -1240,6 +1241,32 @@ namespace ts {
                     }
                 }
             }
+        }
+        function getOperatorExtensions(targetType: Type, name: string): Signature[] {
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
+            const signatures: Signature[] = [];
+            for (const target of symbols) {
+                if (typeSymbolCache.has(target)) {
+                    const x = typeSymbolCache.get(target)!.flatMap(
+                        (tag) => {
+                            if (operatorCache.has(tag)) {
+                                const cache = operatorCache.get(tag)
+                                if (cache?.has(name)) {
+                                    return [cache.get(name)!]
+                                }
+                            }
+                            return []
+                        }
+                    )
+                    if (x.length === 0) {
+                        continue;
+                    }
+                    else {
+                        signatures.push(...x.flatMap(({ patched }) => getSignaturesOfType(getTypeOfSymbol(patched), SignatureKind.Call)))
+                    }
+                }
+            }
+            return signatures;
         }
         function isTransformablePipeableExtension(type: Type): boolean {
             if (type.symbol) {
@@ -15208,6 +15235,77 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION START
+        function checkTsPlusCustomCallMulti(
+            nodeForLink: Node,
+            signatures: readonly Signature[],
+            args: Expression[],
+            checkMode: CheckMode | undefined,
+            addDiagnostic?: (_: Diagnostic) => void,
+        ): Type {
+            const node = factory.createCallExpression(
+                factory.createIdentifier("$tsplus_custom_call"),
+                [],
+                args
+            );
+            let sig: Signature | undefined = void 0;
+            for (let candidate of signatures) {
+                if (candidate.typeParameters && candidate.declaration) {
+                    setParent(node, candidate.declaration);
+                    const inferenceContext = createInferenceContext(
+                        candidate.typeParameters,
+                        candidate,
+                        InferenceFlags.None
+                    );
+                    const typeArgumentTypes = inferTypeArguments(
+                        node,
+                        candidate,
+                        args,
+                        checkMode || CheckMode.Normal,
+                        inferenceContext
+                    );
+                    sig = getSignatureInstantiation(
+                        candidate,
+                        typeArgumentTypes,
+                        /*isJavascript*/ false,
+                        inferenceContext && inferenceContext.inferredTypeParameters
+                    );
+                } else {
+                    sig = candidate;
+                }
+                const digs = getSignatureApplicabilityError(
+                    node,
+                    args,
+                    sig,
+                    assignableRelation,
+                    checkMode || CheckMode.Normal,
+                    /*reportErrors*/ false,
+                    /*containingMessageChain*/ void 0
+                );
+                if (!digs) {
+                    getNodeLinks(nodeForLink).resolvedSignature = sig;
+                    return getReturnTypeOfSignature(sig);
+                }
+            }
+            if (!sig) {
+                return errorType;
+            }
+            if (addDiagnostic) {
+                getSignatureApplicabilityError(
+                    node,
+                    args,
+                    sig,
+                    assignableRelation,
+                    checkMode || CheckMode.Normal,
+                    /*reportErrors*/ true,
+                    /*containingMessageChain*/ void 0
+                )?.forEach((dig) => {
+                    addDiagnostic(dig);
+                });
+                return errorType;
+            }
+            return errorType;
+        }
+
         function checkTsPlusCustomCall(
             declaration: Declaration,
             args: Expression[],
@@ -34627,17 +34725,15 @@ namespace ts {
             // @ts-expect-error
             const operatorMappingEntry = invertedBinaryOp[operator] as string | undefined
             if (operatorMappingEntry) {
-                const operatorOverload = getOperatorExtension(leftType, operatorMappingEntry);
-                if (operatorOverload) {
-                    const declaration = operatorOverload.patched.declarations?.find((node) => isFunctionDeclaration(node) || isVariableDeclaration(node));
-                    if (declaration) {
-                        return checkTsPlusCustomCall(
-                            declaration as FunctionDeclaration | VariableDeclaration,
-                            [left, right],
-                            CheckMode.Normal,
-                            (_) => diagnostics.add(_)
-                        );
-                    }
+                const signatures = getOperatorExtensions(leftType, operatorMappingEntry);
+                if (signatures.length > 0) {
+                    return checkTsPlusCustomCallMulti(
+                        operatorToken,
+                        signatures,
+                        [left, right],
+                        CheckMode.Normal,
+                        (_) => diagnostics.add(_)
+                    );
                 }
             }
             // TSPLUS EXTENSION END
