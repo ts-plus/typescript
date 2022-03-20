@@ -3440,7 +3440,7 @@ namespace ts {
         declaration: (VariableDeclaration & { name: Identifier }) | FunctionDeclaration;
         exportName: string;
         definition: SourceFile;
-        index: number;
+        priority: number;
     }
 
     export interface TsPlusUnresolvedFluentExtension {
@@ -3467,6 +3467,13 @@ namespace ts {
         patched: Symbol;
         definition: SourceFile;
         exportName: string;
+    }
+
+    export interface TsPlusOperatorExtension {
+        patched: Symbol;
+        definition: SourceFile;
+        exportName: string;
+        priority: number;
     }
 
     export interface TsPlusType extends Type {
@@ -5373,7 +5380,7 @@ namespace ts {
         declarationRequiresScopeChange?: boolean; // Set by `useOuterVariableScopeInParameter` in checker when downlevel emit would change the name resolution scope inside of a parameter.
         serializedTypes?: ESMap<string, TypeNode & {truncating?: boolean, addedLength: number}>; // Collection of types serialized at this location
         // TSPLUS EXTENSION START
-        isTsPlus?: boolean
+        isTsPlusOperatorToken?: boolean
         // TSPLUS EXTENSION END
     }
 

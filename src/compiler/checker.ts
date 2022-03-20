@@ -358,7 +358,7 @@ namespace ts {
         const fluentCache = new Map<string, ESMap<string, () => TsPlusFluentExtension | undefined>>();
         const unresolvedFluentCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
-        const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string, priority: number }[]>>();
+        const operatorCache = new Map<string, ESMap<string, TsPlusOperatorExtension[]>>();
         const staticFunctionCache = new Map<string, ESMap<string, TsPlusStaticFunctionExtension>>()
         const staticValueCache = new Map<string, ESMap<string, TsPlusStaticValueExtension>>();
         const staticCache = new Map<string, ESMap<string, () => TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined>>();
@@ -819,7 +819,7 @@ namespace ts {
             getPrimitiveTypeName,
             getResolvedOperator: (node) => {
                 const nodeLinks = getNodeLinks(node.operatorToken);
-                if (nodeLinks.resolvedSignature === undefined && nodeLinks.isTsPlus === undefined) {
+                if (nodeLinks.resolvedSignature === undefined && nodeLinks.isTsPlusOperatorToken === undefined) {
                     checkBinaryLikeExpression(node.left, node.operatorToken, node.right);
                 }
                 return nodeLinks.resolvedSignature;
@@ -34728,7 +34728,7 @@ namespace ts {
             if (operatorMappingEntry) {
                 const signatures = getOperatorExtensions(leftType, rightType, operatorMappingEntry);
                 if (signatures.length > 0) {
-                    getNodeLinks(operatorToken).isTsPlus = true;
+                    getNodeLinks(operatorToken).isTsPlusOperatorToken = true;
                     return checkTsPlusCustomCallMulti(
                         operatorToken,
                         signatures,
@@ -34738,7 +34738,7 @@ namespace ts {
                     );
                 }
             }
-            getNodeLinks(operatorToken).isTsPlus = false;
+            getNodeLinks(operatorToken).isTsPlusOperatorToken = false;
             // TSPLUS EXTENSION END
 
             switch (operator) {
@@ -44816,7 +44816,7 @@ namespace ts {
                                     definition: file,
                                     declaration: declaration as VariableDeclaration & { name: Identifier },
                                     exportName: declaration.name.escapedText.toString(),
-                                    index: tag.priority,
+                                    priority: tag.priority,
                                 }])
                             });
                         }
@@ -44826,7 +44826,7 @@ namespace ts {
                                 definition: file,
                                 declaration: declaration as VariableDeclaration & { name: Identifier },
                                 exportName: declaration.name.escapedText.toString(),
-                                index: tag.priority,
+                                priority: tag.priority,
                             });
                         }
                     }
@@ -44948,7 +44948,7 @@ namespace ts {
                                 definition: file,
                                 declaration,
                                 exportName: declaration.name.escapedText.toString(),
-                                index: tag.priority,
+                                priority: tag.priority,
                             }]),
                         });
                     }
@@ -44958,7 +44958,7 @@ namespace ts {
                             definition: file,
                             declaration,
                             exportName: declaration.name.escapedText.toString(),
-                            index: tag.priority,
+                            priority: tag.priority,
                         });
                     }
                 }
@@ -45323,18 +45323,18 @@ namespace ts {
                             }
                         }
                         const allTypes: { type: Type, signatures: readonly TsPlusSignature[] }[] = [];
-                        const indexedSignaturesMap = new Map<number, TsPlusSignature[]> ()
+                        const prioritizedSignaturesMap = new Map<number, TsPlusSignature[]> ()
 
-                        definition.forEach(({ declaration, definition, exportName, index }) => {
+                        definition.forEach(({ declaration, definition, exportName, priority }) => {
                             if (isFunctionDeclaration(declaration)) {
                                 const typeAndSignatures = getTsPlusFluentSignaturesForFunctionDeclaration(definition, exportName, declaration);
                                 if (typeAndSignatures) {
                                     const [type, signatures] = typeAndSignatures;
-                                    if (indexedSignaturesMap.has(index)) {
-                                        indexedSignaturesMap.get(index)!.push(...signatures)
+                                    if (prioritizedSignaturesMap.has(priority)) {
+                                        prioritizedSignaturesMap.get(priority)!.push(...signatures)
                                     }
                                     else {
-                                        indexedSignaturesMap.set(index, signatures);
+                                        prioritizedSignaturesMap.set(priority, signatures);
                                     }
                                     allTypes.push({ type, signatures });
                                 }
@@ -45343,24 +45343,24 @@ namespace ts {
                                 const typeAndSignatures = getTsPlusFluentSignaturesForVariableDeclaration(definition, exportName, declaration);
                                 if (typeAndSignatures) {
                                     const [type, signatures] = typeAndSignatures;
-                                    if (indexedSignaturesMap.has(index)) {
-                                        indexedSignaturesMap.get(index)!.push(...signatures)
+                                    if (prioritizedSignaturesMap.has(priority)) {
+                                        prioritizedSignaturesMap.get(priority)!.push(...signatures)
                                     }
                                     else {
-                                        indexedSignaturesMap.set(index, signatures);
+                                        prioritizedSignaturesMap.set(priority, signatures);
                                     }
                                     allTypes.push({ type, signatures });
                                 }
                             }
                         });
 
-                        const indexedSignatures: [number, TsPlusSignature[]][] = []
-                        indexedSignaturesMap.forEach((signatures, index) => {
-                            indexedSignatures.push([index, signatures])
+                        const prioritizedSignatures: [number, TsPlusSignature[]][] = []
+                        prioritizedSignaturesMap.forEach((signatures, priority) => {
+                            prioritizedSignatures.push([priority, signatures])
                         })
-                        indexedSignatures.sort((x, y) => x[0] > y[0] ? 1 : x[0] < y[0] ? -1 : 0)
+                        prioritizedSignatures.sort((x, y) => x[0] > y[0] ? 1 : x[0] < y[0] ? -1 : 0)
 
-                        const allSignatures = indexedSignatures.flatMap((signatures) => signatures[1])
+                        const allSignatures = prioritizedSignatures.flatMap((signatures) => signatures[1])
 
                         if (allSignatures.length === 0) {
                             return undefined;
