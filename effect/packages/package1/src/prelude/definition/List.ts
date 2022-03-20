@@ -1,10 +1,26 @@
+export class Cons<A> implements Iterable<A> {
+    constructor(readonly array: readonly A[]) { }
+
+    [Symbol.iterator]!: () => Iterator<A>
+}
+
+export class Nil<A> implements Iterable<A> {
+    readonly _A!: () => A;
+    readonly array = [];
+    [Symbol.iterator]!: () => Iterator<A>
+}
+
 /**
  * @tsplus type tsplus-tests/List
- * @tsplus companion tsplus-tests/ListOps
  */
-export class List<A> {
-    constructor(readonly array: readonly A[]) { }
-}
+export type List<A> = Nil<A> | Cons<A>
+
+/**
+ * @tsplus type tsplus-tests/ListOps
+ */
+export interface ListOps {}
+
+export const List: ListOps = {};
 
 /**
  * @tsplus unify tsplus-tests/List
@@ -26,7 +42,7 @@ export function indexAt<A>(self: List<A>, index: number): A | undefined {
  * @tsplus static tsplus-tests/ListOps __call
  */
 export function make<As extends readonly any[]>(...as: As): List<As[number]> {
-    return new List(as)
+    return new Cons(as)
 }
 
 /**
@@ -35,7 +51,7 @@ export function make<As extends readonly any[]>(...as: As): List<As[number]> {
  * @tsplus fluent tsplus-tests/List concat
  */
 export function concat<A>(self: List<A>, that: List<A>): List<A> {
-    return new List([...self.array, ...that.array])
+    return new Cons([...self.array, ...that.array])
 }
 
 /**
@@ -43,7 +59,7 @@ export function concat<A>(self: List<A>, that: List<A>): List<A> {
  * @tsplus operator tsplus-tests/List +
  */
 export function prependTo<A>(a: A, self: List<A>): List<A> {
-    return new List([a, ...self.array])
+    return new Cons([a, ...self.array])
 }
 
 /**
@@ -51,7 +67,7 @@ export function prependTo<A>(a: A, self: List<A>): List<A> {
  * @tsplus fluent tsplus-tests/List prepend
  */
 export function prepend<A>(self: List<A>, a: A): List<A> {
-    return new List([a, ...self.array])
+    return new Cons([a, ...self.array])
 }
 
 /**
@@ -60,7 +76,7 @@ export function prepend<A>(self: List<A>, a: A): List<A> {
  * @tsplus fluent tsplus-tests/List append
  */
 export function append<A>(self: List<A>, a: A): List<A> {
-    return new List([...self.array, a])
+    return new Cons([...self.array, a])
 }
 
 export const prepended = 1 + List(0) // prepend
