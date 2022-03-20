@@ -15409,9 +15409,11 @@ namespace ts {
                 return unionType;
             }
             for (let type of types) {
+                let tags = 0
                 for (let symbol of collectRelevantSymbols(type)) {
                     for (let declaration of (symbol.declarations || [])){
                         for (let typeTag of collectTsPlusTypeTags(declaration)) {
+                            tags++;
                             const target = typeTag.comment.split(" ")[1]!;
                             const id = identityCache.get(target);
                             if (id) {
@@ -15426,6 +15428,9 @@ namespace ts {
                             }
                         }
                     }
+                }
+                if (tags === 0) {
+                    return unionType
                 }
             }
             return unionType;
