@@ -15405,30 +15405,32 @@ namespace ts {
             if (types.length <= 1) {
                 return unionType;
             }
-            const unifiers = types.map((type) => {
-                const symbols = collectRelevantSymbols(type);
-                const unifiers = symbols.flatMap((symbol) => {
-                    return symbol.declarations?.flatMap((declaration) => collectTsPlusTypeTags(declaration).flatMap((typeTag) => {
-                        const target = typeTag.comment.split(" ")[1]!;
-                        const id = identityCache.get(target);
-                        return id ? [id] : []
-                    })) || []
+            if (every(types, (_) => _.aliasSymbol !== aliasTypeArguments)) {
+                const unifiers = types.map((type) => {
+                    const symbols = collectRelevantSymbols(type);
+                    const unifiers = symbols.flatMap((symbol) => {
+                        return symbol.declarations?.flatMap((declaration) => collectTsPlusTypeTags(declaration).flatMap((typeTag) => {
+                            const target = typeTag.comment.split(" ")[1]!;
+                            const id = identityCache.get(target);
+                            return id ? [id] : []
+                        })) || []
+                    })
+                    return unifiers;
                 })
-                return unifiers;
-            })
-            if (every(unifiers, (unifier) => unifier.length > 0)) {
-                for (let unifierArray of unifiers) {
-                    for (let unifier of unifierArray) {
-                        const result = checkTsPlusCustomCall(
-                            unifier,
-                            [factory.createSyntheticExpression(unionType)],
-                            CheckMode.Normal
-                        );
-                        if (!isErrorType(result)) {
-                            return result
+                if (every(unifiers, (unifier) => unifier.length > 0)) {
+                    for (let unifierArray of unifiers) {
+                        for (let unifier of unifierArray) {
+                            const result = checkTsPlusCustomCall(
+                                unifier,
+                                [factory.createSyntheticExpression(unionType)],
+                                CheckMode.Normal
+                            );
+                            if (!isErrorType(result)) {
+                                return result
+                            }
                         }
                     }
-                }
+                }    
             }
             return unionType;
         }
