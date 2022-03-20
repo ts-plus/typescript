@@ -954,7 +954,6 @@ namespace ts {
                         }
                         intersectSets(inherited).forEach((s) => {
                             relevant.add(s)
-                            stack = makeStack(getTypeOfSymbol(s), stack);
                         })
                     }
                 }
