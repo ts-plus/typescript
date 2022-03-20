@@ -1,7 +1,7 @@
 import { T } from './T.js'
 
 /**
- * @tsplus fluent T op 1
+ * @tsplus fluent T op 0.1
  */
 export function op1_<A>(_self: T<A>, x: string): T<string> {
   return { value: x }

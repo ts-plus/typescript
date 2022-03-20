@@ -44150,7 +44150,7 @@ namespace ts {
             }
             let parsedIndex: number;
             if (index) {
-                const n = Number.parseInt(index);
+                const n = Number.parseFloat(index);
                 if (Number.isNaN(n)) {
                     return undefined;
                 }
@@ -45305,15 +45305,16 @@ namespace ts {
                         const indexedSignaturesMap = new Map<number, TsPlusSignature[]> ()
 
                         definition.forEach(({ declaration, definition, exportName, index }) => {
-                            if (indexedSignaturesMap.has(index)) {
-                                error(declaration, Diagnostics.Multi_method_0_has_multiple_declarations_with_the_index_1, name, index);
-                                return;
-                            }
                             if (isFunctionDeclaration(declaration)) {
                                 const typeAndSignatures = getTsPlusFluentSignaturesForFunctionDeclaration(definition, exportName, declaration);
                                 if (typeAndSignatures) {
                                     const [type, signatures] = typeAndSignatures;
-                                    indexedSignaturesMap.set(index, signatures);
+                                    if (indexedSignaturesMap.has(index)) {
+                                        indexedSignaturesMap.get(index)!.push(...signatures)
+                                    }
+                                    else {
+                                        indexedSignaturesMap.set(index, signatures);
+                                    }
                                     allTypes.push({ type, signatures });
                                 }
                             }
@@ -45321,7 +45322,12 @@ namespace ts {
                                 const typeAndSignatures = getTsPlusFluentSignaturesForVariableDeclaration(definition, exportName, declaration);
                                 if (typeAndSignatures) {
                                     const [type, signatures] = typeAndSignatures;
-                                    indexedSignaturesMap.set(index, signatures);
+                                    if (indexedSignaturesMap.has(index)) {
+                                        indexedSignaturesMap.get(index)!.push(...signatures)
+                                    }
+                                    else {
+                                        indexedSignaturesMap.set(index, signatures);
+                                    }
                                     allTypes.push({ type, signatures });
                                 }
                             }
