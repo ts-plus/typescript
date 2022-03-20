@@ -1914,30 +1914,30 @@ namespace ts {
                 if (isToken(nodeForQuickInfo) && nodeForQuickInfo.parent && isBinaryExpression(nodeForQuickInfo.parent)) {
                     const operator = typeChecker.getTextOfBinaryOp(nodeForQuickInfo.kind);
                     if (operator) {
-                        const signature = typeChecker.getResolvedOperator(nodeForQuickInfo);
-                            if (signature && signature.declaration && !isJSDocSignature(signature.declaration)) {
-                                let displayParts: SymbolDisplayPart[] = [];
-                                displayParts.push(textPart("("));
-                                displayParts.push(textPart("operator"));
-                                displayParts.push(textPart(")"));
-                                displayParts.push(spacePart());
-                                displayParts.push(displayPart(operator, SymbolDisplayPartKind.operator));
-                                displayParts.push(spacePart());
-                                displayParts = displayParts.concat(
-                                    typeChecker.runWithCancellationToken(
-                                        cancellationToken,
-                                        (typeChecker) => getTsPlusSignatureDisplayParts(typeChecker, nodeForQuickInfo, signature.declaration as SignatureDeclaration, signature)
-                                    )
-                                );
-                                return {
-                                    kind: ScriptElementKind.functionElement,
-                                    kindModifiers: ScriptElementKindModifier.none,
-                                    textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
-                                    displayParts,
-                                    documentation: getDocumentationComment([signature.declaration], typeChecker),
-                                    tags: getJsDocTagsOfDeclarations([signature.declaration], typeChecker)
-                                };
-                            }
+                        const signature = typeChecker.getResolvedOperator(nodeForQuickInfo.parent);
+                        if (signature && signature.declaration && !isJSDocSignature(signature.declaration)) {
+                            let displayParts: SymbolDisplayPart[] = [];
+                            displayParts.push(textPart("("));
+                            displayParts.push(textPart("operator"));
+                            displayParts.push(textPart(")"));
+                            displayParts.push(spacePart());
+                            displayParts.push(displayPart(operator, SymbolDisplayPartKind.operator));
+                            displayParts.push(spacePart());
+                            displayParts = displayParts.concat(
+                                typeChecker.runWithCancellationToken(
+                                    cancellationToken,
+                                    (typeChecker) => getTsPlusSignatureDisplayParts(typeChecker, nodeForQuickInfo, signature.declaration as SignatureDeclaration, signature)
+                                )
+                            );
+                            return {
+                                kind: ScriptElementKind.functionElement,
+                                kindModifiers: ScriptElementKindModifier.none,
+                                textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
+                                displayParts,
+                                documentation: getDocumentationComment([signature.declaration], typeChecker),
+                                tags: getJsDocTagsOfDeclarations([signature.declaration], typeChecker)
+                            };
+                        }
                     }
                 }
                 if(isPropertyAccessExpression(node.parent)) {

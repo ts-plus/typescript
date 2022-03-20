@@ -165,7 +165,7 @@ namespace ts {
                 return visitEachChild(node, visitor(source, traceInScope), context)
             }
             function visitBinaryExpression(source: SourceFile, traceInScope: Identifier | undefined, node: BinaryExpression, context: TransformationContext): VisitResult<Node> {
-                const call = checker.getResolvedOperator(node.operatorToken);
+                const call = checker.getResolvedOperator(node);
 
                 if (call && call.declaration) {
                     const lastTrace = call.parameters.length > 0 ? call.parameters[call.parameters.length - 1].escapedName === "___tsplusTrace" : false

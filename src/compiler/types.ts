@@ -4671,7 +4671,7 @@ namespace ts {
         collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocFluentTag[]
         getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
         getPrimitiveTypeName(type: Type): string | undefined
-        getResolvedOperator(node: Node): Signature | undefined
+        getResolvedOperator(node: BinaryExpression): Signature | undefined
     }
 
     /* @internal */
@@ -5372,6 +5372,9 @@ namespace ts {
         skipDirectInference?: true;         // Flag set by the API `getContextualType` call on a node when `Completions` is passed to force the checker to skip making inferences to a node's type
         declarationRequiresScopeChange?: boolean; // Set by `useOuterVariableScopeInParameter` in checker when downlevel emit would change the name resolution scope inside of a parameter.
         serializedTypes?: ESMap<string, TypeNode & {truncating?: boolean, addedLength: number}>; // Collection of types serialized at this location
+        // TSPLUS EXTENSION START
+        isTsPlus?: boolean
+        // TSPLUS EXTENSION END
     }
 
     export const enum TypeFlags {

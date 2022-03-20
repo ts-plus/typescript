@@ -817,7 +817,13 @@ namespace ts {
             collectTsPlusFluentTags,
             getFluentExtensionForPipeableSymbol,
             getPrimitiveTypeName,
-            getResolvedOperator: (node) => getNodeLinks(node).resolvedSignature
+            getResolvedOperator: (node) => {
+                const nodeLinks = getNodeLinks(node.operatorToken);
+                if (nodeLinks.resolvedSignature === undefined && nodeLinks.isTsPlus === undefined) {
+                    checkBinaryLikeExpression(node.left, node.operatorToken, node.right);
+                }
+                return nodeLinks.resolvedSignature;
+            }
             // TSPLUS EXTENSION END
         };
 
@@ -34722,6 +34728,7 @@ namespace ts {
             if (operatorMappingEntry) {
                 const signatures = getOperatorExtensions(leftType, rightType, operatorMappingEntry);
                 if (signatures.length > 0) {
+                    getNodeLinks(operatorToken).isTsPlus = true;
                     return checkTsPlusCustomCallMulti(
                         operatorToken,
                         signatures,
@@ -34731,6 +34738,7 @@ namespace ts {
                     );
                 }
             }
+            getNodeLinks(operatorToken).isTsPlus = false;
             // TSPLUS EXTENSION END
 
             switch (operator) {
@@ -44793,7 +44801,7 @@ namespace ts {
                     for (const fluentTag of fluentTags) {
                         const tag = parseTsPlusExtensionTag(fluentTag)
                         if (!tag) {
-                            error(statement, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name);
+                            error(statement, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
                             return;
                         }
                         if (!unresolvedFluentCache.has(tag.target)) {
@@ -44863,7 +44871,7 @@ namespace ts {
                     if (symbol) {
                         const tag = parseTsPlusExtensionTag(operatorTag);
                         if (!tag) {
-                            error(declaration, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol);
+                            error(declaration, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
                             return;
                         }
                         if (!operatorCache.has(tag.target)) {
@@ -44893,7 +44901,7 @@ namespace ts {
                         if (symbol) {
                             const tag = parseTsPlusExtensionTag(operatorTag);
                             if (!tag) {
-                                error(declaration, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol);
+                                error(declaration, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
                                 return;
                             }
                             if (!operatorCache.has(tag.target)) {
@@ -44925,7 +44933,7 @@ namespace ts {
                 for (const fluentTag of fluentTags) {
                     const tag = parseTsPlusExtensionTag(fluentTag)
                     if (!tag) {
-                        error(declaration, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name);
+                        error(declaration, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
                         return;
                     }
                     if (!unresolvedFluentCache.has(tag.target)) {
