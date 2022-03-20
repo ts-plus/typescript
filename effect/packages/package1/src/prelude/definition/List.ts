@@ -30,6 +30,7 @@ export function make<As extends readonly any[]>(...as: As): List<As[number]> {
 }
 
 /**
+ * Concatenates `List<A>` and `List<B>`
  * @tsplus operator tsplus-tests/List +
  * @tsplus fluent tsplus-tests/List concat
  */
@@ -46,6 +47,7 @@ export function prependTo<A, B>(a: A, self: List<B>): List<A | B> {
 }
 
 /**
+ * Prepends `a: B` to `List<A>`
  * @tsplus fluent tsplus-tests/List prepend
  */
 export function prepend<A, B>(self: List<A>, a: B): List<A | B> {
@@ -53,6 +55,7 @@ export function prepend<A, B>(self: List<A>, a: B): List<A | B> {
 }
 
 /**
+ * Appends `a: B` to `List<A>`
  * @tsplus operator tsplus-tests/List +
  * @tsplus fluent tsplus-tests/List append
  */
@@ -60,6 +63,6 @@ export function append<A, B>(self: List<A>, a: B): List<A | B> {
     return new List([...self.array, a])
 }
 
-export const prepended = 1 + List(0)
-export const appended = List(0) + 1
-export const sequenced = List(0) + List(1)
+export const prepended = 1 + List(0) // prepend
+export const appended = List(0) + 1 // append
+export const sequenced = List(0) + List(1) // concat
