@@ -34,32 +34,32 @@ export function make<As extends readonly any[]>(...as: As): List<As[number]> {
  * @tsplus operator tsplus-tests/List +
  * @tsplus fluent tsplus-tests/List concat
  */
-export function concat<A, B>(self: List<A>, that: List<B>): List<A | B> {
+export function concat<A>(self: List<A>, that: List<A>): List<A> {
     return new List([...self.array, ...that.array])
 }
 
 /**
- * Prepends `a: B` to `List<A>`
+ * Prepends `a: A` to `List<A>`
  * @tsplus operator tsplus-tests/List +
  */
-export function prependTo<A, B>(a: A, self: List<B>): List<A | B> {
+export function prependTo<A>(a: A, self: List<A>): List<A> {
     return new List([a, ...self.array])
 }
 
 /**
- * Prepends `a: B` to `List<A>`
+ * Prepends `a: A` to `List<A>`
  * @tsplus fluent tsplus-tests/List prepend
  */
-export function prepend<A, B>(self: List<A>, a: B): List<A | B> {
+export function prepend<A>(self: List<A>, a: A): List<A> {
     return new List([a, ...self.array])
 }
 
 /**
- * Appends `a: B` to `List<A>`
+ * Appends `a: A` to `List<A>`
  * @tsplus operator tsplus-tests/List +
  * @tsplus fluent tsplus-tests/List append
  */
-export function append<A, B>(self: List<A>, a: B): List<A | B> {
+export function append<A>(self: List<A>, a: A): List<A> {
     return new List([...self.array, a])
 }
 
