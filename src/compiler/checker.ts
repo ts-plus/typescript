@@ -1060,10 +1060,10 @@ namespace ts {
                 }
             })
             copyFluent.forEach((extensions, k) => {
-                copy.set(k, createSymbolWithType(
-                    createSymbol(SymbolFlags.Method, k as __String),
-                    getIntersectionType(extensions.map((e) => getTypeOfSymbol(e.patched)))
-                ))
+                copy.set(
+                    k,
+                    createTsPlusFluentSymbolWithType(k, extensions.flatMap((e) => getSignaturesOfType(getTypeOfSymbol(e.patched), SignatureKind.Call)) as TsPlusSignature[])
+                );
             });
             copy.delete("__call");
             return copy;
@@ -1090,7 +1090,7 @@ namespace ts {
         }
         function getFluentExtension(targetType: Type, name: string): Type | undefined {
             const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType));
-            const candidates: Type[] = [];
+            const candidates: TsPlusSignature[] = [];
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
@@ -1111,14 +1111,14 @@ namespace ts {
                         x.forEach((getExt) => {
                             const ext = getExt();
                             if (ext) {
-                                candidates.push(getTypeOfSymbol(ext.patched));
+                                candidates.push(...ext.signatures);
                             }
                         });
                     }
                 }
             }
             if (candidates.length > 0) {
-                return getIntersectionType(candidates)
+                return getTypeOfSymbol(createTsPlusFluentSymbolWithType(name, candidates));
             }
         }
         function getGetterExtension(targetType: Type, name: string) {
@@ -44152,6 +44152,11 @@ namespace ts {
             symbol.tsPlusResolvedSignatures = signatures;
             symbol.tsPlusName = name;
             return symbol;
+        }
+        function createTsPlusFluentSymbolWithType(name: string, allSignatures: TsPlusSignature[]): TransientSymbol {
+            const symbol = createTsPlusFluentSymbol(name, allSignatures);
+            const type = createAnonymousType(symbol, emptySymbols, allSignatures, [], []);
+            return createSymbolWithType(symbol, type);
         }
         function createTsPlusGetterVariableSymbol(name: string, dataFirst: VariableDeclaration & { name: Identifier }, returnType: Type, selfType: Type) {
             const symbol = createSymbol(SymbolFlags.Property, name as __String) as TsPlusGetterVariableSymbol;
