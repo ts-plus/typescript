@@ -39,11 +39,17 @@ export function indexAt<A>(self: List<A>, index: number): A | undefined {
 }
 
 /**
+ * @tsplus static tsplus-tests/ListOps from
  * @tsplus static tsplus-tests/ListOps __call
  */
 export function make<As extends readonly any[]>(...as: As): List<As[number]> {
     return new Cons(as)
 }
+
+pipe(
+    List.from(1, 2, 3),
+    List.from
+)
 
 /**
  * Concatenates `List<A>` and `List<B>`
@@ -75,9 +81,11 @@ export function prepend<A>(self: List<A>, a: A): List<A> {
  * @tsplus operator tsplus-tests/List +
  * @tsplus fluent tsplus-tests/List append
  */
-export function append<A>(self: List<A>, a: A): List<A> {
+export function append_<A>(self: List<A>, a: A): List<A> {
     return new Cons([...self.array, a])
 }
+
+export const append = Pipeable(append_)
 
 export const prepended = 1 + List(0) // prepend
 export const appended = List(0) + 1 // append

@@ -45,7 +45,7 @@ namespace ts.GoToDefinition {
         if (isPropertyAccessExpression(parent)) {
             const nodeType = typeChecker.getTypeAtLocation(node);
             if(nodeType.symbol && isTsPlusSymbol(nodeType.symbol)) {
-                if (parent.parent && isCallLikeExpression(parent.parent)) {
+                if (parent.parent && isCallExpression(parent.parent) && parent.parent.expression === parent) {
                     const declaration = getDeclarationForTsPlus(typeChecker, parent.parent, nodeType.symbol)
                     if (declaration) {
                         symbol = declaration.symbol
