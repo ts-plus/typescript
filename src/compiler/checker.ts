@@ -15297,34 +15297,33 @@ namespace ts {
             }
             return candidate;
         }
+        
         function getUnionType(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type): Type {
             const unionType = getUnionTypeOriginal(types, unionReduction, aliasSymbol, aliasTypeArguments, origin);
             if (types.length <= 1) {
                 return unionType;
             }
-            const target = types[0]
-            const targetSymbol = target.symbol || target.aliasSymbol
-            if (targetSymbol) {
-                const declaration = targetSymbol.declarations?.[0];
-                if (declaration) {
-                    const typeTag = collectTsPlusTypeTags(declaration)[0];
-                    if (typeTag) {
-                        const target = typeTag.comment.split(" ")[1]!;
-                        if (target) {
+            for (let type of types) {
+                const symbols = collectRelevantSymbols(type).filter((s) => s !== void 0);
+                if (symbols.length === 0) {
+                    return unionType;
+                }
+                for (let symbol of symbols) {
+                    if (!symbol.declarations || symbol.declarations.length === 0) {
+                        return unionType;
+                    }
+                    for (let declaration of symbol.declarations){
+                        for (let typeTag of collectTsPlusTypeTags(declaration)) {
+                            const target = typeTag.comment.split(" ")[1]!;
                             const id = identityCache.get(target);
                             if (id) {
-                                for(const type of types) {
-                                    if (targetSymbol !== (type.symbol || type.aliasSymbol)) {
-                                        return unionType;
-                                    }
-                                }
                                 const result = checkTsPlusCustomCall(
                                     id,
-                                    [factory.createSyntheticExpression(getUnionTypeOriginal(types, unionReduction, aliasSymbol, aliasTypeArguments, origin))],
+                                    [factory.createSyntheticExpression(unionType)],
                                     CheckMode.Normal
                                 );
                                 if (!isErrorType(result)) {
-                                    return result;
+                                    return result
                                 }
                             }
                         }
