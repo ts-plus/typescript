@@ -15399,32 +15399,27 @@ namespace ts {
             }
             return candidate;
         }
-        
         function getUnionType(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type): Type {
             const unionType = getUnionTypeOriginal(types, unionReduction, aliasSymbol, aliasTypeArguments, origin);
             if (types.length <= 1) {
                 return unionType;
             }
-            if (currentNode && isTypeNode(currentNode)) {
-                return unionType;
-            }
             for (let type of types) {
                 let tags = 0
-                for (let symbol of collectRelevantSymbols(type)) {
-                    for (let declaration of (symbol.declarations || [])){
-                        for (let typeTag of collectTsPlusTypeTags(declaration)) {
-                            tags++;
-                            const target = typeTag.comment.split(" ")[1]!;
-                            const id = identityCache.get(target);
-                            if (id) {
-                                const result = checkTsPlusCustomCall(
-                                    id,
-                                    [factory.createSyntheticExpression(unionType)],
-                                    CheckMode.Normal
-                                );
-                                if (!isErrorType(result)) {
-                                    return result
-                                }
+                const targetSymbol = type.symbol || type.aliasSymbol;
+                for (let declaration of (targetSymbol?.declarations || [])) {
+                    for (let typeTag of collectTsPlusTypeTags(declaration)) {
+                        tags++;
+                        const target = typeTag.comment.split(" ")[1]!;
+                        const id = identityCache.get(target);
+                        if (id) {
+                            const result = checkTsPlusCustomCall(
+                                id,
+                                [factory.createSyntheticExpression(unionType)],
+                                CheckMode.Normal
+                            );
+                            if (!isErrorType(result)) {
+                                return result
                             }
                         }
                     }
