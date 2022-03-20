@@ -3295,10 +3295,10 @@ namespace ts {
         readonly comment: `fluent ${string} ${string}`
     }
 
-    export interface TsPlusFluentTag {
+    export interface TsPlusExtensionTag {
         readonly target: string;
         readonly name: string;
-        readonly index: number;
+        readonly priority: number;
     }
 
     export interface TsPlusJSDocPipeableTag extends JSDocTag {

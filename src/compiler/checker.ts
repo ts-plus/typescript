@@ -358,7 +358,7 @@ namespace ts {
         const fluentCache = new Map<string, ESMap<string, () => TsPlusFluentExtension | undefined>>();
         const unresolvedFluentCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
-        const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }[]>>();
+        const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string, priority: number }[]>>();
         const staticFunctionCache = new Map<string, ESMap<string, TsPlusStaticFunctionExtension>>()
         const staticValueCache = new Map<string, ESMap<string, TsPlusStaticValueExtension>>();
         const staticCache = new Map<string, ESMap<string, () => TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined>>();
@@ -44143,24 +44143,6 @@ namespace ts {
                 (tag): tag is TsPlusJSDocFluentTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("fluent")
             );
         }
-        function parseTsPlusFluentTag(tag: TsPlusJSDocFluentTag): TsPlusFluentTag | undefined {
-            const [_, typeName, functionName, index] = tag.comment.split(" ");
-            if (!typeName || !functionName) {
-                return undefined;
-            }
-            let parsedIndex: number;
-            if (index) {
-                const n = Number.parseFloat(index);
-                if (Number.isNaN(n)) {
-                    return undefined;
-                }
-                if (n >= 0) {
-                    parsedIndex = n;
-                }
-            }
-            parsedIndex ||= 0;
-            return { target: typeName, name: functionName, index: parsedIndex };
-        }
         function collectTsPlusPipeableTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
@@ -44214,6 +44196,24 @@ namespace ts {
                 statement,
                 (tag): tag is TsPlusJSDocOperatorTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("getter")
             );
+        }
+        function parseTsPlusExtensionTag(tag: TsPlusJSDocFluentTag | TsPlusJSDocOperatorTag): TsPlusExtensionTag | undefined {
+            const [_, typeName, functionName, priority] = tag.comment.split(" ");
+            if (!typeName || !functionName) {
+                return undefined;
+            }
+            let parsedPriority: number;
+            if (priority) {
+                const n = Number.parseFloat(priority);
+                if (Number.isNaN(n)) {
+                    return undefined;
+                }
+                if (n >= 0) {
+                    parsedPriority = n;
+                }
+            }
+            parsedPriority ||= 0;
+            return { target: typeName, name: functionName, priority: parsedPriority };
         }
         function createTsPlusSignature(call: Signature, exportName: string, file: SourceFile): TsPlusSignature {
             const signature = cloneSignature(call) as TsPlusSignature
@@ -44780,7 +44780,7 @@ namespace ts {
                         }
                     }
                     for (const fluentTag of fluentTags) {
-                        const tag = parseTsPlusFluentTag(fluentTag)
+                        const tag = parseTsPlusExtensionTag(fluentTag)
                         if (!tag) {
                             error(statement, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name);
                             return;
@@ -44797,7 +44797,7 @@ namespace ts {
                                     definition: file,
                                     declaration: declaration as VariableDeclaration & { name: Identifier },
                                     exportName: declaration.name.escapedText.toString(),
-                                    index: tag.index,
+                                    index: tag.priority,
                                 }])
                             });
                         }
@@ -44807,7 +44807,7 @@ namespace ts {
                                 definition: file,
                                 declaration: declaration as VariableDeclaration & { name: Identifier },
                                 exportName: declaration.name.escapedText.toString(),
-                                index: tag.index,
+                                index: tag.priority,
                             });
                         }
                     }
@@ -44850,22 +44850,23 @@ namespace ts {
                 for (const operatorTag of operatorTags) {
                     const symbol = getSymbolAtLocation(declaration.name);
                     if (symbol) {
-                        const [, target, name] = operatorTag.comment.split(" ");
-                        if (!target || !name) {
+                        const tag = parseTsPlusExtensionTag(operatorTag);
+                        if (!tag) {
                             error(declaration, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol);
                             return;
                         }
-                        if (!operatorCache.has(target)) {
-                            operatorCache.set(target, new Map());
+                        if (!operatorCache.has(tag.target)) {
+                            operatorCache.set(tag.target, new Map());
                         }
-                        const map = operatorCache.get(target)!;
-                        if (!map.has(name)) {
-                            map.set(name, []);
+                        const map = operatorCache.get(tag.target)!;
+                        if (!map.has(tag.name)) {
+                            map.set(tag.name, []);
                         }
-                        map.get(name)!.push({
+                        map.get(tag.name)!.push({
                             patched: symbol,
                             exportName: declaration.name.escapedText.toString(),
-                            definition: file
+                            definition: file,
+                            priority: tag.priority,
                         });
                     }
                 }
@@ -44879,22 +44880,23 @@ namespace ts {
                     for (const operatorTag of operatorTags) {
                         const symbol = getSymbolAtLocation(declaration.name);
                         if (symbol) {
-                            const [, target, name] = operatorTag.comment.split(" ");
-                            if (!target || !name) {
+                            const tag = parseTsPlusExtensionTag(operatorTag);
+                            if (!tag) {
                                 error(declaration, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol);
                                 return;
                             }
-                            if (!operatorCache.has(target)) {
-                                operatorCache.set(target, new Map());
+                            if (!operatorCache.has(tag.target)) {
+                                operatorCache.set(tag.target, new Map());
                             }
-                            const map = operatorCache.get(target)!;
-                            if (!map.has(name)) {
-                                map.set(name, []);
+                            const map = operatorCache.get(tag.target)!;
+                            if (!map.has(tag.name)) {
+                                map.set(tag.name, []);
                             }
-                            map.get(name)!.push({
+                            map.get(tag.name)!.push({
                                 patched: symbol,
                                 exportName: declaration.name.escapedText.toString(),
-                                definition: file
+                                definition: file,
+                                priority: tag.priority,
                             });
                         }
                     }
@@ -44910,7 +44912,7 @@ namespace ts {
                     }
                 }
                 for (const fluentTag of fluentTags) {
-                    const tag = parseTsPlusFluentTag(fluentTag)
+                    const tag = parseTsPlusExtensionTag(fluentTag)
                     if (!tag) {
                         error(declaration, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name);
                         return;
@@ -44927,7 +44929,7 @@ namespace ts {
                                 definition: file,
                                 declaration,
                                 exportName: declaration.name.escapedText.toString(),
-                                index: tag.index,
+                                index: tag.priority,
                             }]),
                         });
                     }
@@ -44937,7 +44939,7 @@ namespace ts {
                             definition: file,
                             declaration,
                             exportName: declaration.name.escapedText.toString(),
-                            index: tag.index,
+                            index: tag.priority,
                         });
                     }
                 }
@@ -45362,6 +45364,12 @@ namespace ts {
             });
 
             unresolvedFluentCache.clear();
+
+            operatorCache.forEach((map) => {
+                map.forEach((extensions) => {
+                    extensions.sort(({ priority: x }, { priority: y }) => x > y ? 1 : x < y ? -1 : 0)
+                })
+            })
 
             pipeableCache.forEach((map, typeName) => {
                 if (!fluentCache.has(typeName)) {
