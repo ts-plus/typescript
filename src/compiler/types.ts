@@ -3289,10 +3289,22 @@ namespace ts {
         readonly comment: `index ${string}`
     }
 
-    export interface TsPlusJSDocExtensionTag extends JSDocTag {
+    export interface TsPlusJSDocFluentTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
         readonly comment: `fluent ${string} ${string}`
+    }
+
+    export interface TsPlusFluentTag {
+        readonly target: string;
+        readonly name: string;
+        readonly index: number;
+    }
+
+    export interface TsPlusJSDocPipeableTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `pipeable ${string} ${string}`
     }
     
     export interface TsPlusJSDocGetterTag extends JSDocTag {
@@ -3428,6 +3440,7 @@ namespace ts {
         declaration: (VariableDeclaration & { name: Identifier }) | FunctionDeclaration;
         exportName: string;
         definition: SourceFile;
+        index: number;
     }
 
     export interface TsPlusUnresolvedFluentExtension {
@@ -4655,7 +4668,7 @@ namespace ts {
         getIndexAccessExpressionCache(): ESMap<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isClassCompanionReference(node: Expression): boolean
-        collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocExtensionTag[]
+        collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocFluentTag[]
         getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
         getPrimitiveTypeName(type: Type): string | undefined
         getResolvedOperator(node: Node): Signature | undefined

@@ -7394,5 +7394,9 @@
     "The first parameter of a 'pipeable' annotated function cannot be a rest parameter.": {
         "category": "Error",
         "code": 50023
+    },
+    "Multi-method '{0}' has multiple declarations with the index '{1}'.": {
+        "category": "Error",
+        "code": 50024
     }
 }
