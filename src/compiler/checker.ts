@@ -358,7 +358,7 @@ namespace ts {
         const fluentCache = new Map<string, ESMap<string, () => TsPlusFluentExtension | undefined>>();
         const unresolvedFluentCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
-        const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }>>();
+        const operatorCache = new Map<string, ESMap<string, { patched: Symbol, definition: SourceFile, exportName: string }[]>>();
         const staticFunctionCache = new Map<string, ESMap<string, TsPlusStaticFunctionExtension>>()
         const staticValueCache = new Map<string, ESMap<string, TsPlusStaticValueExtension>>();
         const staticCache = new Map<string, ESMap<string, () => TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined>>();
@@ -1220,17 +1220,27 @@ namespace ts {
                 }
             }
         }
-        function getOperatorExtensions(targetType: Type, name: string): Signature[] {
-            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
+        function getOperatorExtensions(leftType: Type, rightType: Type, name: string): Signature[] {
+            const symbols = new Set<Symbol>();
+            collectRelevantSymbols(getBaseConstraintOrType(leftType)).forEach((symbol) => {
+                symbols.add(symbol)
+            })
+            collectRelevantSymbols(getBaseConstraintOrType(rightType)).forEach((symbol) => {
+                symbols.add(symbol)
+            })
+            const symbolArray: Symbol[] = [];
+            symbols.forEach((symbol) => {
+                symbolArray.push(symbol);
+            });
             const signatures: Signature[] = [];
-            for (const target of symbols) {
+            for (const target of symbolArray) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
                         (tag) => {
                             if (operatorCache.has(tag)) {
                                 const cache = operatorCache.get(tag)
                                 if (cache?.has(name)) {
-                                    return [cache.get(name)!]
+                                    return cache.get(name)!
                                 }
                             }
                             return []
@@ -34703,7 +34713,7 @@ namespace ts {
             // @ts-expect-error
             const operatorMappingEntry = invertedBinaryOp[operator] as string | undefined
             if (operatorMappingEntry) {
-                const signatures = getOperatorExtensions(leftType, operatorMappingEntry);
+                const signatures = getOperatorExtensions(leftType, rightType, operatorMappingEntry);
                 if (signatures.length > 0) {
                     return checkTsPlusCustomCallMulti(
                         operatorToken,
@@ -44833,7 +44843,10 @@ namespace ts {
                             operatorCache.set(target, new Map());
                         }
                         const map = operatorCache.get(target)!;
-                        map.set(name, {
+                        if (!map.has(name)) {
+                            map.set(name, []);
+                        }
+                        map.get(name)!.push({
                             patched: symbol,
                             exportName: declaration.name.escapedText.toString(),
                             definition: file
@@ -44859,7 +44872,10 @@ namespace ts {
                                 operatorCache.set(target, new Map());
                             }
                             const map = operatorCache.get(target)!;
-                            map.set(name, {
+                            if (!map.has(name)) {
+                                map.set(name, []);
+                            }
+                            map.get(name)!.push({
                                 patched: symbol,
                                 exportName: declaration.name.escapedText.toString(),
                                 definition: file
