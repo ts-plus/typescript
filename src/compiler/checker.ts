@@ -15405,32 +15405,28 @@ namespace ts {
             if (types.length <= 1) {
                 return unionType;
             }
-            if (every(types, (_) => _.aliasSymbol !== aliasTypeArguments)) {
-                const unifiers = types.map((type) => {
-                    const symbols = collectRelevantSymbols(type);
-                    const unifiers = symbols.flatMap((symbol) => {
-                        return symbol.declarations?.flatMap((declaration) => collectTsPlusTypeTags(declaration).flatMap((typeTag) => {
+            if (currentNode && isTypeNode(currentNode)) {
+                return unionType;
+            }
+            for (let type of types) {
+                for (let symbol of collectRelevantSymbols(type)) {
+                    for (let declaration of (symbol.declarations || [])){
+                        for (let typeTag of collectTsPlusTypeTags(declaration)) {
                             const target = typeTag.comment.split(" ")[1]!;
                             const id = identityCache.get(target);
-                            return id ? [id] : []
-                        })) || []
-                    })
-                    return unifiers;
-                })
-                if (every(unifiers, (unifier) => unifier.length > 0)) {
-                    for (let unifierArray of unifiers) {
-                        for (let unifier of unifierArray) {
-                            const result = checkTsPlusCustomCall(
-                                unifier,
-                                [factory.createSyntheticExpression(unionType)],
-                                CheckMode.Normal
-                            );
-                            if (!isErrorType(result)) {
-                                return result
+                            if (id) {
+                                const result = checkTsPlusCustomCall(
+                                    id,
+                                    [factory.createSyntheticExpression(unionType)],
+                                    CheckMode.Normal
+                                );
+                                if (!isErrorType(result)) {
+                                    return result
+                                }
                             }
                         }
                     }
-                }    
+                }
             }
             return unionType;
         }
