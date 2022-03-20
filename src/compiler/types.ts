@@ -4640,7 +4640,7 @@ namespace ts {
         getGlobalImport(file: SourceFile): string
         getLocalImport(from: SourceFile, file: SourceFile): string
         getExtensions(selfNode: Expression): ESMap<string, Symbol>
-        getFluentExtension(target: Type, name: string): TsPlusFluentExtension | undefined
+        getFluentExtension(target: Type, name: string): Type | undefined
         getGetterExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
         getGetterCompanionExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
         getStaticExtension(target: Type, name: string): TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined

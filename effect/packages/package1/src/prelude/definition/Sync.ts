@@ -1,5 +1,6 @@
 import * as _ from "@effect-ts/core/Sync";
-import { Effect, unifyEffect } from "./Effect";
+import { LazyArgument } from "../../utils/LazyArgument";
+import { Effect } from "./Effect";
 
 /**
  * @tsplus type ets/Sync
@@ -32,19 +33,27 @@ export function unifySync<X extends Sync<any, any, any>>(self: X): Sync<
     return self
 }
 
-// /**
-//  * Returns an effect that models the execution of this effect, followed by
-//  * the passing of its value to the specified continuation function `f`,
-//  * followed by the effect that it returns.
-//  *
-//  * @tsplus fluent ets/Sync flatMap
-//  */
-// export declare function chain_<R, E, A, R1, E1, A1>(
-//     self: Sync<R, E, A>,
-//     f: (a: A) => Sync<R1, E1, A1>,
-//     __tsplusTrace?: string
-// ): Sync<R & R1, E | E1, A1>
-// 
+/**
+ * Imports a synchronous side-effect into a pure value
+ *
+ * @tsplus static ets/SyncOps __call
+ * @tsplus static ets/SyncOps succeed
+ * @tsplus static ets/SyncAspects succeed
+ */
+export declare function succeedWith<A>(effect: LazyArgument<A>, __tsplusTrace?: string): Sync<unknown, never, A>
+
+/**
+ * Returns an effect that models the execution of this effect, followed by
+ * the passing of its value to the specified continuation function `f`,
+ * followed by the effect that it returns.
+ *
+ * @tsplus fluent ets/Sync flatMap
+ */
+export declare function chain_<R, E, A, R1, E1, A1>(
+    self: Sync<R, E, A>,
+    f: (a: A) => Sync<R1, E1, A1>,
+    __tsplusTrace?: string
+): Sync<R & R1, E | E1, A1>
 
 export const unifiedEffect = (n: number) => {
     if (n > 0) {
@@ -60,4 +69,5 @@ export const unifiedSync = (n: number) => {
     return 0 as unknown as Sync<{ b: number }, "b", 1>
 }
 
-// c.flatMap(() => Effect(0))
+export const resSync = unifiedSync(0).flatMap((n) => Sync(n + 1))
+export const resEffect = unifiedSync(0).flatMap((n) => Effect(n + 1))

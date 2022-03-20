@@ -434,10 +434,11 @@ namespace ts {
                         const fluentExtension = checker.getFluentExtension(innerExpressionType, (node.expression as PropertyAccessExpression).name.escapedText.toString());
 
                         if (fluentExtension) {
-                            let targetSignature: TsPlusSignature = fluentExtension.signatures[0];
+                            const signatures = checker.getSignaturesOfType(fluentExtension, SignatureKind.Call) as TsPlusSignature[];
+                            let targetSignature: TsPlusSignature = signatures[0];
 
                             const resolvedSignature = checker.getResolvedSignature(node);
-                            if (fluentExtension.signatures.length > 1) {
+                            if (signatures.length > 1) {
                                 if (resolvedSignature) {
                                     // For signatures with type arguments, TsPlusSignature will be signature.target.
                                     // For signatures without type arguments, TsPlusSignature is the signature itself.

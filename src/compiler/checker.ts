@@ -998,6 +998,7 @@ namespace ts {
             const targetType: Type = getBaseConstraintOrType(getTypeOfNode(selfNode));
             const symbols = collectRelevantSymbols(targetType);
             const copy: ESMap<string, Symbol> = new Map();
+            const copyFluent: ESMap<string, TsPlusFluentExtension[]> = new Map();
             symbols.forEach((target) => {
                 if (typeSymbolCache.has(target) && !isClassCompanionReference(selfNode)) {
                     typeSymbolCache.get(target)!.forEach((typeSymbol) => {
@@ -1016,13 +1017,13 @@ namespace ts {
                         const _fluent = fluentCache.get(typeSymbol);
                         if (_fluent) {
                             _fluent.forEach((v, k) => {
-                                if (copy.has(k)) {
-                                    return;
-                                }
                                 const extension = v()
                                 if (extension) {
-                                    if (isExtensionValidForTarget(extension, targetType)) {
-                                        copy.set(k, extension.patched);
+                                    if (isExtensionValidForTarget(getTypeOfSymbol(extension.patched), targetType)) {
+                                        if (!copyFluent.has(k)) {
+                                            copyFluent.set(k, []);
+                                        }
+                                        copyFluent.get(k)!.push(extension);
                                     }
                                 }
                             });
@@ -1058,11 +1059,17 @@ namespace ts {
                     })
                 }
             })
+            copyFluent.forEach((extensions, k) => {
+                copy.set(k, createSymbolWithType(
+                    createSymbol(SymbolFlags.Method, k as __String),
+                    getIntersectionType(extensions.map((e) => getTypeOfSymbol(e.patched)))
+                ))
+            });
             copy.delete("__call");
             return copy;
         }
-        function isExtensionValidForTarget(extension: TsPlusFluentExtension, targetType: Type) {
-            return getSignaturesOfType(getTypeOfSymbol(extension.patched), SignatureKind.Call).find((candidate) => {
+        function isExtensionValidForTarget(extension: Type, targetType: Type) {
+            return getSignaturesOfType(extension, SignatureKind.Call).find((candidate) => {
                 if (candidate.thisParameter) {
                     const thisType = getTypeOfSymbol(candidate.thisParameter);
                     if (!candidate.typeParameters) {
@@ -1081,8 +1088,9 @@ namespace ts {
                 return false;
             });
         }
-        function getFluentExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
+        function getFluentExtension(targetType: Type, name: string): Type | undefined {
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType));
+            const candidates: Type[] = [];
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
@@ -1100,9 +1108,17 @@ namespace ts {
                         continue;
                     }
                     else {
-                        return x[x.length - 1]();
+                        x.forEach((getExt) => {
+                            const ext = getExt();
+                            if (ext) {
+                                candidates.push(getTypeOfSymbol(ext.patched));
+                            }
+                        });
                     }
                 }
+            }
+            if (candidates.length > 0) {
+                return getIntersectionType(candidates)
             }
         }
         function getGetterExtension(targetType: Type, name: string) {
@@ -24600,7 +24616,7 @@ namespace ts {
                             if (symbol && typeSymbolCache.has(symbol)) {
                                 const fluentExtenion = getFluentExtension(type, name.escapedText as string);
                                 if (fluentExtenion) {
-                                    return getTypeOfSymbol(fluentExtenion.patched);
+                                    return fluentExtenion;
                                 }
                             }
                             // TSPLUS EXTENSION END
@@ -29581,13 +29597,13 @@ namespace ts {
                 return;
             }
             if (!inType) {
-                const fluentExt = getFluentExtension(leftType, right.escapedText.toString())
-                if (fluentExt && isCallExpression(node.parent) && node.parent.expression === node) {
-                    if (isExtensionValidForTarget(fluentExt, leftType)) {
+                const fluentExtType = getFluentExtension(leftType, right.escapedText.toString());
+                if (fluentExtType && isCallExpression(node.parent) && node.parent.expression === node) {
+                    if (isExtensionValidForTarget(fluentExtType, leftType)) {
                         if (isIdentifier(_left)) {
                             markAliasReferenced(getResolvedSymbol(_left), _left);
                         }
-                        return getTypeOfSymbol(fluentExt.patched)
+                        return fluentExtType;
                     }
                     return;
                 }
