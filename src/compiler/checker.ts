@@ -15405,29 +15405,27 @@ namespace ts {
             if (types.length <= 1) {
                 return unionType;
             }
-            for (let type of types) {
+            const unifiers = types.map((type) => {
                 const symbols = collectRelevantSymbols(type);
-                if (symbols.length === 0) {
-                    return unionType;
-                }
-                for (let symbol of symbols) {
-                    if (!symbol.declarations || symbol.declarations.length === 0) {
-                        return unionType;
-                    }
-                    for (let declaration of symbol.declarations){
-                        for (let typeTag of collectTsPlusTypeTags(declaration)) {
-                            const target = typeTag.comment.split(" ")[1]!;
-                            const id = identityCache.get(target);
-                            if (id) {
-                                const result = checkTsPlusCustomCall(
-                                    id,
-                                    [factory.createSyntheticExpression(unionType)],
-                                    CheckMode.Normal
-                                );
-                                if (!isErrorType(result)) {
-                                    return result
-                                }
-                            }
+                const unifiers = symbols.flatMap((symbol) => {
+                    return symbol.declarations?.flatMap((declaration) => collectTsPlusTypeTags(declaration).flatMap((typeTag) => {
+                        const target = typeTag.comment.split(" ")[1]!;
+                        const id = identityCache.get(target);
+                        return id ? [id] : []
+                    })) || []
+                })
+                return unifiers;
+            })
+            if (every(unifiers, (unifier) => unifier.length > 0)) {
+                for (let unifierArray of unifiers) {
+                    for (let unifier of unifierArray) {
+                        const result = checkTsPlusCustomCall(
+                            unifier,
+                            [factory.createSyntheticExpression(unionType)],
+                            CheckMode.Normal
+                        );
+                        if (!isErrorType(result)) {
+                            return result
                         }
                     }
                 }
