@@ -7327,7 +7327,7 @@
         "category": "Error",
         "code": 50006
     },
-    "Annotation of a fluent extension must have the form '@tsplus fluent [typename] [name]'.": {
+    "Annotation of a fluent extension must have the form '@tsplus fluent [typename] [name] [priority?]'.": {
         "category": "Error",
         "code": 50007
     },
@@ -7335,7 +7335,7 @@
         "category": "Error",
         "code": 50008
     },
-    "Annotation of an operator extension must have the form '@tsplus operator [typename] [symbol]'.": {
+    "Annotation of an operator extension must have the form '@tsplus operator [typename] [symbol] [priority?]'.": {
         "category": "Error",
         "code": 50009
     },
@@ -7394,9 +7394,5 @@
     "The first parameter of a 'pipeable' annotated function cannot be a rest parameter.": {
         "category": "Error",
         "code": 50023
-    },
-    "Multi-method '{0}' has multiple declarations with the index '{1}'.": {
-        "category": "Error",
-        "code": 50024
     }
 }
