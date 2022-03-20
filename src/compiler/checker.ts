@@ -921,17 +921,6 @@ namespace ts {
                         const heritage = inheritanceSymbolCache.get(target.symbol)!;
                         heritage.forEach(addInheritedSymbol);
                     }
-                    else if (target.symbol.declarations) {
-                        target.symbol.declarations.forEach((declaration) => {
-                            if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.heritageClauses) {
-                                tryCacheTsPlusInheritance(target.symbol, declaration.heritageClauses);
-                                if (inheritanceSymbolCache.has(target.symbol)) {
-                                    const heritage = inheritanceSymbolCache.get(target.symbol)!;
-                                    heritage.forEach(addInheritedSymbol);
-                                }
-                            }
-                        })
-                    }
                 }
                 if (target.aliasSymbol) {
                     relevant.add(target.aliasSymbol);
