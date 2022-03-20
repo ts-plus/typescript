@@ -369,12 +369,6 @@ namespace ts {
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
-        let tsplusStringPrimitiveSymbol: Symbol;
-        let tsplusNumberPrimitiveSymbol: Symbol;
-        let tsplusBooleanPrimitiveSymbol: Symbol;
-        let tsplusBigIntPrimitiveSymbol: Symbol;
-        let tsplusFunctionPrimitiveSymbol: Symbol;
-        let tsplusObjectPrimitiveSymbol: Symbol;
         // TSPLUS EXTENSION END
 
         // Cancellation that controls whether or not we can cancel in the middle of type checking.
@@ -393,6 +387,15 @@ namespace ts {
         const Symbol = objectAllocator.getSymbolConstructor();
         const Type = objectAllocator.getTypeConstructor();
         const Signature = objectAllocator.getSignatureConstructor();
+
+        // TSPLUS EXTENSION START
+        const tsplusStringPrimitiveSymbol = createSymbol(SymbolFlags.None, "string" as __String);
+        const tsplusNumberPrimitiveSymbol = createSymbol(SymbolFlags.None, "number" as __String);
+        const tsplusBooleanPrimitiveSymbol = createSymbol(SymbolFlags.None, "boolean" as __String);
+        const tsplusBigIntPrimitiveSymbol = createSymbol(SymbolFlags.None, "bigint" as __String);
+        const tsplusFunctionPrimitiveSymbol = createSymbol(SymbolFlags.None, "function" as __String);
+        const tsplusObjectPrimitiveSymbol = createSymbol(SymbolFlags.None, "object" as __String);
+        // TSPLUS EXTENSION END
 
         let typeCount = 0;
         let symbolCount = 0;
@@ -15393,7 +15396,7 @@ namespace ts {
                 return unionType;
             }
             for (let type of types) {
-                const symbols = collectRelevantSymbols(type).filter((s) => s !== void 0);
+                const symbols = collectRelevantSymbols(type);
                 if (symbols.length === 0) {
                     return unionType;
                 }
@@ -45166,12 +45169,6 @@ namespace ts {
             }
         }
         function initTsPlusTypeChecker() {
-            tsplusStringPrimitiveSymbol = createSymbol(SymbolFlags.None, "string" as __String);
-            tsplusNumberPrimitiveSymbol = createSymbol(SymbolFlags.None, "number" as __String);
-            tsplusBooleanPrimitiveSymbol = createSymbol(SymbolFlags.None, "boolean" as __String);
-            tsplusBigIntPrimitiveSymbol = createSymbol(SymbolFlags.None, "bigint" as __String);
-            tsplusFunctionPrimitiveSymbol = createSymbol(SymbolFlags.None, "function" as __String);
-            tsplusObjectPrimitiveSymbol = createSymbol(SymbolFlags.None, "object" as __String);
             fluentCache.clear();
             unresolvedFluentCache.clear();
             operatorCache.clear();
