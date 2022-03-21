@@ -202,29 +202,16 @@ namespace ts {
                 return visitEachChild(node, visitor(source, traceInScope), context)
             }
             function visitPropertyAccessExpression(source: SourceFile, node: PropertyAccessExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
-                const expressionType = checker.getTypeAtLocation(node.expression);
-                const inType = checker.getPropertyOfType(expressionType, node.name.escapedText.toString());
-                if (!inType) {
-                    if (checker.isClassCompanionReference(node.expression)) {
-                        const staticExtension = checker.getStaticCompanionExtension(expressionType, node.name.escapedText.toString());
-                        if (staticExtension) {
-                            return getPathOfExtension(context, importer, staticExtension, source, localUniqueExtensionNames);
-                        }
-                    } else {
-                        const staticExtension = checker.getStaticExtension(expressionType, node.name.escapedText.toString());
-                        if (staticExtension) {
-                            return getPathOfExtension(context, importer, staticExtension, source, localUniqueExtensionNames);
-                        }
-
-                        const getterExtension = checker.getGetterExtension(expressionType, node.name.escapedText.toString());
-                        if (getterExtension) {
-                            return factory.createCallExpression(
-                                getPathOfExtension(context, importer, getterExtension, source, localUniqueExtensionNames),
-                                void 0,
-                                [visitNode(node.expression, visitor)]
-                            );
-                        }
-                    }
+                const nodeLinks = checker.getNodeLinks(node);
+                if (nodeLinks.tsPlusStaticExtension) {
+                    return getPathOfExtension(context, importer, nodeLinks.tsPlusStaticExtension, source, localUniqueExtensionNames)
+                }
+                if (nodeLinks.tsPlusGetterExtension) {
+                    return factory.createCallExpression(
+                        getPathOfExtension(context, importer, nodeLinks.tsPlusGetterExtension, source, localUniqueExtensionNames),
+                        void 0,
+                        [visitNode(node.expression, visitor)]
+                    );
                 }
                 return visitEachChild(node, visitor, context);
             }

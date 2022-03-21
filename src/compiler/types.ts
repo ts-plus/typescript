@@ -5385,6 +5385,7 @@ namespace ts {
         tsPlusCallExtension?: TsPlusStaticFunctionExtension;
         tsPlusFluentSignature?: TsPlusSignature;
         tsPlusStaticExtension?: TsPlusStaticFunctionExtension;
+        tsPlusGetterExtension?: { definition: SourceFile, exportName: string }
         // TSPLUS EXTENSION END
     }
 

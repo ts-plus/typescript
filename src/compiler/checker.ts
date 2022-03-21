@@ -29678,6 +29678,7 @@ namespace ts {
             if (!inType && isClassCompanionReference(_left)) {
                 const staticExt = getStaticCompanionExtension(leftType, right.escapedText.toString());
                 if (staticExt) {
+                    getNodeLinks(node).tsPlusStaticExtension = staticExt;
                     return staticExt.type;
                 }
                 return;
@@ -29705,6 +29706,7 @@ namespace ts {
                         const type = getTypeOfSymbol(symbol);
                         // @ts-expect-error
                         type.tsPlusSymbol = symbol; // TsPlusGetterSymbol | TsPlusGetterVariableSymbol
+                        getNodeLinks(node).tsPlusGetterExtension = getterExt;
                         return type;
                     }
                 }
