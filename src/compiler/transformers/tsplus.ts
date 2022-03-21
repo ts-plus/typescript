@@ -403,72 +403,43 @@ namespace ts {
                 }
                 const nodeLinks = checker.getNodeLinks(node);
                 if (nodeLinks.tsPlusCallExtension) {
-                    const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
+                    const visited = visitCallExpression(source, traceInScope, node, visitor, context);
                     return factory.updateCallExpression(
-                        visited as CallExpression,
+                        visited,
                         getPathOfExtension(context, importer, nodeLinks.tsPlusCallExtension, source, localUniqueExtensionNames),
-                        (visited as CallExpression).typeArguments,
-                        (visited as CallExpression).arguments
+                        visited.typeArguments,
+                        visited.arguments
                     );
                 }
                 if (isPropertyAccessExpression(node.expression)) {
-                    const innerExpressionType = checker.getTypeAtLocation((node.expression as PropertyAccessExpression).expression);
-                    const inType = checker.getPropertyOfType(innerExpressionType, (node.expression as PropertyAccessExpression).name.escapedText.toString());
-                    if (!inType) {
-                        const fluentExtension = checker.getFluentExtension(innerExpressionType, (node.expression as PropertyAccessExpression).name.escapedText.toString());
-
-                        if (fluentExtension) {
-                            const signatures = checker.getSignaturesOfType(fluentExtension, SignatureKind.Call) as TsPlusSignature[];
-                            let targetSignature: TsPlusSignature = signatures[0];
-
-                            const resolvedSignature = checker.getResolvedSignature(node);
-                            if (signatures.length > 1) {
-                                if (resolvedSignature) {
-                                    // For signatures with type arguments, TsPlusSignature will be signature.target.
-                                    // For signatures without type arguments, TsPlusSignature is the signature itself.
-                                    if (isTsPlusSignature(resolvedSignature)) {
-                                        targetSignature = resolvedSignature
-                                    }
-                                    else if (resolvedSignature.target && isTsPlusSignature(resolvedSignature.target)) {
-                                        targetSignature = resolvedSignature.target
-                                    }
-                                }
-                            }
-
-                            if (!targetSignature || !isTsPlusSignature(targetSignature)) {
-                                throw new Error("BUG: No applicable signature found for fluent extension");
-                            }
-                            if (resolvedSignature && !resolvedSignature.thisParameter) {
-                                // We have a TsPlusSignature that is NOT a fluent signature, skip transforming as fluent
-                                return visitCallExpression(source, traceInScope, node, visitor, context);
-                            }
-                            const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
-                            if (targetSignature.tsPlusPipeable) {
-                                return factory.updateCallExpression(
-                                    visited,
-                                    factory.createCallExpression(
-                                        getPathOfExtension(context, importer, { definition: targetSignature.tsPlusFile, exportName: targetSignature.tsPlusExportName }, source, localUniqueExtensionNames),
-                                        undefined,
-                                        visited.arguments
-                                    ),
+                    const fluentExtension = checker.getNodeLinks(node.expression).tsPlusFluentSignature
+                    if (fluentExtension) {
+                        const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
+                        if (fluentExtension.tsPlusPipeable) {
+                            return factory.updateCallExpression(
+                                visited,
+                                factory.createCallExpression(
+                                    getPathOfExtension(context, importer, { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName }, source, localUniqueExtensionNames),
                                     undefined,
-                                    [(visited.expression as PropertyAccessExpression).expression]
-                                )
-                            }
-                            else {
-                                return factory.updateCallExpression(
-                                    visited as CallExpression,
-                                    getPathOfExtension(context, importer, { definition: targetSignature.tsPlusFile, exportName: targetSignature.tsPlusExportName }, source, localUniqueExtensionNames),
-                                    (visited as CallExpression).typeArguments,
-                                    [((visited as CallExpression).expression as PropertyAccessExpression).expression, ...(visited as CallExpression).arguments]
-                                );
-                            }
+                                    visited.arguments
+                                ),
+                                undefined,
+                                [(visited.expression as PropertyAccessExpression).expression]
+                            )
+                        }
+                        else {
+                            return factory.updateCallExpression(
+                                visited as CallExpression,
+                                getPathOfExtension(context, importer, { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName }, source, localUniqueExtensionNames),
+                                (visited as CallExpression).typeArguments,
+                                [((visited as CallExpression).expression as PropertyAccessExpression).expression, ...(visited as CallExpression).arguments]
+                            );
                         }
                     }
                 }
-                return visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;;
+                return visitCallExpression(source, traceInScope, node, visitor, context);;
             }
-            function visitCallExpression(source: SourceFile, traceInScope: Identifier | undefined, node: CallExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
+            function visitCallExpression(source: SourceFile, traceInScope: Identifier | undefined, node: CallExpression, visitor: Visitor, context: TransformationContext): CallExpression {
                 const signature = checker.getResolvedSignature(node);
                 if (signature) {
                     const params = signature.parameters;

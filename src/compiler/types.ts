@@ -5381,8 +5381,10 @@ namespace ts {
         declarationRequiresScopeChange?: boolean; // Set by `useOuterVariableScopeInParameter` in checker when downlevel emit would change the name resolution scope inside of a parameter.
         serializedTypes?: ESMap<string, TypeNode & {truncating?: boolean, addedLength: number}>; // Collection of types serialized at this location
         // TSPLUS EXTENSION START
-        isTsPlusOperatorToken?: boolean
-        tsPlusCallExtension?: TsPlusStaticFunctionExtension
+        isTsPlusOperatorToken?: boolean;
+        tsPlusCallExtension?: TsPlusStaticFunctionExtension;
+        tsPlusFluentSignature?: TsPlusSignature;
+        tsPlusStaticExtension?: TsPlusStaticFunctionExtension;
         // TSPLUS EXTENSION END
     }
 

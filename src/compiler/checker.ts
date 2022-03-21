@@ -29685,10 +29685,12 @@ namespace ts {
             if (!inType) {
                 const fluentExtType = getFluentExtension(leftType, right.escapedText.toString());
                 if (fluentExtType && isCallExpression(node.parent) && node.parent.expression === node) {
+                    const signature = isExtensionValidForTarget(fluentExtType, leftType);
                     if (isExtensionValidForTarget(fluentExtType, leftType)) {
                         if (isIdentifier(_left)) {
                             markAliasReferenced(getResolvedSymbol(_left), _left);
                         }
+                        getNodeLinks(node).tsPlusFluentSignature = signature as TsPlusSignature;
                         return fluentExtType;
                     }
                     return;
@@ -29708,6 +29710,7 @@ namespace ts {
                 }
                 const staticExt = getStaticExtension(leftType, right.escapedText.toString());
                 if (staticExt) {
+                    getNodeLinks(node).tsPlusStaticExtension = staticExt;
                     return staticExt.type;
                 }
             }
