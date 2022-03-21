@@ -823,7 +823,8 @@ namespace ts {
                     checkBinaryLikeExpression(node.left, node.operatorToken, node.right);
                 }
                 return nodeLinks.resolvedSignature;
-            }
+            },
+            getNodeLinks
             // TSPLUS EXTENSION END
         };
 
@@ -31848,6 +31849,7 @@ namespace ts {
                     if (callExtension) {
                         callSignatures = Array.from(getSignaturesOfType(getTypeOfSymbol(callExtension.patched), SignatureKind.Call));
                         callCache.set(node.expression, callExtension);
+                        getNodeLinks(node).tsPlusCallExtension = callExtension;
                     }
                 }
                 else {
@@ -31856,6 +31858,7 @@ namespace ts {
                     if (callExtension) {
                         callSignatures = Array.from(getSignaturesOfType(getTypeOfSymbol(callExtension.patched), SignatureKind.Call));
                         callCache.set(node.expression, callExtension);
+                        getNodeLinks(node).tsPlusCallExtension = callExtension;
                     }
                 }
             }

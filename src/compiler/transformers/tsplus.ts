@@ -165,9 +165,11 @@ namespace ts {
                 return visitEachChild(node, visitor(source, traceInScope), context)
             }
             function visitBinaryExpression(source: SourceFile, traceInScope: Identifier | undefined, node: BinaryExpression, context: TransformationContext): VisitResult<Node> {
-                const call = checker.getResolvedOperator(node);
-
-                if (call && call.declaration) {
+                const operatorLinks = checker.getNodeLinks(node.operatorToken);
+                if (operatorLinks.isTsPlusOperatorToken && operatorLinks.resolvedSignature && operatorLinks.resolvedSignature.declaration) {
+                    const call = operatorLinks.resolvedSignature;
+                    const declaration = call.declaration!;
+                    const exportName = isFunctionDeclaration(declaration) ? declaration.symbol.escapedName as string : declaration.parent.symbol.escapedName as string;
                     const lastTrace = call.parameters.length > 0 ? call.parameters[call.parameters.length - 1].escapedName === "___tsplusTrace" : false
                     const params = [visitNode(node.left, visitor(source, traceInScope)), visitNode(node.right, visitor(source, traceInScope))]
                     if (checker.shouldMakeLazy(call.parameters[1], checker.getTypeAtLocation(node.right))) {
@@ -178,8 +180,8 @@ namespace ts {
                     }
                     return context.factory.createCallExpression(
                         getPathOfExtension(context, importer, {
-                            definition: getSourceFileOfNode(call.declaration),
-                            exportName: call.declaration.symbol.escapedName as string
+                            definition: getSourceFileOfNode(declaration),
+                            exportName: exportName
                         }, source, localUniqueExtensionNames),
                         [],
                         params
@@ -187,7 +189,6 @@ namespace ts {
                 }
                 return visitEachChild(node, visitor(source, traceInScope), context)
             }
-
             function visitFunctionDeclaration(source: SourceFile, traceInScope: Identifier | undefined, node: FunctionDeclaration, context: TransformationContext): VisitResult<Node> {
                 if (node.parameters.length > 0) {
                     const last = node.parameters[node.parameters.length - 1]
@@ -396,36 +397,19 @@ namespace ts {
                         );
                     }
                 }
-                const expressionType = checker.getTypeAtLocation(node.expression)
                 // Avoid transforming super call as __call extension
                 if (isSuperCall(node)) {
                     return visitCallExpression(source, traceInScope, node, visitor, context);
                 }
-                if (checker.getSignaturesOfType(expressionType, SignatureKind.Call).length === 0) {
-                    if (checker.isClassCompanionReference(node.expression)) {
-                        const customCall = checker.getStaticCompanionExtension(expressionType, "__call")
-                        if (customCall) {
-                            const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
-                            return factory.updateCallExpression(
-                                visited as CallExpression,
-                                getPathOfExtension(context, importer, customCall, source, localUniqueExtensionNames),
-                                (visited as CallExpression).typeArguments,
-                                (visited as CallExpression).arguments
-                            );
-                        }
-                    }
-                    else {
-                        const customCall = checker.getStaticExtension(expressionType, "__call")
-                        if (customCall) {
-                            const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
-                            return factory.updateCallExpression(
-                                visited as CallExpression,
-                                getPathOfExtension(context, importer, customCall, source, localUniqueExtensionNames),
-                                (visited as CallExpression).typeArguments,
-                                (visited as CallExpression).arguments
-                            );
-                        }
-                    }
+                const nodeLinks = checker.getNodeLinks(node);
+                if (nodeLinks.tsPlusCallExtension) {
+                    const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
+                    return factory.updateCallExpression(
+                        visited as CallExpression,
+                        getPathOfExtension(context, importer, nodeLinks.tsPlusCallExtension, source, localUniqueExtensionNames),
+                        (visited as CallExpression).typeArguments,
+                        (visited as CallExpression).arguments
+                    );
                 }
                 if (isPropertyAccessExpression(node.expression)) {
                     const innerExpressionType = checker.getTypeAtLocation((node.expression as PropertyAccessExpression).expression);

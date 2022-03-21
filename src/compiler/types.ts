@@ -4679,6 +4679,7 @@ namespace ts {
         getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
         getPrimitiveTypeName(type: Type): string | undefined
         getResolvedOperator(node: BinaryExpression): Signature | undefined
+        getNodeLinks(node: Node): NodeLinks
     }
 
     /* @internal */
@@ -5381,6 +5382,7 @@ namespace ts {
         serializedTypes?: ESMap<string, TypeNode & {truncating?: boolean, addedLength: number}>; // Collection of types serialized at this location
         // TSPLUS EXTENSION START
         isTsPlusOperatorToken?: boolean
+        tsPlusCallExtension?: TsPlusStaticFunctionExtension
         // TSPLUS EXTENSION END
     }
 
