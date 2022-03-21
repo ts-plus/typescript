@@ -132,7 +132,7 @@ namespace ts {
                 return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && extensionRegex.test(tag.comment)).length > 0;
             }
             function visitIdentifier(source: SourceFile, traceInScope: Identifier | undefined, node: Identifier, context: TransformationContext): Identifier {
-                if (isDeclarationName(node) && !isExportDeclaration(node.parent)) {
+                if ((isDeclarationName(node) && !isExportDeclaration(node.parent)) || (node.parent && isTypeReferenceNode(node.parent))) {
                     return visitEachChild(node, visitor(source, traceInScope), context);
                 }
                 const symbol = checker.getSymbolAtLocation(node);
