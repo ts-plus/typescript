@@ -871,14 +871,7 @@ namespace ts {
                 return extension;
             }
         }
-        interface Stack<A> {
-            value: A
-            previous?: Stack<A>
-        }
-        function makeStack<A>(value: A, previous?: Stack<A>): Stack<A> {
-            return { value, previous };
-        }
-        function intersectSets<A>(sets: Set<A>[]): Set<A> {
+        function intersectSets<A>(sets: readonly Set<A>[]): Set<A> {
             if (sets.length === 0) {
                 return new Set();
             }
@@ -909,25 +902,22 @@ namespace ts {
         function collectRelevantSymbolsLoop(target: Type, lastSeen?: Set<Type>) {
             const seen: Set<Type> = new Set(lastSeen);
             const relevant: Set<Symbol> = new Set();
-            let stack: Stack<Type> | undefined = makeStack(target);
-            while (stack) {
-                const target = stack.value
-                stack = stack.previous
+            let queue: Type[] = [target]
+            while (queue.length > 0) {
+                const target = queue.shift()!
                 if (target.symbol) {
                     // Add the current symbol to the return Set
                     relevant.add(target.symbol)
                     // Check if the current type inherits other types
                     if (inheritanceSymbolCache.has(target.symbol)) {
-                        const heritage = inheritanceSymbolCache.get(target.symbol)!;
-                        heritage.forEach(addInheritedSymbol);
+                        inheritanceSymbolCache.get(target.symbol)!.forEach(addInheritedSymbol);
                     }
                     else if (target.symbol.declarations) {
                         target.symbol.declarations.forEach((declaration) => {
                             if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.heritageClauses) {
                                 tryCacheTsPlusInheritance(target.symbol, declaration.heritageClauses);
                                 if (inheritanceSymbolCache.has(target.symbol)) {
-                                    const heritage = inheritanceSymbolCache.get(target.symbol)!;
-                                    heritage.forEach(addInheritedSymbol);
+                                    inheritanceSymbolCache.get(target.symbol)!.forEach(addInheritedSymbol);
                                 }
                             }
                         })
@@ -936,8 +926,7 @@ namespace ts {
                 if (target.aliasSymbol) {
                     relevant.add(target.aliasSymbol);
                     if (inheritanceSymbolCache.has(target.aliasSymbol)) {
-                        const heritage = inheritanceSymbolCache.get(target.aliasSymbol)!;
-                        heritage.forEach(addInheritedSymbol);
+                        inheritanceSymbolCache.get(target.aliasSymbol)!.forEach(addInheritedSymbol)
                     }
                     // If the current type is a union type, add the inherited type symbols common to all members
                     if (target.flags & TypeFlags.Union) {
@@ -952,6 +941,7 @@ namespace ts {
                         for (const member of types) {
                             seen.add(member);
                         }
+
                         intersectSets(inherited).forEach((s) => {
                             relevant.add(s)
                         })
@@ -975,7 +965,7 @@ namespace ts {
 
                             if (!isErrorType(type)) {
                                 seen.add(type);
-                                stack = makeStack(type, stack)
+                                queue.push(type);
                             }
                         }
                     }
@@ -987,11 +977,8 @@ namespace ts {
          * followed by subtypes, subtypes of subtypes, etc.
          */
         function collectRelevantSymbols(target: Type) {
-            const relevant = collectRelevantSymbolsLoop(target);
-            const returnArray: Symbol[] = []
-            relevant.forEach((s) => {
-                returnArray.push(s)
-            })
+            const returnArray = arrayFrom(collectRelevantSymbolsLoop(target).values())
+
             // collect primitive symbols last, in case they have overridden extensions
             if (target.flags & TypeFlags.StringLike) {
                 returnArray.push(tsplusStringPrimitiveSymbol);
