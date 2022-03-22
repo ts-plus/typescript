@@ -143,7 +143,7 @@ namespace ts {
                             return localUniqueExtensionNames.get(name)!;
                         }
                         else {
-                            const uniqueName = context.factory.createUniqueName(node.escapedText.toString());
+                            const uniqueName = context.factory.createTsPlusUniqueName(node.escapedText.toString());
                             localUniqueExtensionNames.set(name, uniqueName);
                             return uniqueName;
                         }
@@ -509,7 +509,7 @@ namespace ts {
                 if (localUniqueExtensionNames.has(extension.exportName)) {
                     return localUniqueExtensionNames.get(extension.exportName)!;
                 }
-                const uniqueIdentifier = factory.createUniqueName(extension.exportName);
+                const uniqueIdentifier = factory.createTsPlusUniqueName(extension.exportName);
                 localUniqueExtensionNames.set(extension.exportName, uniqueIdentifier);
                 return uniqueIdentifier;
             }

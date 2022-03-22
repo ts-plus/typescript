@@ -526,6 +526,9 @@ namespace ts {
             liftToBlock,
             mergeLexicalEnvironment,
             updateModifiers,
+            // TSPLUS EXTENSION START
+            createTsPlusUniqueName,
+            // TSPLUS EXTENSION END
         };
 
         return factory;
@@ -932,6 +935,15 @@ namespace ts {
             Debug.assert((flags & (GeneratedIdentifierFlags.Optimistic | GeneratedIdentifierFlags.FileLevel)) !== GeneratedIdentifierFlags.FileLevel, "GeneratedIdentifierFlags.FileLevel cannot be set without also setting GeneratedIdentifierFlags.Optimistic");
             return createBaseGeneratedIdentifier(text, GeneratedIdentifierFlags.Unique | flags);
         }
+
+        // TSPLUS EXTENSION START
+        /** Create a unique name based on the supplied text. */
+        function createTsPlusUniqueName(text: string, flags: GeneratedIdentifierFlags = GeneratedIdentifierFlags.None): TsPlusUniqueIdentifier {
+            const identifier = createUniqueName(text, flags);
+            (identifier as TsPlusUniqueIdentifier).tsPlusUniqueIdentifier = true;
+            return identifier as TsPlusUniqueIdentifier;
+        }
+        // TSPLUS EXTENSION END
 
         /** Create a unique name generated for a node. */
         // @api

@@ -13,7 +13,7 @@ namespace ts {
         exportedNames: Identifier[] | undefined; // all exported names in the module, both local and reexported
         exportEquals: ExportAssignment | undefined; // an export= declaration if one was present
         hasExportStarsToExportValues: boolean; // whether this module contains export*
-        generatedExportSpecifiers?: ESMap<Identifier, ExportSpecifier>;
+        generatedExportSpecifiers?: ESMap<Identifier, ExportSpecifier[]>;
     }
 
     function containsDefaultReference(node: NamedImportBindings | undefined) {
@@ -70,7 +70,7 @@ namespace ts {
         const externalImports: (ImportDeclaration | ImportEqualsDeclaration | ExportDeclaration)[] = [];
         const exportSpecifiers = createMultiMap<ExportSpecifier>();
         // TSPLUS EXTENSION START
-        const generatedExportSpecifiers = new Map<Identifier, ExportSpecifier>();
+        const generatedExportSpecifiers = new Map<Identifier, ExportSpecifier[]>();
         // TSPLUS EXTENSION END
         const exportedBindings: Identifier[][] = [];
         const uniqueExports = new Map<string, boolean>();
@@ -210,7 +210,10 @@ namespace ts {
                     if (!node.moduleSpecifier) {
                         // TSPLUS EXTENSION START
                         if (isGeneratedIdentifier(name)) {
-                            generatedExportSpecifiers.set(name, specifier);
+                            if (!generatedExportSpecifiers.has(name)) {
+                                generatedExportSpecifiers.set(name, []);
+                            }
+                            generatedExportSpecifiers.get(name)!.push(specifier)
                         }
                         else {
                         // TSPLUS EXTENSION END

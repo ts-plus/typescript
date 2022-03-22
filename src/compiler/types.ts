@@ -3488,6 +3488,10 @@ namespace ts {
         tsPlusPipeable?: boolean;
     }
 
+    export interface TsPlusUniqueIdentifier extends Identifier {
+        tsPlusUniqueIdentifier: true
+    }
+
     export interface JSDocLink extends Node {
         readonly kind: SyntaxKind.JSDocLink;
         readonly name?: EntityName | JSDocMemberName;
@@ -8163,6 +8167,11 @@ namespace ts {
          */
         /* @internal */ cloneNode<T extends Node | undefined>(node: T): T;
         /* @internal */ updateModifiers<T extends HasModifiers>(node: T, modifiers: readonly Modifier[] | ModifierFlags | undefined): T;
+
+        // TSPLUS EXTENSION START
+        /** Create a unique name based on the supplied text. */
+        createTsPlusUniqueName(text: string, flags?: GeneratedIdentifierFlags): TsPlusUniqueIdentifier;
+        // TSPLUS EXTENSION END
     }
 
     /* @internal */

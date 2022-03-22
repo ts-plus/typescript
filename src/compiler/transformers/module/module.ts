@@ -1626,13 +1626,22 @@ namespace ts {
             exportSpecifiers ||= [];
             if (currentModuleInfo.generatedExportSpecifiers) {
                 if (currentModuleInfo.generatedExportSpecifiers.has(name)) {
-                    exportSpecifiers.push(currentModuleInfo.generatedExportSpecifiers.get(name)!);
+                    exportSpecifiers = concatenate(exportSpecifiers, currentModuleInfo.generatedExportSpecifiers.get(name)!)
                 }
             }
             // TSPLUS EXTENSION END
             for (const exportSpecifier of exportSpecifiers) {
                 statements = appendExportStatement(statements, exportSpecifier.name, name, /*location*/ exportSpecifier.name, /* allowComments */ undefined, liveBinding);
             }
+            // TSPLUS EXTENSION START
+            if (isNamedDeclaration(decl) && isIdentifier(decl.name) && isTsPlusUniqueIdentifier(decl.name) && currentModuleInfo.generatedExportSpecifiers) {
+                if (currentModuleInfo.generatedExportSpecifiers.has(decl.name)) {
+                    for (const exportSpecifier of currentModuleInfo.generatedExportSpecifiers.get(decl.name)!) {
+                        statements = appendExportStatement(statements, exportSpecifier.name, decl.name, exportSpecifier.name, undefined, liveBinding);
+                    }
+                }
+            }
+            // TSPLUS EXTENSION END
             return statements;
         }
 
