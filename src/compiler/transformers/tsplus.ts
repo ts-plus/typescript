@@ -218,45 +218,43 @@ namespace ts {
             function visitVariableStatement(_source: SourceFile, node: VariableStatement, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
                 if (node.declarationList.declarations.length > 0) {
                     const declaration = node.declarationList.declarations[0];
-                    if (declaration.initializer && checker.isTsPlusMacroCall(declaration.initializer, 'pipeable') && isIdentifier(declaration.name)) {
-                        const targetType = checker.getTypeAtLocation(declaration.initializer.arguments[0])
-                        if (targetType.symbol && targetType.symbol.valueDeclaration && isFunctionLikeDeclaration(targetType.symbol.valueDeclaration)) {
-                            const signatureDeclaration = targetType.symbol.valueDeclaration
-                            let updatedDeclaration = factory.updateVariableDeclaration(
-                                declaration,
-                                declaration.name,
+                    const nodeLinks = checker.getNodeLinks(declaration);
+                    if (nodeLinks.tsPlusDataFirstDeclaration && declaration.initializer && isCallExpression(declaration.initializer)) {
+                        const signatureDeclaration = nodeLinks.tsPlusDataFirstDeclaration;
+                        const updatedDeclaration = factory.updateVariableDeclaration(
+                            declaration,
+                            declaration.name,
+                            undefined,
+                            undefined,
+                            factory.createArrowFunction(
+                                undefined,
+                                undefined,
+                                signatureDeclaration.parameters.slice(1, signatureDeclaration.parameters.length),
                                 undefined,
                                 undefined,
                                 factory.createArrowFunction(
                                     undefined,
                                     undefined,
-                                    signatureDeclaration.parameters.slice(1, signatureDeclaration.parameters.length),
+                                    [signatureDeclaration.parameters[0]],
                                     undefined,
                                     undefined,
-                                    factory.createArrowFunction(
+                                    factory.createCallExpression(
+                                        declaration.initializer.arguments[0],
                                         undefined,
-                                        undefined,
-                                        [signatureDeclaration.parameters[0]],
-                                        undefined,
-                                        undefined,
-                                        factory.createCallExpression(
-                                            declaration.initializer.arguments[0],
-                                            undefined,
-                                            map(signatureDeclaration.parameters, (pdecl) => pdecl.name as Identifier)
-                                        )
+                                        map(signatureDeclaration.parameters, (pdecl) => pdecl.name as Identifier)
                                     )
                                 )
                             )
-                            const updatedStatement = factory.updateVariableStatement(
-                                node,
-                                node.modifiers,
-                                factory.updateVariableDeclarationList(
-                                    node.declarationList,
-                                    [updatedDeclaration]
-                                )
+                        )
+                        const updatedStatement = factory.updateVariableStatement(
+                            node,
+                            node.modifiers,
+                            factory.updateVariableDeclarationList(
+                                node.declarationList,
+                                [updatedDeclaration]
                             )
-                            return updatedStatement;
-                        }
+                        )
+                        return updatedStatement;
                     }
                 }
                 return ts.visitEachChild(node, visitor, context)
@@ -280,63 +278,13 @@ namespace ts {
             }
             function tryGetOptimizedPipeableCall(call: CallExpression): { definition: SourceFile, exportName: string } | undefined {
                 const original = getOriginalNode(call);
-                if (isCallExpression(original) && isIdentifier(original.expression)) {
-                    const identifierType = checker.getTypeAtLocation(original.expression);
-                    const identifierSymbol = identifierType.symbol;
-                    if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
-                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
-                            const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
-                            if (fluentExtension) {
-                                const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
-                                if (signature) {
-                                    return { definition: signature.tsPlusFile, exportName: signature.tsPlusExportName };
-                                }
-                            }
-                        }
-                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
-                            return { definition: identifierSymbol.tsPlusSourceFile, exportName: identifierSymbol.tsPlusExportName };
-                        }
+                const optimized = checker.getNodeLinks(original).tsPlusOptimizedDataFirst;
+                if (optimized && isExpressionWithReferencedImport(call.expression)) {
+                    if (isExpressionWithReferencedImport(call.expression)) {
+                        importer.remove(call.expression.tsPlusReferencedImport);
                     }
                 }
-                if (isCallExpression(original) && isPropertyAccessExpression(original.expression) && isIdentifier(original.expression.name)) {
-                    const identifierType = checker.getTypeAtLocation(original.expression.name);
-                    const identifierSymbol = identifierType.symbol;
-                    if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
-                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
-                            const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
-                            if (fluentExtension) {
-                                const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
-                                if (signature) {
-                                    return { definition: signature.tsPlusFile, exportName: signature.tsPlusExportName };
-                                }
-                            }
-                        }
-                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
-                            return { definition: identifierSymbol.tsPlusSourceFile, exportName: identifierSymbol.tsPlusExportName };
-                        }
-                        if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.StaticFunction) {
-                            const declType = checker.getTypeAtLocation(identifierSymbol.tsPlusDeclaration.name!);
-                            const declSym = declType.symbol;
-                            if (declSym && isTsPlusSymbol(declSym)) {
-                                if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
-                                    const fluentExtension = checker.getFluentExtensionForPipeableSymbol(declSym);
-                                    if (fluentExtension) {
-                                        const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(declSym.tsPlusDataFirstType, type))?.signatures[0];
-                                        if (signature) {
-                                            if (isExpressionWithReferencedImport(call.expression)) {
-                                                importer.remove(call.expression.tsPlusReferencedImport);
-                                            }
-                                            return { definition: signature.tsPlusFile, exportName: signature.tsPlusExportName };
-                                        }
-                                    }
-                                }
-                                if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
-                                    return { definition: declSym.tsPlusSourceFile, exportName: declSym.tsPlusExportName };
-                                }
-                            }
-                        }
-                    }
-                }
+                return optimized;
             }
             function optimizePipe(
                 args: NodeArray<Expression>,

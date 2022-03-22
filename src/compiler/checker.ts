@@ -824,7 +824,7 @@ namespace ts {
                 }
                 return nodeLinks.resolvedSignature;
             },
-            getNodeLinks
+            getNodeLinks,
             // TSPLUS EXTENSION END
         };
 
@@ -32535,6 +32535,81 @@ namespace ts {
             }
         }
 
+        function tryCacheOptimizedPipeableCall(node: CallExpression): void {
+            if (isIdentifier(node.expression)) {
+                const identifierType = getTypeOfNode(node.expression);
+                const identifierSymbol = identifierType.symbol;
+                if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
+                    if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
+                        const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
+                        if (fluentExtension) {
+                            const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
+                            if (signature) {
+                                getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                                    definition: signature.tsPlusFile,
+                                    exportName: signature.tsPlusExportName
+                                };
+                            }
+                        }
+                    }
+                    if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                        getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                            definition: identifierSymbol.tsPlusSourceFile,
+                            exportName: identifierSymbol.tsPlusExportName
+                        };
+                    }
+                }
+            }
+            if (isPropertyAccessExpression(node.expression) && isIdentifier(node.expression.name)) {
+                const identifierType = checker.getTypeAtLocation(node.expression.name);
+                const identifierSymbol = identifierType.symbol;
+                if (identifierSymbol && isTsPlusSymbol(identifierSymbol)) {
+                    if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
+                        const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
+                        if (fluentExtension) {
+                            const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
+                            if (signature) {
+                                getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                                    definition: signature.tsPlusFile,
+                                    exportName: signature.tsPlusExportName
+                                };
+                            }
+                        }
+                    }
+                    if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                        getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                            definition: identifierSymbol.tsPlusSourceFile,
+                            exportName: identifierSymbol.tsPlusExportName
+                        };
+                    }
+                    if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.StaticFunction) {
+                        const declType = checker.getTypeAtLocation(identifierSymbol.tsPlusDeclaration.name!);
+                        const declSym = declType.symbol;
+                        if (declSym && isTsPlusSymbol(declSym)) {
+                            if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
+                                const fluentExtension = checker.getFluentExtensionForPipeableSymbol(declSym);
+                                if (fluentExtension) {
+                                    const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(declSym.tsPlusDataFirstType, type))?.signatures[0];
+                                    if (signature) {
+                                        getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                                            definition: signature.tsPlusFile,
+                                            exportName: signature.tsPlusExportName
+                                        };
+                                    }
+                                }
+                            }
+                            if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableMacro) {
+                                getNodeLinks(node).tsPlusOptimizedDataFirst = {
+                                    definition: declSym.tsPlusSourceFile,
+                                    exportName: declSym.tsPlusExportName
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        } 
+
         // TSPLUS EXTENSION START
         function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
             const checked = checkCallExpressionOriginal(node, checkMode);
@@ -32550,6 +32625,7 @@ namespace ts {
                         if (dataFirstDeclaration) {
                             const type = generatePipeable(node.parent, dataFirstDeclaration);
                             if (type) {
+                                getNodeLinks(node.parent).tsPlusDataFirstDeclaration = dataFirstDeclaration;
                                 return type;
                             }
                         }
@@ -32563,6 +32639,9 @@ namespace ts {
                         return checked;
                     }
                 }
+            }
+            if (isCallExpression(node)) {
+                tryCacheOptimizedPipeableCall(node);
             }
             return checked;
         }

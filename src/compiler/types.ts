@@ -5386,6 +5386,8 @@ namespace ts {
         tsPlusFluentSignature?: TsPlusSignature;
         tsPlusStaticExtension?: TsPlusStaticFunctionExtension;
         tsPlusGetterExtension?: { definition: SourceFile, exportName: string }
+        tsPlusDataFirstDeclaration?: FunctionDeclaration | ArrowFunction | FunctionExpression;
+        tsPlusOptimizedDataFirst?: { definition: SourceFile, exportName: string }
         // TSPLUS EXTENSION END
     }
 
