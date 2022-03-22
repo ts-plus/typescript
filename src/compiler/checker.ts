@@ -1075,7 +1075,7 @@ namespace ts {
             copy.delete("__call");
             return copy;
         }
-        function isExtensionValidForTarget(extension: Type, targetType: Type) {
+        function isExtensionValidForTarget(extension: Type, targetType: Type): boolean {
             return getSignaturesOfType(extension, SignatureKind.Call).find((candidate) => {
                 if (candidate.thisParameter) {
                     const thisType = getTypeOfSymbol(candidate.thisParameter);
@@ -1093,7 +1093,7 @@ namespace ts {
                     }
                 }
                 return false;
-            });
+            }) !== undefined;
         }
         function getFluentExtension(targetType: Type, name: string): Type | undefined {
             const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType));
@@ -29675,23 +29675,28 @@ namespace ts {
         // TSPLUS EXTENSION START
         function checkPropertyAccessForExtension(node: PropertyAccessExpression | QualifiedName, _left: Expression | QualifiedName, leftType: Type, right: Identifier | PrivateIdentifier, _checkMode: CheckMode | undefined) {
             const inType = getPropertiesOfType(leftType).findIndex((p) => p.escapedName === right.escapedText) !== -1;
-            if (!inType && isClassCompanionReference(_left)) {
-                const staticExt = getStaticCompanionExtension(leftType, right.escapedText.toString());
-                if (staticExt) {
-                    getNodeLinks(node).tsPlusStaticExtension = staticExt;
-                    return staticExt.type;
-                }
-                return;
-            }
             if (!inType) {
+                const nodeLinks = getNodeLinks(node);
+                if (nodeLinks.tsPlusResolvedType) {
+                    return nodeLinks.tsPlusResolvedType;
+                }
+                if (isClassCompanionReference(_left)) {
+                    const staticExt = getStaticCompanionExtension(leftType, right.escapedText.toString());
+                    if (staticExt) {
+                        nodeLinks.tsPlusStaticExtension = staticExt;
+                        nodeLinks.tsPlusResolvedType = staticExt.type
+                        return staticExt.type;
+                    }
+                    return;
+                }
                 const fluentExtType = getFluentExtension(leftType, right.escapedText.toString());
                 if (fluentExtType && isCallExpression(node.parent) && node.parent.expression === node) {
-                    const signature = isExtensionValidForTarget(fluentExtType, leftType);
                     if (isExtensionValidForTarget(fluentExtType, leftType)) {
                         if (isIdentifier(_left)) {
                             markAliasReferenced(getResolvedSymbol(_left), _left);
                         }
-                        getNodeLinks(node).tsPlusFluentSignature = signature as TsPlusSignature;
+                        nodeLinks.tsPlusResolvedType = fluentExtType;
+                        nodeLinks.isFluent = true;
                         return fluentExtType;
                     }
                     return;
@@ -29706,13 +29711,15 @@ namespace ts {
                         const type = getTypeOfSymbol(symbol);
                         // @ts-expect-error
                         type.tsPlusSymbol = symbol; // TsPlusGetterSymbol | TsPlusGetterVariableSymbol
-                        getNodeLinks(node).tsPlusGetterExtension = getterExt;
+                        nodeLinks.tsPlusGetterExtension = getterExt;
+                        nodeLinks.tsPlusResolvedType = type;
                         return type;
                     }
                 }
                 const staticExt = getStaticExtension(leftType, right.escapedText.toString());
                 if (staticExt) {
-                    getNodeLinks(node).tsPlusStaticExtension = staticExt;
+                    nodeLinks.tsPlusStaticExtension = staticExt;
+                    nodeLinks.tsPlusResolvedType = staticExt.type;
                     return staticExt.type;
                 }
             }

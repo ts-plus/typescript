@@ -347,8 +347,20 @@ namespace ts {
                     );
                 }
                 if (isPropertyAccessExpression(node.expression)) {
-                    const fluentExtension = checker.getNodeLinks(node.expression).tsPlusFluentSignature
-                    if (fluentExtension) {
+                    if (checker.getNodeLinks(node.expression).isFluent && nodeLinks.resolvedSignature) {
+                        let fluentExtension: TsPlusSignature | undefined;
+
+                        if (isTsPlusSignature(nodeLinks.resolvedSignature)) {
+                            fluentExtension = nodeLinks.resolvedSignature;
+                        }
+                        else if (nodeLinks.resolvedSignature.target && isTsPlusSignature(nodeLinks.resolvedSignature.target)) {
+                            fluentExtension = nodeLinks.resolvedSignature.target;
+                        }
+                        
+                        if (!fluentExtension) {
+                            throw new Error("BUG: No fluent signature found for fluent extension");
+                        }
+
                         const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
                         if (fluentExtension.tsPlusPipeable) {
                             return factory.updateCallExpression(

@@ -5383,11 +5383,12 @@ namespace ts {
         // TSPLUS EXTENSION START
         isTsPlusOperatorToken?: boolean;
         tsPlusCallExtension?: TsPlusStaticFunctionExtension;
-        tsPlusFluentSignature?: TsPlusSignature;
         tsPlusStaticExtension?: TsPlusStaticFunctionExtension;
         tsPlusGetterExtension?: { definition: SourceFile, exportName: string }
         tsPlusDataFirstDeclaration?: FunctionDeclaration | ArrowFunction | FunctionExpression;
         tsPlusOptimizedDataFirst?: { definition: SourceFile, exportName: string }
+        tsPlusResolvedType?: Type;
+        isFluent?: true;
         // TSPLUS EXTENSION END
     }
 

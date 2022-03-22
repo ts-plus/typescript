@@ -85,8 +85,30 @@ export function append_<A>(self: List<A>, a: A): List<A> {
     return new Cons([...self.array, a])
 }
 
+/**
+ * @tsplus fluent Iterable flatMap
+ */
+export function iterableFlatMap_<A, B>(self: Iterable<A>, f: (a: A) => Iterable<B>): Iterable<B> {
+    return {
+        *[Symbol.iterator]() {
+            for (const a of self) {
+                yield* f(a)
+            }
+        }
+    }
+}
+
+/**
+ * @tsplus fluent tsplus-tests/List flatMap
+ */
+export function flatMap_<A, B>(self: List<A>, f: (a: A) => List<B>): List<B> {
+    return new Cons(self.array.flatMap((a) => f(a).array));
+}
+
 export const append = Pipeable(append_)
 
 export const prepended = 1 + List(0) // prepend
 export const appended = List(0) + 1 // append
 export const sequenced = List(0) + List(1) // concat
+
+export const flatMapped = List(0, 1, 2).flatMap((n) => [n + 1, n + 2, n + 3]) // iterableFlatMap_
