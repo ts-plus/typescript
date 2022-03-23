@@ -30,3 +30,11 @@ export function unifyEffect<X extends Effect<any, any, any>>(self: X): Effect<
 > {
     return self
 }
+
+/**
+ * @tsplus operator ets/Effect >>
+ */
+export function piped<A, B>(self: A, f: (a: A) => B) {
+    return f(self)
+}
+

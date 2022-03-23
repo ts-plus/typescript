@@ -114,3 +114,10 @@ export const appended = List(0) + 1 // append
 export const sequenced = List(0) + List(1) // concat
 
 export const flatMapped = List(0, 1, 2).flatMap((n) => [n + 1, n + 2, n + 3]) // iterableFlatMap_
+
+function appending() {
+    let x = List(0)
+    for (let j = 0; j < 10; j++) {
+        x = x + 1
+    }
+}

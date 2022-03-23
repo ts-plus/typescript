@@ -1255,6 +1255,39 @@ namespace ts {
                 }
             }
         }
+        function getOperatorLeftExtensions(leftType: Type, name: string): Signature[] {
+            const symbols = new Set<Symbol>();
+            collectRelevantSymbols(getBaseConstraintOrType(leftType)).forEach((symbol) => {
+                symbols.add(symbol)
+            })
+            const symbolArray: Symbol[] = [];
+            symbols.forEach((symbol) => {
+                symbolArray.push(symbol);
+            });
+            const signatures: Signature[] = [];
+            for (const target of symbolArray) {
+                if (typeSymbolCache.has(target)) {
+                    const x = typeSymbolCache.get(target)!.flatMap(
+                        (tag) => {
+                            if (operatorCache.has(tag)) {
+                                const cache = operatorCache.get(tag)
+                                if (cache?.has(name)) {
+                                    return cache.get(name)!
+                                }
+                            }
+                            return []
+                        }
+                    )
+                    if (x.length === 0) {
+                        continue;
+                    }
+                    else {
+                        signatures.push(...x.flatMap(({ patched }) => getSignaturesOfType(getTypeOfSymbol(patched), SignatureKind.Call)))
+                    }
+                }
+            }
+            return signatures;
+        }
         function getOperatorExtensions(leftType: Type, rightType: Type, name: string): Signature[] {
             const symbols = new Set<Symbol>();
             collectRelevantSymbols(getBaseConstraintOrType(leftType)).forEach((symbol) => {
@@ -35838,6 +35871,26 @@ namespace ts {
         }
 
         function checkExpressionWorker(node: Expression | QualifiedName, checkMode: CheckMode | undefined, forceTuple?: boolean): Type {
+            // TSPLUS EXTENSION START
+            if (isBinaryExpression(node)) {
+                const operatorMappingEntry = invertedBinaryOp[node.operatorToken.kind as keyof typeof invertedBinaryOp] as string | undefined
+                if (operatorMappingEntry) {
+                    const signatures = getOperatorLeftExtensions(getTypeOfNode(node.left), operatorMappingEntry);
+                    if (signatures.length > 0) {
+                        const resolved = checkTsPlusCustomCallMulti(
+                            node.operatorToken,
+                            signatures,
+                            [node.left, node.right],
+                            checkMode || CheckMode.Normal
+                        );
+                        if (!isErrorType(resolved)) {
+                            getNodeLinks(node.operatorToken).isTsPlusOperatorToken = true;
+                            return resolved;
+                        }
+                    }
+                }
+            }
+            // TSPLUS EXTENSION END
             const kind = node.kind;
             if (cancellationToken) {
                 // Only bother checking on a few construct kinds.  We don't want to be excessively
