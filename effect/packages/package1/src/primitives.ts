@@ -29,7 +29,6 @@ declare global {
   export interface Object {}
 }
 declare const a: string;
-declare const b: number;
 
 /**
  * @tsplus getter string lines
@@ -41,13 +40,13 @@ export function lines(self: string): string[] {
 const xs = a.lines;
 
 /**
- * @tsplus fluent number days
+ * @tsplus getter number days
  */
 export function days(self: number, n: number): Date {
   return new Date();
 }
 
-(0).days(1);
+(0).days
 
 /**
  * @tsplus fluent function flow

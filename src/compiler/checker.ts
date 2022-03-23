@@ -835,16 +835,16 @@ namespace ts {
 
         // TSPLUS EXTENSION BEGIN
         function getPrimitiveTypeName(type: Type): string | undefined {
-            if (type === stringType) {
+            if (type.flags & TypeFlags.StringLike) {
                 return "String";
             }
-            if (type === numberType) {
+            if (type.flags & TypeFlags.NumberLike) {
                 return "Number";
             }
-            if (type === booleanType) {
+            if (type.flags & TypeFlags.BooleanLike) {
                 return "Boolean";
             }
-            if (type === bigintType) {
+            if (type.flags & TypeFlags.BigIntLike) {
                 return "BigInt";
             }
         }
