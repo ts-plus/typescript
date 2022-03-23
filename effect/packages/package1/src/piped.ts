@@ -1,4 +1,6 @@
+import { Managed } from "@effect-ts/core";
 import { Effect } from "./prelude";
-import * as T from "./prelude/pipeable/pipeable"
 
-export const ok = Effect.succeed(0) >> T.chain((n) => Effect.succeed(n))
+export const effect = Effect.succeed(0) >>> Effect.$.chain((n) => Effect.succeed(0 + n)) >>> Effect.$.chain((n) => Effect.succeed(() => { console.log(n) }))
+
+export const managed = effect >>> Managed.makeExit((s) => Effect.succeed(s));

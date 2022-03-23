@@ -34818,7 +34818,7 @@ namespace ts {
                     const rightType = getLastResult(state);
                     Debug.assertIsDefined(rightType);
 
-                    result = checkBinaryLikeExpressionWorker(node.left, node.operatorToken, node.right, leftType, rightType, node);
+                    result = checkBinaryLikeExpressionWorker(node.left, node.operatorToken, node.right, leftType, rightType, state.checkMode, node);
                 }
 
                 state.skip = false;
@@ -34889,7 +34889,7 @@ namespace ts {
             }
 
             const rightType = checkExpression(right, checkMode);
-            return checkBinaryLikeExpressionWorker(left, operatorToken, right, leftType, rightType, errorNode);
+            return checkBinaryLikeExpressionWorker(left, operatorToken, right, leftType, rightType, checkMode, errorNode);
         }
 
         function checkBinaryLikeExpressionWorker(
@@ -34898,6 +34898,7 @@ namespace ts {
             right: Expression,
             leftType: Type,
             rightType: Type,
+            checkMode: CheckMode | undefined,
             errorNode?: Node
         ): Type {
             const operator = operatorToken.kind;
@@ -34913,7 +34914,7 @@ namespace ts {
                         operatorToken,
                         signatures,
                         [left, right],
-                        CheckMode.Normal,
+                        checkMode || CheckMode.Normal,
                         (_) => diagnostics.add(_)
                     );
                 }
