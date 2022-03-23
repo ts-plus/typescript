@@ -26348,6 +26348,23 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION START
+        function shouldMarkIdentifierAliasReferenced(node: Identifier, type: Type): boolean {
+            if (
+                !(node.parent &&
+                    isCallExpression(node.parent) &&
+                    node.parent.expression === node &&
+                    getSignaturesOfType(type, SignatureKind.Call).length === 0 &&
+                    (
+                        (getStaticExtension(type, "__call") != null) ||
+                        (getStaticCompanionExtension(type, "__call") != null)
+                    )
+                ) &&
+                !isTransformablePipeableExtension(type)
+            ) {
+                return true;
+            }
+            return false;
+        }
         function checkIdentifier(node: Identifier, checkMode: CheckMode | undefined): Type {
             if (isThisInTypeQuery(node)) {
                 return checkThisExpression(node);
@@ -26358,15 +26375,7 @@ namespace ts {
             // for the symbol. Also, don't mark any property access expression LHS - checkPropertyAccessExpression will handle that
             if (!(node.parent && isPropertyAccessExpression(node.parent) && node.parent.expression === node)) {
                 // We should also not mark as used identifiers that will be replaced
-                if (
-                    !(node.parent &&
-                        isCallExpression(node.parent) &&
-                        node.parent.expression === node &&
-                        getSignaturesOfType(type, SignatureKind.Call).length === 0 &&
-                        (getStaticExtension(type, "__call") != null)
-                    ) &&
-                    !isTransformablePipeableExtension(type)
-                ) {
+                if (shouldMarkIdentifierAliasReferenced(node, type)) {
                     markAliasReferenced(getResolvedSymbol(node), node);
                 }
             }
