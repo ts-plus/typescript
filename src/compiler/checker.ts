@@ -1083,6 +1083,15 @@ namespace ts {
                     }
                 }
             });
+            getterCache.get("global")?.forEach((v, k) => {
+                if (copy.has(k)) {
+                    return;
+                }
+                const symbol = v.patched(selfNode);
+                if (symbol) {
+                    copy.set(k, symbol);
+                }
+            });
             copyFluent.forEach((extensions, k) => {
                 copy.set(
                     k,
@@ -1172,6 +1181,7 @@ namespace ts {
                     }
                 }
             }
+            return getterCache.get("global")?.get(name);
         }
         function getGetterCompanionExtension(targetType: Type, name: string) {
             const symbols = collectRelevantSymbols(targetType)

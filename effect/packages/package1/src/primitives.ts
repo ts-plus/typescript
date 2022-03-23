@@ -435,3 +435,12 @@ export function pipe(
 
 export const ok_0 = ({ a: "hello" }).mapObject((s) => parseInt(s));
 export const ok_1 = (1).via(n => `${n}`, s => s.length)
+
+/**
+ * @tsplus getter global asTuple
+ */
+export function asTuple<A>(self: A): [A] {
+  return [self]
+}
+
+const x = (0).asTuple
