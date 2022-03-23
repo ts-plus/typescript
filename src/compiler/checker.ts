@@ -26383,7 +26383,7 @@ namespace ts {
 
         // TSPLUS EXTENSION START
         function shouldMarkIdentifierAliasReferenced(node: Identifier, type: Type): boolean {
-            if (node.parent && isCallExpression(node.parent) && node === node.parent.expression && type.symbol.valueDeclaration) {
+            if (node.parent && isCallExpression(node.parent) && node === node.parent.expression && type.symbol && type.symbol.valueDeclaration) {
                 if (collectTsPlusMacroTags(type.symbol.valueDeclaration).find((tag) => tag.comment === "macro pipe")) {
                     return false;
                 }
