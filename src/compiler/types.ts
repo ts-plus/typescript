@@ -4693,6 +4693,7 @@ namespace ts {
         getPrimitiveTypeName(type: Type): string | undefined
         getResolvedOperator(node: BinaryExpression): Signature | undefined
         getNodeLinks(node: Node): NodeLinks
+        collectTsPlusMacroTags(statement: Declaration): readonly TsPlusJSDocMacroTag[]
     }
 
     /* @internal */

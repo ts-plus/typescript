@@ -830,6 +830,7 @@ namespace ts {
                 return nodeLinks.resolvedSignature;
             },
             getNodeLinks,
+            collectTsPlusMacroTags
             // TSPLUS EXTENSION END
         };
 
@@ -1071,6 +1072,17 @@ namespace ts {
                     })
                 }
             })
+            fluentCache.get("global")?.forEach((v, k) => {
+                const extension = v()
+                if (extension) {
+                    if (isExtensionValidForTarget(getTypeOfSymbol(extension.patched), targetType)) {
+                        if (!copyFluent.has(k)) {
+                            copyFluent.set(k, []);
+                        }
+                        copyFluent.get(k)!.push(extension);
+                    }
+                }
+            });
             copyFluent.forEach((extensions, k) => {
                 copy.set(
                     k,
@@ -1128,6 +1140,10 @@ namespace ts {
                         });
                     }
                 }
+            }
+            const globalExtension = fluentCache.get("global")?.get(name)?.();
+            if (globalExtension) {
+                candidates.push(...globalExtension.signatures)
             }
             if (candidates.length > 0) {
                 return getTypeOfSymbol(createTsPlusFluentSymbolWithType(name, candidates));
@@ -26357,6 +26373,11 @@ namespace ts {
 
         // TSPLUS EXTENSION START
         function shouldMarkIdentifierAliasReferenced(node: Identifier, type: Type): boolean {
+            if (node.parent && isCallExpression(node.parent) && node === node.parent.expression && type.symbol.valueDeclaration) {
+                if (collectTsPlusMacroTags(type.symbol.valueDeclaration).find((tag) => tag.comment === "macro pipe")) {
+                    return false;
+                }
+            }
             if (
                 !(node.parent &&
                     isCallExpression(node.parent) &&

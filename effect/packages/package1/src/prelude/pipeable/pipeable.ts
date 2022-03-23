@@ -1,3 +1,4 @@
+import { pipe } from "../../primitives";
 import { Effect, T } from "../definition/Effect";
 import { bind_ } from "../operations/bind";
 import { chain_ } from "../operations/flatMap.js";

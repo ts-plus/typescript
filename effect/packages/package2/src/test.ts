@@ -1,5 +1,6 @@
 import { Effect, T, chain, chainPipeable } from "@tsplus-test/package1/prelude";
 import * as EffectModule from "@tsplus-test/package1/prelude";
+import { pipe } from "@tsplus-test/package1/primitives"
 
 const a = pipe(
   Effect(1),
@@ -21,3 +22,4 @@ b.unsafeRunPromise().then((x) => console.log(x))
 c.unsafeRunPromise().then((x) => console.log(x))
 d.unsafeRunPromise().then((x) => console.log(x))
 
+export const f = pipe(0, n => n + 1, n => n + 2)

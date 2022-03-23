@@ -211,7 +211,7 @@ namespace ts {
                     return factory.createCallExpression(
                         getPathOfExtension(context, importer, nodeLinks.tsPlusGetterExtension, source, localUniqueExtensionNames),
                         void 0,
-                        [visitNode(node.expression, visitor)]
+                        [simplyfy(visitNode(node.expression, visitor))]
                     );
                 }
                 return visitEachChild(node, visitor, context);
@@ -311,6 +311,12 @@ namespace ts {
                     return node;
                 }
             }
+            function simplyfy(node: Expression): Expression {
+                if (isParenthesizedExpression(node) && isNumericLiteral(node.expression)) {
+                    return node.expression
+                }
+                return node
+            }
             function visitCallExpressionOrFluentCallExpression(source: SourceFile, traceInScope: Identifier | undefined, node: CallExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
                 if (checker.isPipeCall(node)) {
                     return optimizePipe(visitNodes(node.arguments, visitor), context.factory, source);
@@ -362,6 +368,18 @@ namespace ts {
                             throw new Error("BUG: No fluent signature found for fluent extension");
                         }
 
+                        if (fluentExtension.tsPlusDeclaration) {
+                            const macroTags = checker.collectTsPlusMacroTags(fluentExtension.tsPlusDeclaration)
+
+                            if (macroTags.find((tag) => tag.comment === "macro pipe")) {
+                                return optimizePipe(
+                                    visitNodes(factory.createNodeArray([simplyfy(node.expression.expression), ...node.arguments], node.arguments.hasTrailingComma), visitor),
+                                    context.factory,
+                                    source
+                                );
+                            }
+                        }
+
                         const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
                         if (fluentExtension.tsPlusPipeable) {
                             return factory.updateCallExpression(
@@ -372,7 +390,7 @@ namespace ts {
                                     visited.arguments
                                 ),
                                 undefined,
-                                [(visited.expression as PropertyAccessExpression).expression]
+                                [simplyfy((visited.expression as PropertyAccessExpression).expression)]
                             )
                         }
                         else {
@@ -380,7 +398,7 @@ namespace ts {
                                 visited as CallExpression,
                                 getPathOfExtension(context, importer, { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName }, source, localUniqueExtensionNames),
                                 (visited as CallExpression).typeArguments,
-                                [((visited as CallExpression).expression as PropertyAccessExpression).expression, ...(visited as CallExpression).arguments]
+                                [simplyfy(((visited as CallExpression).expression as PropertyAccessExpression).expression), ...(visited as CallExpression).arguments]
                             );
                         }
                     }

@@ -1,3 +1,5 @@
+import { pipe } from "../../primitives";
+
 export class Cons<out A> implements Iterable<A> {
     constructor(readonly array: readonly A[]) { }
 
