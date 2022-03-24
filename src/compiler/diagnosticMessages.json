@@ -7406,5 +7406,9 @@
     "The first parameter of a 'pipeable' annotated function cannot be a rest parameter.": {
         "category": "Error",
         "code": 50023
+    },
+    "Declaration of an extension must be exported.": {
+        "category": "Error",
+        "code": 50024
     }
 }

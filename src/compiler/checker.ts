@@ -368,6 +368,7 @@ namespace ts {
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
+        const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/
         // TSPLUS EXTENSION END
 
         // Cancellation that controls whether or not we can cancel in the middle of type checking.
@@ -44385,6 +44386,14 @@ namespace ts {
                 (tag): tag is TsPlusJSDocGetterTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("getter")
             );
         }
+        function hasTsPlusExportedExtensionTags(statement: Node) {
+            for (const tag of getJSDocTags(statement)) {
+                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tsPlusExportedExtensionRegex.test(tag.comment)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         function parseTsPlusExtensionTag(tag: TsPlusJSDocFluentTag | TsPlusJSDocOperatorTag): TsPlusExtensionTag | undefined {
             const [_, typeName, functionName, priority] = tag.comment.split(" ");
             if (!typeName || !functionName) {
@@ -45354,6 +45363,11 @@ namespace ts {
                 }
             }
         }
+        function checkTsPlusNonExportedExtension(declaration: Declaration): void {
+            if (hasTsPlusExportedExtensionTags(declaration)) {
+                error(declaration, Diagnostics.Declaration_of_an_extension_must_be_exported);
+            }
+        }
         function collectTsPlusSymbols(file: SourceFile, statements: NodeArray<Statement>): void {
             for (const statement of statements) {
                 if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
@@ -45382,6 +45396,19 @@ namespace ts {
                         tryCacheTsPlusUnifyFunction(statement);
                         tryCacheTsPlusIndexFunction(statement);
                         tryCacheTsPlusPipeableFunction(file, statement);
+                    }
+                } else {
+                    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
+                        checkTsPlusNonExportedExtension(statement)
+                    }
+                    if (isClassDeclaration(statement)) {
+                        checkTsPlusNonExportedExtension(statement)
+                    }
+                    if (isFunctionDeclaration(statement)) {
+                        checkTsPlusNonExportedExtension(statement)
+                    }
+                    if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                        checkTsPlusNonExportedExtension(statement.declarationList.declarations[0]);
                     }
                 }
                 if (isFunctionDeclaration(statement)) {
