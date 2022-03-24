@@ -1733,6 +1733,18 @@ namespace ts {
                 );
             }
         }
+        function getFirstDeclarationWithJsDoc(typeChecker: TypeChecker, declaration: NamedDeclaration): Declaration {
+            if (!hasJSDocNodes(declaration) && declaration.name) {
+                const declarationSymbol = typeChecker.getSymbolAtLocation(declaration.name);
+                if (declarationSymbol && declarationSymbol.declarations) {
+                    const declarationWithJsDoc = firstDefined(declarationSymbol.declarations, (decl) => hasJSDocNodes(decl) ? decl : undefined);
+                    if (declarationWithJsDoc) {
+                        return declarationWithJsDoc;
+                    }
+                }
+            }
+            return declaration;
+        }
         // TSPLUS EXTENSION END
 
         function getQuickInfoAtPosition(fileName: string, position: number): QuickInfo | undefined {
@@ -1929,13 +1941,14 @@ namespace ts {
                                     (typeChecker) => getTsPlusSignatureDisplayParts(typeChecker, nodeForQuickInfo, signature.declaration as SignatureDeclaration, signature)
                                 )
                             );
+                            const declaration = getFirstDeclarationWithJsDoc(typeChecker, signature.declaration);
                             return {
                                 kind: ScriptElementKind.functionElement,
                                 kindModifiers: ScriptElementKindModifier.none,
                                 textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
                                 displayParts,
-                                documentation: getDocumentationComment([signature.declaration], typeChecker),
-                                tags: getJsDocTagsOfDeclarations([signature.declaration], typeChecker)
+                                documentation: getDocumentationComment([declaration], typeChecker),
+                                tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
                             };
                         }
                     }
