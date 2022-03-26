@@ -1868,20 +1868,13 @@ namespace ts {
                                     break;
                                 }
                                 displayParts = displayParts.concat(getTsPlusSignatureDisplayParts(typeChecker, nodeForQuickInfo, declaration, resolvedSignature));
-                                let tsPlusDeclaration = getDeclarationForTsPlus(typeChecker, node.parent.parent, tsPlusSymbol);
-
-                                let declarations: Declaration[] = [declaration]
-                                if (tsPlusDeclaration && tsPlusDeclaration !== declaration) {
-                                    declarations.push(tsPlusDeclaration)
-                                }
-
                                 return {
                                     kind: ScriptElementKind.memberFunctionElement,
                                     kindModifiers: ScriptElementKindModifier.staticModifier,
                                     textSpan: createTextSpanFromNode(nodeForQuickInfo, sourceFile),
                                     displayParts,
-                                    documentation: getDocumentationComment(declarations, typeChecker),
-                                    tags: getJsDocTagsOfDeclarations(declarations, typeChecker)
+                                    documentation: getDocumentationComment([declaration], typeChecker),
+                                    tags: getJsDocTagsOfDeclarations([declaration], typeChecker)
                                 };
                             }
                             case TsPlusSymbolTag.StaticFunction: {

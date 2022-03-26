@@ -48,7 +48,7 @@ export const just = <A>(value: A): Maybe<A> => {
 /**
  * @tsplus fluent Maybe match
  */
-export function match_<A, B, C>(self: Maybe<A>, onNothing: () => B, onJust: (a: A) => C): B | C {
+export const match_ = <A, B, C>(self: Maybe<A>, onNothing: () => B, onJust: (a: A) => C): B | C => {
     return self._tag === "Nothing" ? onNothing() : onJust(self.value);
 }
 
