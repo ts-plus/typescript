@@ -368,7 +368,7 @@ namespace ts {
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
-        const globalSymbolsCache = new Map<string, Symbol>()
+        const globalSymbolsCache = new Map<string, { symbol: Symbol, targetSymbol: Symbol }>()
         const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/
         // TSPLUS EXTENSION END
 
@@ -834,7 +834,7 @@ namespace ts {
             getNodeLinks,
             collectTsPlusMacroTags,
             getTsPlusGlobals: () => {
-                return arrayFrom(globalSymbolsCache.values());
+                return arrayFrom(mapIterator(globalSymbolsCache.values(), ({ symbol }) => symbol));
             }
             // TSPLUS EXTENSION END
         };
@@ -2869,12 +2869,16 @@ namespace ts {
                 const globalSymbol = globalSymbolsCache.get(name as string);
 
                 if (globalSymbol && originalLocation) {
-                    if (!errorLocation ||
-                        !checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation, name, meaning, globalSymbol) &&
-                        !checkAndReportErrorForUsingTsPlusValueAsType(errorLocation, name, meaning, globalSymbol)) {
-                        getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalSymbol;
-                        return globalSymbol;
+                    const { symbol, targetSymbol } = globalSymbol
+                    if (produceDiagnostics) {
+                        if (!errorLocation ||
+                            !checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation, name, meaning, symbol, targetSymbol) &&
+                            !checkAndReportErrorForUsingTsPlusValueAsType(errorLocation, name, meaning, targetSymbol)) {
+                            getNodeLinks(originalLocation).tsPlusGlobalIdentifier = symbol;
+                            return symbol;
+                        }
                     }
+                    return symbol;
                 }
 
                 if (nameNotFoundMessage && produceDiagnostics) {
@@ -3197,10 +3201,17 @@ namespace ts {
             return false;
         }
 
-        function checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation: Node, name: __String, meaning: SymbolFlags, globalSymbol: Symbol): boolean {
-            if (meaning & (SymbolFlags.Value & ~SymbolFlags.NamespaceModule)) {
-                if (!(globalSymbol.flags & SymbolFlags.Value)) {
-                    const rawName = unescapeLeadingUnderscores(name);
+        function checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation: Node, name: __String, meaning: SymbolFlags, symbol: Symbol, targetSymbol: Symbol): boolean {
+            if ((meaning & (SymbolFlags.Value & ~SymbolFlags.Namespace)) && meaning !== SymbolFlags.Type) {
+                const isTypeOnlyGlobal = getSymbolLinks(symbol).isTsPlusTypeOnlyGlobal;
+                const rawName = unescapeLeadingUnderscores(name);
+                if (isTypeOnlyGlobal) {
+                    if (meaning !== (SymbolFlags.Value | SymbolFlags.ExportValue)) {
+                        error(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName);
+                        return true;
+                    }
+                }
+                if (!(targetSymbol.flags & SymbolFlags.Value)) {
                     error(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName);
                     return true;
                 }
@@ -3208,9 +3219,11 @@ namespace ts {
             return false;
         }
 
-        function checkAndReportErrorForUsingTsPlusValueAsType(errorLocation: Node, name: __String, meaning: SymbolFlags, globalSymbol: Symbol): boolean {
-            if (meaning & (SymbolFlags.Type & ~SymbolFlags.Namespace)) {
-                if (!(globalSymbol.flags & SymbolFlags.Type)) {
+        function checkAndReportErrorForUsingTsPlusValueAsType(errorLocation: Node, name: __String, meaning: SymbolFlags, targetSymbol: Symbol): boolean {
+            if (meaning & (SymbolFlags.Type & ~SymbolFlags.Namespace) &&
+                meaning !== SymbolFlags.Value &&
+                meaning !== (SymbolFlags.Value | SymbolFlags.ExportValue)) {
+                if (!(targetSymbol.flags & SymbolFlags.Type)) {
                     error(errorLocation, Diagnostics._0_refers_to_a_value_but_is_being_used_as_a_type_here_Did_you_mean_typeof_0, unescapeLeadingUnderscores(name));
                     return true;
                 }
@@ -44914,11 +44927,15 @@ namespace ts {
                 const tags = collectTsPlusGlobalTags(declaration);
 
                 if (tags.length > 0) {
+                    const isDeclarationTypeOnly = declaration.importClause.isTypeOnly;
                     declaration.importClause.namedBindings.elements.forEach((importSpecifier) => {
-                        const symbol = getTargetOfImportSpecifier(importSpecifier, false);
-                        if (symbol) {
-                            getSymbolLinks(symbol).isTsPlusGlobal = true;
-                            globalSymbolsCache.set(importSpecifier.name.escapedText as string, symbol);
+                        const symbol = getSymbolAtLocation(importSpecifier.name);
+                        const targetSymbol = getTargetOfImportSpecifier(importSpecifier, false);
+                        if (symbol && targetSymbol) {
+                            const symbolLinks = getSymbolLinks(symbol);
+                            symbolLinks.isTsPlusGlobal = true;
+                            symbolLinks.isTsPlusTypeOnlyGlobal = isDeclarationTypeOnly || importSpecifier.isTypeOnly;
+                            globalSymbolsCache.set(importSpecifier.name.escapedText as string, { symbol, targetSymbol });
                         }
                     })
                 }

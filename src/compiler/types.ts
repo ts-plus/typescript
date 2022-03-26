@@ -3437,6 +3437,10 @@ namespace ts {
         | TsPlusPipeableIdentifierSymbol
         | TsPlusPipeableDeclarationSymbol;
 
+    export interface TsPlusGlobalSymbol extends Symbol {
+        isTypeOnly: boolean;
+    }
+
     export interface TsPlusFluentExtension {
         patched: Symbol;
         types: { type: Type, signatures: readonly TsPlusSignature[] }[];
@@ -5244,6 +5248,7 @@ namespace ts {
         accessibleChainCache?: ESMap<string, Symbol[] | undefined>;
         // TSPLUS
         isTsPlusGlobal?: boolean
+        isTsPlusTypeOnlyGlobal?: boolean
     }
 
     /* @internal */
