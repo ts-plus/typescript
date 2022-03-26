@@ -2869,8 +2869,12 @@ namespace ts {
                 const globalSymbol = globalSymbolsCache.get(name as string);
 
                 if (globalSymbol && originalLocation) {
-                    getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalSymbol;
-                    return globalSymbol;
+                    if (!errorLocation ||
+                        !checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation, name, meaning, globalSymbol) &&
+                        !checkAndReportErrorForUsingTsPlusValueAsType(errorLocation, name, meaning, globalSymbol)) {
+                        getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalSymbol;
+                        return globalSymbol;
+                    }
                 }
 
                 if (nameNotFoundMessage && produceDiagnostics) {
@@ -3187,6 +3191,27 @@ namespace ts {
                     else {
                         error(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName);
                     }
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation: Node, name: __String, meaning: SymbolFlags, globalSymbol: Symbol): boolean {
+            if (meaning & (SymbolFlags.Value & ~SymbolFlags.NamespaceModule)) {
+                if (!(globalSymbol.flags & SymbolFlags.Value)) {
+                    const rawName = unescapeLeadingUnderscores(name);
+                    error(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function checkAndReportErrorForUsingTsPlusValueAsType(errorLocation: Node, name: __String, meaning: SymbolFlags, globalSymbol: Symbol): boolean {
+            if (meaning & (SymbolFlags.Type & ~SymbolFlags.Namespace)) {
+                if (!(globalSymbol.flags & SymbolFlags.Type)) {
+                    error(errorLocation, Diagnostics._0_refers_to_a_value_but_is_being_used_as_a_type_here_Did_you_mean_typeof_0, unescapeLeadingUnderscores(name));
                     return true;
                 }
             }
@@ -44890,7 +44915,7 @@ namespace ts {
 
                 if (tags.length > 0) {
                     declaration.importClause.namedBindings.elements.forEach((importSpecifier) => {
-                        const symbol = getSymbolAtLocation(importSpecifier.name);
+                        const symbol = getTargetOfImportSpecifier(importSpecifier, false);
                         if (symbol) {
                             getSymbolLinks(symbol).isTsPlusGlobal = true;
                             globalSymbolsCache.set(importSpecifier.name.escapedText as string, symbol);
