@@ -1,7 +1,7 @@
 /**
  * @tsplus global
  */
-import type { Effect, T } from "@tsplus-test/package1/prelude/definition/Effect"
+import { Effect, T } from "@tsplus-test/package1/prelude/definition/Effect"
 
 /**
  * @tsplus global

@@ -3206,6 +3206,17 @@ namespace ts {
                 const isTypeOnlyGlobal = getSymbolLinks(symbol).isTsPlusTypeOnlyGlobal;
                 const rawName = unescapeLeadingUnderscores(name);
                 if (isTypeOnlyGlobal) {
+                    if (!isValidTypeOnlyAliasUseSite(errorLocation)) {
+                        const typeOnlyDeclaration = getTypeOnlyAliasDeclaration(symbol);
+                        if (typeOnlyDeclaration) {
+                            const message = typeOnlyDeclaration.kind === SyntaxKind.ExportSpecifier
+                                ? Diagnostics._0_cannot_be_used_as_a_value_because_it_was_exported_using_export_type
+                                : Diagnostics._0_cannot_be_used_as_a_value_because_it_was_imported_using_import_type;
+                            const unescapedName = unescapeLeadingUnderscores(name);
+                            error(errorLocation, message, unescapedName);
+                            return true;
+                        }
+                    }
                     if (meaning !== (SymbolFlags.Value | SymbolFlags.ExportValue)) {
                         error(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName);
                         return true;
