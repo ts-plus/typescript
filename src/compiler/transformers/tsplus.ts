@@ -132,7 +132,7 @@ namespace ts {
                 const extensionRegex = /^(static|fluent|getter|operator|index|pipeable).*/;
                 return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && extensionRegex.test(tag.comment)).length > 0;
             }
-            function visitIdentifier(source: SourceFile, traceInScope: Identifier | undefined, node: Identifier, context: TransformationContext): Identifier {
+            function visitIdentifier(source: SourceFile, traceInScope: Identifier | undefined, node: Identifier, context: TransformationContext) {
                 if ((isDeclarationName(node) && !isExportDeclaration(node.parent)) || (node.parent && isTypeReferenceNode(node.parent))) {
                     return visitEachChild(node, visitor(source, traceInScope), context);
                 }
@@ -148,6 +148,11 @@ namespace ts {
                             localUniqueExtensionNames.set(name, uniqueName);
                             return uniqueName;
                         }
+                    }
+                    const { tsPlusGlobalIdentifier } = checker.getNodeLinks(node);
+                    const globalImport = checker.getTsPlusGlobal(node.escapedText.toString());
+                    if (tsPlusGlobalIdentifier && globalImport) {
+                        return getPathOfGlobalImport(context, importer, node, globalImport.location)
                     }
                 }
                 return visitEachChild(node, visitor(source, traceInScope), context);
@@ -520,6 +525,14 @@ namespace ts {
                     }
                 }
             }
+        }
+
+        function getPathOfGlobalImport(context: TransformationContext, importer: TsPlusImporter, identifier: Identifier, location: string) {
+            const factory = context.factory;
+            const id = importer.get(location);
+            const node = factory.createPropertyAccessExpression(id, identifier);
+            (node as ExpressionWithReferencedImport<PropertyAccessExpression>).tsPlusReferencedImport = location;
+            return node;
         }
 
         function getPathOfExtension(context: TransformationContext, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile, localUniqueExtensionNames: ESMap<string, Identifier>) {

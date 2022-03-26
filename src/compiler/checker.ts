@@ -368,7 +368,7 @@ namespace ts {
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
-        const globalSymbolsCache = new Map<string, { symbol: Symbol, targetSymbol: Symbol }>()
+        const globalSymbolsCache = new Map<string, { symbol: Symbol, targetSymbol: Symbol, location: string }>()
         const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/
         // TSPLUS EXTENSION END
 
@@ -835,6 +835,9 @@ namespace ts {
             collectTsPlusMacroTags,
             getTsPlusGlobals: () => {
                 return arrayFrom(mapIterator(globalSymbolsCache.values(), ({ symbol }) => symbol));
+            },
+            getTsPlusGlobal: (name) => {
+                return globalSymbolsCache.get(name);
             }
             // TSPLUS EXTENSION END
         };
@@ -44934,7 +44937,8 @@ namespace ts {
             }
         }
         function tryCacheTsPlusGlobalSymbol(declaration: ImportDeclaration): void {
-            if (declaration.importClause && declaration.importClause.namedBindings && isNamedImports(declaration.importClause.namedBindings)) {
+            if (declaration.importClause && declaration.importClause.namedBindings && isNamedImports(declaration.importClause.namedBindings) && isStringLiteral(declaration.moduleSpecifier)) {
+                const location = declaration.moduleSpecifier.text;
                 const tags = collectTsPlusGlobalTags(declaration);
 
                 if (tags.length > 0) {
@@ -44946,7 +44950,7 @@ namespace ts {
                             const symbolLinks = getSymbolLinks(symbol);
                             symbolLinks.isTsPlusGlobal = true;
                             symbolLinks.isTsPlusTypeOnlyGlobal = isDeclarationTypeOnly || importSpecifier.isTypeOnly;
-                            globalSymbolsCache.set(importSpecifier.name.escapedText as string, { symbol, targetSymbol });
+                            globalSymbolsCache.set(importSpecifier.name.escapedText as string, { symbol, targetSymbol, location });
                         }
                     })
                 }

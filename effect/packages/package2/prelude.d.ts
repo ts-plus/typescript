@@ -1,7 +1,7 @@
 /**
  * @tsplus global
  */
-import { Effect, T } from "@tsplus-test/package1/prelude/definition/Effect"
+import { Effect, T, chain, chainPipeable } from "@tsplus-test/package1/prelude"
 
 /**
  * @tsplus global

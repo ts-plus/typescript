@@ -4705,6 +4705,7 @@ namespace ts {
         getNodeLinks(node: Node): NodeLinks
         collectTsPlusMacroTags(statement: Declaration): readonly TsPlusJSDocMacroTag[]
         getTsPlusGlobals(): Symbol[];
+        getTsPlusGlobal(name: string): { targetSymbol: Symbol, symbol: Symbol, location: string } | undefined;
     }
 
     /* @internal */
