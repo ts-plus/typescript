@@ -368,6 +368,7 @@ namespace ts {
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
+        const globalSymbolsCache = new Map<string, Symbol>()
         const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/
         // TSPLUS EXTENSION END
 
@@ -2862,6 +2863,13 @@ namespace ts {
                 }
             }
             if (!result) {
+                const globalSymbol = globalSymbolsCache.get(name as string);
+
+                if (globalSymbol && originalLocation) {
+                    getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalSymbol;
+                    return globalSymbol;
+                }
+
                 if (nameNotFoundMessage && produceDiagnostics) {
                     if (!errorLocation ||
                         !checkAndReportErrorForMissingPrefix(errorLocation, name, nameArg!) && // TODO: GH#18217
@@ -5345,6 +5353,10 @@ namespace ts {
             const firstIdentifier = getFirstIdentifier(entityName);
             const symbol = resolveName(enclosingDeclaration, firstIdentifier.escapedText, meaning, /*nodeNotFoundErrorMessage*/ undefined, /*nameArg*/ undefined, /*isUse*/ false);
             if (symbol && symbol.flags & SymbolFlags.TypeParameter && meaning & SymbolFlags.Type) {
+                return { accessibility: SymbolAccessibility.Accessible };
+            }
+
+            if (symbol && getSymbolLinks(symbol).isTsPlusGlobal) {
                 return { accessibility: SymbolAccessibility.Accessible };
             }
 
@@ -44326,6 +44338,12 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION START
+        function collectTsPlusGlobalTags(statement: ImportDeclaration) {
+            return getAllJSDocTags(
+                statement,
+                (tag): tag is TsPlusJSDocGlobalTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("global")
+            );
+        }
         function collectTsPlusFluentTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
@@ -44863,6 +44881,21 @@ namespace ts {
                 tags.push(tag)
             }
         }
+        function tryCacheTsPlusGlobalSymbol(declaration: ImportDeclaration): void {
+            if (declaration.importClause && declaration.importClause.namedBindings && isNamedImports(declaration.importClause.namedBindings)) {
+                const tags = collectTsPlusGlobalTags(declaration);
+
+                if (tags.length > 0) {
+                    declaration.importClause.namedBindings.elements.forEach((importSpecifier) => {
+                        const symbol = getSymbolAtLocation(importSpecifier.name);
+                        if (symbol) {
+                            getSymbolLinks(symbol).isTsPlusGlobal = true;
+                            globalSymbolsCache.set(importSpecifier.name.escapedText as string, symbol);
+                        }
+                    })
+                }
+            }
+        }
         function tryCacheTsPlusType(declaration: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration): void {
             const tag = collectTsPlusTypeTags(declaration)[0];
             if (tag) {
@@ -45373,6 +45406,9 @@ namespace ts {
                 if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
                     collectTsPlusSymbols(file, statement.body.statements);
                 }
+                if (isImportDeclaration(statement)) {
+                    tryCacheTsPlusGlobalSymbol(statement);
+                }
                 if(statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
                     if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
                         tryCacheTsPlusType(statement);
@@ -45434,6 +45470,7 @@ namespace ts {
             indexAccessExpressionCache.clear();
             pipeableCache.clear();
             inheritanceSymbolCache.clear();
+            globalSymbolsCache.clear();
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);
             }

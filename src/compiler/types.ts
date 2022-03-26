@@ -3305,6 +3305,12 @@ namespace ts {
         readonly comment: `fluent ${string} ${string}`
     }
 
+    export interface TsPlusJSDocGlobalTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `global`
+    }
+
     export interface TsPlusExtensionTag {
         readonly target: string;
         readonly name: string;
@@ -5235,6 +5241,8 @@ namespace ts {
         isConstructorDeclaredProperty?: boolean;    // Property declared through 'this.x = ...' assignment in constructor
         tupleLabelDeclaration?: NamedTupleMember | ParameterDeclaration; // Declaration associated with the tuple's label
         accessibleChainCache?: ESMap<string, Symbol[] | undefined>;
+        // TSPLUS
+        isTsPlusGlobal?: boolean
     }
 
     /* @internal */
@@ -5400,8 +5408,9 @@ namespace ts {
         tsPlusStaticExtension?: TsPlusStaticFunctionExtension;
         tsPlusGetterExtension?: { definition: SourceFile, exportName: string }
         tsPlusDataFirstDeclaration?: FunctionDeclaration | ArrowFunction | FunctionExpression;
-        tsPlusOptimizedDataFirst?: { definition: SourceFile, exportName: string }
+        tsPlusOptimizedDataFirst?: { definition: SourceFile, exportName: string };
         tsPlusResolvedType?: Type;
+        tsPlusGlobalIdentifier?: Symbol;
         isFluent?: true;
         // TSPLUS EXTENSION END
     }
