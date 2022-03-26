@@ -832,7 +832,10 @@ namespace ts {
                 return nodeLinks.resolvedSignature;
             },
             getNodeLinks,
-            collectTsPlusMacroTags
+            collectTsPlusMacroTags,
+            getTsPlusGlobals: () => {
+                return arrayFrom(globalSymbolsCache.values());
+            }
             // TSPLUS EXTENSION END
         };
 

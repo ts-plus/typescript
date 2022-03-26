@@ -4700,6 +4700,7 @@ namespace ts {
         getResolvedOperator(node: BinaryExpression): Signature | undefined
         getNodeLinks(node: Node): NodeLinks
         collectTsPlusMacroTags(statement: Declaration): readonly TsPlusJSDocMacroTag[]
+        getTsPlusGlobals(): Symbol[];
     }
 
     /* @internal */
