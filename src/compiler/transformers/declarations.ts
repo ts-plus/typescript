@@ -338,7 +338,7 @@ namespace ts {
             }
             else {
                 const statements = visitNodes(node.statements, visitDeclarationStatements);
-                combinedStatements = setTextRange(factory.createNodeArray([...node.tsPlusGlobalImports ?? [], ...transformAndReplaceLatePaintedStatements(statements)]), node.statements);
+                combinedStatements = setTextRange(factory.createNodeArray([/* TSPLUS EXTENSION START */...node.tsPlusGlobalImports ?? [], /* TSPLUS EXTENSION END */...transformAndReplaceLatePaintedStatements(statements)]), node.statements);
                 refs.forEach(referenceVisitor);
                 emittedImports = filter(combinedStatements, isAnyImportSyntax);
                 if (isExternalModule(node) && (!resultHasExternalModuleIndicator || (needsScopeFixMarker && !resultHasScopeMarker))) {
