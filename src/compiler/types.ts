@@ -3929,7 +3929,10 @@ namespace ts {
         /* @internal */ exportedModulesFromDeclarationEmit?: ExportedModulesFromDeclarationEmit;
         /* @internal */ endFlowNode?: FlowNode;
 
+        // TSPLUS EXTENSION START
         tsPlusImportAs?: () => string | undefined
+        tsPlusGlobalImports?: ImportDeclaration[]
+        // TSPLUS EXTENSION END
     }
 
     /* @internal */

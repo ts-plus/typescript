@@ -1,16 +1,75 @@
 /*@internal*/
 namespace ts {
+    class TsPlusGlobalTypeImporter {
+        readonly imports: ESMap<string, Set<string>> = new Map();
+        add(path: string, name: string): void {
+            if (!this.imports.has(path)) {
+                this.imports.set(path, new Set());
+            }
+            const names = this.imports.get(path)!;
+            names.add(name);
+        }
+    }
+
     export function transformTsPlusDeclaration(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
         const fileMap: [string, RegExp][] = getFileMap(options, host);
         
         return function (context: TransformationContext) {
+            const importer = new TsPlusGlobalTypeImporter();
             return chainBundle(context, transformSourceFile);
             function transformSourceFile(node: SourceFile) {
                 if (node.isDeclarationFile) {
                     return node;
                 }
-                const transformed = visitEachChild(node, visitor(node), context);
-                return transformed
+
+                visitEachChild(node, visitor(node), context);
+                visitEachChild(node, importVisitor, context);
+
+                const imports: ImportDeclaration[] = []
+                importer.imports.forEach((names, path) => {
+                    imports.push(
+                        factory.createImportDeclaration(
+                            undefined,
+                            undefined,
+                            factory.createImportClause(
+                                false,
+                                undefined,
+                                factory.createNamedImports(arrayFrom(mapIterator(names.values(), (name) =>
+                                    factory.createImportSpecifier(false, undefined, factory.createIdentifier(name))
+                                )))
+                            ),
+                            factory.createStringLiteral(path),
+                            undefined
+                        )
+                    );
+                });
+
+                node.tsPlusGlobalImports = imports;
+                return node;
+            }
+            function isTransformable(node: Node): boolean {
+                const nodeLinks = checker.getNodeLinks(node);
+                return !!nodeLinks.tsPlusCallExtension ||
+                    !!nodeLinks.tsPlusGetterExtension ||
+                    !!nodeLinks.tsPlusOptimizedDataFirst ||
+                    !!nodeLinks.tsPlusStaticExtension ||
+                    !!nodeLinks.isTsPlusOperatorToken ||
+                    !!nodeLinks.isFluent
+            }
+            function importVisitor(node: Node): VisitResult<Node> {
+                if (node.kind === SyntaxKind.Identifier) {
+                    if (!isTransformable(node)) {
+                        const { tsPlusGlobalIdentifier } = checker.getNodeLinks(node);
+                        const globalImport = checker.getTsPlusGlobal((node as Identifier).escapedText as string);
+                        if (tsPlusGlobalIdentifier && globalImport) {
+                            importer.add(globalImport.location, (node as Identifier).escapedText as string);
+                        }
+                    }
+                }
+                else {
+                    visitEachChild(node, importVisitor, context);
+                }
+                return node;
             }
             function visitor(source: SourceFile) {
                 return function (node: Node): VisitResult<Node> {
