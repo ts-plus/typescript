@@ -2869,6 +2869,7 @@ namespace ts {
                 }
             }
             if (!result) {
+                // TSPLUS EXTENSION START
                 const globalImport = globalSymbolsCache.get(name as string);
 
                 if (globalImport && originalLocation) {
@@ -2882,6 +2883,7 @@ namespace ts {
                     }
                     return globalImport.symbol;
                 }
+                // TSPLUS EXTENSION END
 
                 if (nameNotFoundMessage && produceDiagnostics) {
                     if (!errorLocation ||
@@ -3203,6 +3205,8 @@ namespace ts {
             return false;
         }
 
+        // TSPLUS EXTENSION START
+
         function addRelatedGlobalImportInfo(diagnostic: Diagnostic, globalImport: TsPlusGlobalImport, name: string) {
             return addRelatedInfo(diagnostic, createDiagnosticForNode(
                 globalImport.importSpecifier,
@@ -3250,6 +3254,8 @@ namespace ts {
             }
             return false;
         }
+
+        // TSPLUS EXTENSION END
 
         function maybeMappedType(node: Node, symbol: Symbol) {
             const container = findAncestor(node.parent, n =>
