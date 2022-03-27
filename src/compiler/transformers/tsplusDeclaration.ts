@@ -9,6 +9,12 @@ namespace ts {
             const names = this.imports.get(path)!;
             names.add(name);
         }
+        has(path: string, name: string): boolean {
+            if (!this.imports.has(path)) {
+                return false;
+            }
+            return this.imports.get(path)!.has(name);
+        }
     }
 
     export function transformTsPlusDeclaration(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
@@ -60,9 +66,12 @@ namespace ts {
                 if (node.kind === SyntaxKind.Identifier) {
                     if (!isTransformable(node)) {
                         const { tsPlusGlobalIdentifier } = checker.getNodeLinks(node);
-                        const globalImport = checker.getTsPlusGlobal((node as Identifier).escapedText as string);
-                        if (tsPlusGlobalIdentifier && globalImport) {
-                            importer.add(globalImport.location, (node as Identifier).escapedText as string);
+                        const name = (node as Identifier).escapedText as string;
+                        const globalImport = checker.getTsPlusGlobal(name);
+                        if (tsPlusGlobalIdentifier && globalImport && !importer.has(globalImport.location, name)) {
+                            if (isPartOfTypeNode(node) || isPartOfTypeQuery(node)) {
+                                importer.add(globalImport.location, name);
+                            }
                         }
                     }
                 }
