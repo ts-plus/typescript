@@ -368,7 +368,7 @@ namespace ts {
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
-        const globalSymbolsCache = new Map<string, { symbol: Symbol, targetSymbol: Symbol, location: string }>()
+        const globalSymbolsCache = new Map<string, TsPlusGlobalImport>()
         const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/
         // TSPLUS EXTENSION END
 
@@ -2869,19 +2869,18 @@ namespace ts {
                 }
             }
             if (!result) {
-                const globalSymbol = globalSymbolsCache.get(name as string);
+                const globalImport = globalSymbolsCache.get(name as string);
 
-                if (globalSymbol && originalLocation) {
-                    const { symbol, targetSymbol } = globalSymbol
+                if (globalImport && originalLocation) {
                     if (produceDiagnostics) {
                         if (!errorLocation ||
-                            !checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation, name, meaning, symbol, targetSymbol) &&
-                            !checkAndReportErrorForUsingTsPlusValueAsType(errorLocation, name, meaning, targetSymbol)) {
-                            getNodeLinks(originalLocation).tsPlusGlobalIdentifier = symbol;
-                            return symbol;
+                            !checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation, name, meaning, globalImport) &&
+                            !checkAndReportErrorForUsingTsPlusValueAsType(errorLocation, name, meaning, globalImport)) {
+                            getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalImport.symbol;
+                            return globalImport.symbol;
                         }
                     }
-                    return symbol;
+                    return globalImport.symbol;
                 }
 
                 if (nameNotFoundMessage && produceDiagnostics) {
@@ -3204,41 +3203,48 @@ namespace ts {
             return false;
         }
 
-        function checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation: Node, name: __String, meaning: SymbolFlags, symbol: Symbol, targetSymbol: Symbol): boolean {
+        function addRelatedGlobalImportInfo(diagnostic: Diagnostic, globalImport: TsPlusGlobalImport, name: string) {
+            return addRelatedInfo(diagnostic, createDiagnosticForNode(
+                globalImport.importSpecifier,
+                Diagnostics._0_was_imported_here,
+                name
+            ))
+        }
+
+        function checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation: Node, name: __String, meaning: SymbolFlags, globalImport: TsPlusGlobalImport): boolean {
             if ((meaning & (SymbolFlags.Value & ~SymbolFlags.Namespace)) && meaning !== SymbolFlags.Type) {
-                const isTypeOnlyGlobal = getSymbolLinks(symbol).isTsPlusTypeOnlyGlobal;
+                const isTypeOnlyGlobal = getSymbolLinks(globalImport.symbol).isTsPlusTypeOnlyGlobal;
                 const rawName = unescapeLeadingUnderscores(name);
                 if (isTypeOnlyGlobal) {
-                    if (!isValidTypeOnlyAliasUseSite(errorLocation)) {
-                        const typeOnlyDeclaration = getTypeOnlyAliasDeclaration(symbol);
-                        if (typeOnlyDeclaration) {
-                            const message = typeOnlyDeclaration.kind === SyntaxKind.ExportSpecifier
-                                ? Diagnostics._0_cannot_be_used_as_a_value_because_it_was_exported_using_export_type
-                                : Diagnostics._0_cannot_be_used_as_a_value_because_it_was_imported_using_import_type;
-                            const unescapedName = unescapeLeadingUnderscores(name);
-                            error(errorLocation, message, unescapedName);
-                            return true;
-                        }
+                    const typeOnlyDeclaration = getTypeOnlyAliasDeclaration(globalImport.symbol);
+                    if (typeOnlyDeclaration && !isValidTypeOnlyAliasUseSite(errorLocation)) {
+                        const message = typeOnlyDeclaration.kind === SyntaxKind.ExportSpecifier
+                            ? Diagnostics._0_cannot_be_used_as_a_value_because_it_was_exported_using_export_type
+                            : Diagnostics._0_cannot_be_used_as_a_value_because_it_was_imported_using_import_type;
+                        const unescapedName = unescapeLeadingUnderscores(name);
+                        diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, message, unescapedName), globalImport, rawName));
+                        return true;
                     }
                     if (meaning !== (SymbolFlags.Value | SymbolFlags.ExportValue)) {
-                        error(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName);
+                        diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName), globalImport, rawName));
                         return true;
                     }
                 }
-                if (!(targetSymbol.flags & SymbolFlags.Value)) {
-                    error(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName);
+                if (!(globalImport.targetSymbol.flags & SymbolFlags.Value)) {
+                    diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName), globalImport, rawName));
                     return true;
                 }
             }
             return false;
         }
 
-        function checkAndReportErrorForUsingTsPlusValueAsType(errorLocation: Node, name: __String, meaning: SymbolFlags, targetSymbol: Symbol): boolean {
+        function checkAndReportErrorForUsingTsPlusValueAsType(errorLocation: Node, name: __String, meaning: SymbolFlags, globalImport: TsPlusGlobalImport): boolean {
             if (meaning & (SymbolFlags.Type & ~SymbolFlags.Namespace) &&
                 meaning !== SymbolFlags.Value &&
                 meaning !== (SymbolFlags.Value | SymbolFlags.ExportValue)) {
-                if (!(targetSymbol.flags & SymbolFlags.Type)) {
-                    error(errorLocation, Diagnostics._0_refers_to_a_value_but_is_being_used_as_a_type_here_Did_you_mean_typeof_0, unescapeLeadingUnderscores(name));
+                const rawName = unescapeLeadingUnderscores(name);
+                if (!(globalImport.targetSymbol.flags & SymbolFlags.Type)) {
+                    diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, Diagnostics._0_refers_to_a_value_but_is_being_used_as_a_type_here_Did_you_mean_typeof_0, rawName), globalImport, rawName));
                     return true;
                 }
             }
@@ -44950,7 +44956,7 @@ namespace ts {
                             const symbolLinks = getSymbolLinks(symbol);
                             symbolLinks.isTsPlusGlobal = true;
                             symbolLinks.isTsPlusTypeOnlyGlobal = isDeclarationTypeOnly || importSpecifier.isTypeOnly;
-                            globalSymbolsCache.set(importSpecifier.name.escapedText as string, { symbol, targetSymbol, location });
+                            globalSymbolsCache.set(importSpecifier.name.escapedText as string, { symbol, targetSymbol, importSpecifier, location });
                         }
                     })
                 }

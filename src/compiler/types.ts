@@ -3496,6 +3496,13 @@ namespace ts {
         priority: number;
     }
 
+    export interface TsPlusGlobalImport {
+        symbol: Symbol;
+        targetSymbol: Symbol;
+        location: string;
+        importSpecifier: ImportSpecifier;
+    }
+
     export interface TsPlusType extends Type {
         tsPlusSymbol: TsPlusSymbol;
     }
