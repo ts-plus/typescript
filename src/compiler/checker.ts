@@ -45473,15 +45473,24 @@ namespace ts {
                 error(declaration, Diagnostics.Declaration_of_an_extension_must_be_exported);
             }
         }
-        function collectTsPlusSymbols(file: SourceFile, statements: NodeArray<Statement>): void {
+        function collectTsPlusSymbols(file: SourceFile, statements: NodeArray<Statement>, collectTypesIfNotExported = false): void {
             for (const statement of statements) {
                 if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
-                    collectTsPlusSymbols(file, statement.body.statements);
+                    if (isIdentifier(statement.name) && statement.name.escapedText === "global" as __String) {
+                        collectTsPlusSymbols(file, statement.body.statements, true);
+                    }
+                    else if (statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
+                        collectTsPlusSymbols(file, statement.body.statements, true)
+                    }
+                    else {
+                        collectTsPlusSymbols(file, statement.body.statements);
+                    }
                 }
                 if (isImportDeclaration(statement)) {
                     tryCacheTsPlusGlobalSymbol(statement);
                 }
-                if(statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
+                if (collectTypesIfNotExported ||
+                    (statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1)) {
                     if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
                         tryCacheTsPlusType(statement);
                     }
@@ -45489,6 +45498,8 @@ namespace ts {
                         tryCacheTsPlusType(statement);
                         tryCacheTsPlusCompanion(statement);
                     }
+                }
+                if(statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
                     if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
                         tryCacheTsPlusOperatorVariable(file, statement);
                         tryCacheTsPlusStaticVariable(file, statement);
@@ -45506,11 +45517,13 @@ namespace ts {
                         tryCacheTsPlusPipeableFunction(file, statement);
                     }
                 } else {
-                    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
-                        checkTsPlusNonExportedExtension(statement)
-                    }
-                    if (isClassDeclaration(statement)) {
-                        checkTsPlusNonExportedExtension(statement)
+                    if (!collectTypesIfNotExported) {
+                        if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
+                            checkTsPlusNonExportedExtension(statement)
+                        }
+                        if (isClassDeclaration(statement)) {
+                            checkTsPlusNonExportedExtension(statement)
+                        }
                     }
                     if (isFunctionDeclaration(statement)) {
                         checkTsPlusNonExportedExtension(statement)
