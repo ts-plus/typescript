@@ -3437,10 +3437,6 @@ namespace ts {
         | TsPlusPipeableIdentifierSymbol
         | TsPlusPipeableDeclarationSymbol;
 
-    export interface TsPlusGlobalSymbol extends Symbol {
-        isTypeOnly: boolean;
-    }
-
     export interface TsPlusFluentExtension {
         patched: Symbol;
         types: { type: Type, signatures: readonly TsPlusSignature[] }[];
@@ -4715,7 +4711,7 @@ namespace ts {
         getNodeLinks(node: Node): NodeLinks
         collectTsPlusMacroTags(statement: Declaration): readonly TsPlusJSDocMacroTag[]
         getTsPlusGlobals(): Symbol[];
-        getTsPlusGlobal(name: string): { targetSymbol: Symbol, symbol: Symbol, location: string } | undefined;
+        getTsPlusGlobal(name: string): TsPlusGlobalImport | undefined;
     }
 
     /* @internal */
