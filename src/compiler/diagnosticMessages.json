@@ -7410,5 +7410,9 @@
     "Declaration of an extension must be exported.": {
         "category": "Error",
         "code": 50024
+    },
+    "Global import path cannot be relative.": {
+        "category": "Error",
+        "code": 50025
     }
 }

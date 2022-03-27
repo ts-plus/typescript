@@ -44954,6 +44954,10 @@ namespace ts {
                 const tags = collectTsPlusGlobalTags(declaration);
 
                 if (tags.length > 0) {
+                    if (pathIsRelative(location)) {
+                        error(declaration, Diagnostics.Global_import_path_cannot_be_relative);
+                        return;
+                    }
                     const isDeclarationTypeOnly = declaration.importClause.isTypeOnly;
                     declaration.importClause.namedBindings.elements.forEach((importSpecifier) => {
                         const symbol = getSymbolAtLocation(importSpecifier.name);
