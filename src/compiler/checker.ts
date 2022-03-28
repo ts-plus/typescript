@@ -3216,9 +3216,7 @@ namespace ts {
         }
 
         function checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation: Node, name: __String, meaning: SymbolFlags, globalImport: TsPlusGlobalImport): boolean {
-            if (meaning & (SymbolFlags.Value & ~SymbolFlags.NamespaceModule) &&
-                meaning !== SymbolFlags.Type &&
-                meaning !== (SymbolFlags.Type | SymbolFlags.Namespace)) {
+            if ((meaning & SymbolFlags.Value) === SymbolFlags.Value) {
                 const isTypeOnlyGlobal = getSymbolLinks(globalImport.symbol).isTsPlusTypeOnlyGlobal;
                 const rawName = unescapeLeadingUnderscores(name);
                 if (isTypeOnlyGlobal) {
@@ -3231,6 +3229,7 @@ namespace ts {
                         diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, message, unescapedName), globalImport, rawName));
                         return true;
                     }
+                    // Value | ExportValue is the flag ascribed to type queries (typeof)
                     if (meaning !== (SymbolFlags.Value | SymbolFlags.ExportValue)) {
                         diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName), globalImport, rawName));
                         return true;
@@ -3245,9 +3244,7 @@ namespace ts {
         }
 
         function checkAndReportErrorForUsingTsPlusValueAsType(errorLocation: Node, name: __String, meaning: SymbolFlags, globalImport: TsPlusGlobalImport): boolean {
-            if (meaning & (SymbolFlags.Type & ~SymbolFlags.Namespace) &&
-                meaning !== SymbolFlags.Value &&
-                meaning !== (SymbolFlags.Value | SymbolFlags.ExportValue)) {
+            if ((meaning & SymbolFlags.Type) === SymbolFlags.Type) {
                 const rawName = unescapeLeadingUnderscores(name);
                 if (!(globalImport.targetSymbol.flags & SymbolFlags.Type)) {
                     diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, Diagnostics._0_refers_to_a_value_but_is_being_used_as_a_type_here_Did_you_mean_typeof_0, rawName), globalImport, rawName));
