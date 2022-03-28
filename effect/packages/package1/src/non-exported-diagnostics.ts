@@ -8,7 +8,7 @@ function fluent() {}
  * @tsplus static TypeName static
  */
 // @ts-expect-error
-function static() {}
+function staticFn() {}
 
 /**
  * @tsplus operator TypeName operator

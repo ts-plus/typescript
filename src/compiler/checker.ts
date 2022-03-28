@@ -3222,7 +3222,7 @@ namespace ts {
         }
 
         function checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation: Node, name: __String, meaning: SymbolFlags, globalImport: TsPlusGlobalImport): boolean {
-            if ((meaning & SymbolFlags.Value) === SymbolFlags.Value) {
+            if ((meaning & SymbolFlags.Value) && !(meaning & SymbolFlags.All)) {
                 const isTypeOnlyGlobal = getSymbolLinks(globalImport.symbol).isTsPlusTypeOnlyGlobal;
                 const rawName = unescapeLeadingUnderscores(name);
                 if (isTypeOnlyGlobal) {
