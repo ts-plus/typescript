@@ -401,6 +401,8 @@ namespace ts {
         const tsplusBigIntPrimitiveSymbol = createSymbol(SymbolFlags.None, "bigint" as __String);
         const tsplusFunctionPrimitiveSymbol = createSymbol(SymbolFlags.None, "function" as __String);
         const tsplusObjectPrimitiveSymbol = createSymbol(SymbolFlags.None, "object" as __String);
+        const tsplusArraySymbol = createSymbol(SymbolFlags.None, "array" as __String);
+        const tsplusReadonlyArraySymbol = createSymbol(SymbolFlags.None, "readonlyArray" as __String);
         // TSPLUS EXTENSION END
 
         let typeCount = 0;
@@ -1014,6 +1016,14 @@ namespace ts {
             }
             if (isFunctionType(target)) {
                 returnArray.push(tsplusFunctionPrimitiveSymbol);
+            }
+            if (isTupleType(target)) {
+                if (target.target.readonly) {
+                    returnArray.push(tsplusReadonlyArraySymbol);
+                }
+                else {
+                    returnArray.push(tsplusArraySymbol);
+                }
             }
             if (target.flags & TypeFlags.Object) {
                 returnArray.push(tsplusObjectPrimitiveSymbol);
@@ -45026,6 +45036,12 @@ namespace ts {
                 }
                 if (type === globalObjectType) {
                     addToTypeSymbolCache(tsplusObjectPrimitiveSymbol, typeTag, "after");
+                }
+                if (type === globalArrayType) {
+                    addToTypeSymbolCache(tsplusArraySymbol, typeTag, "after");
+                }
+                if (type === globalReadonlyArrayType) {
+                    addToTypeSymbolCache(tsplusReadonlyArraySymbol, typeTag, "after");
                 }
                 if (type.symbol) {
                     addToTypeSymbolCache(type.symbol, typeTag, "after");
