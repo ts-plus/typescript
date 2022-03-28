@@ -2530,9 +2530,8 @@ namespace ts {
             nameArg: __String | Identifier | undefined,
             isUse: boolean,
             excludeGlobals = false,
-            getSpellingSuggstions = true,
-            tsPlusExcludeGlobals = false): Symbol | undefined {
-            return resolveNameHelper(location, name, meaning, nameNotFoundMessage, nameArg, isUse, excludeGlobals, getSpellingSuggstions, getSymbol, tsPlusExcludeGlobals);
+            getSpellingSuggstions = true): Symbol | undefined {
+            return resolveNameHelper(location, name, meaning, nameNotFoundMessage, nameArg, isUse, excludeGlobals, getSpellingSuggstions, getSymbol);
         }
 
         function resolveNameHelper(
@@ -2544,8 +2543,7 @@ namespace ts {
             isUse: boolean,
             excludeGlobals: boolean,
             getSpellingSuggestions: boolean,
-            lookup: typeof getSymbol,
-            tsPlusExcludeGlobals: boolean = false): Symbol | undefined {
+            lookup: typeof getSymbol): Symbol | undefined {
             const originalLocation = location; // needed for did-you-mean error reporting, which gathers candidates starting from the original location
             let result: Symbol | undefined;
             let lastLocation: Node | undefined;
@@ -2846,20 +2844,25 @@ namespace ts {
                 lastLocation = location;
                 location = isJSDocTemplateTag(location) ? getEffectiveContainerForJSDocTemplateTag(location) || location.parent :
                     isJSDocParameterTag(location) || isJSDocReturnTag(location) ? getHostSignatureFromJSDoc(location) || location.parent :
-                    location.parent;
-
-                // TSPLUS EXTENSION START
-                if (!location && !result) {
-                    const globalImport = globalSymbolsCache.get(name as string);
-
-                    if (globalImport && originalLocation && !tsPlusExcludeGlobals) {
-                        tsPlusExcludeGlobals = true;
-                        getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalImport.symbol;
-                        location = globalImport.importSpecifier;
-                    }
-                }
-                // TSPLUS EXTENSION END
+                    location.parent;                
             }
+
+            // TSPLUS EXTENSION START
+            if (!result && originalLocation) {
+                const source = getSourceFileOfNode(originalLocation);
+                const locals = source.locals || emptySymbols;
+                if (!locals.has(name)) {
+                    const globalImport = globalSymbolsCache.get(name as string);
+                    if (globalImport) {
+                        getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalImport.symbol;
+                        
+                        if (globalImport.targetSymbol.flags & meaning) {
+                            result = globalImport.targetSymbol;
+                        }
+                    }    
+                }
+            }
+            // TSPLUS EXTENSION END
 
             // We just climbed up parents looking for the name, meaning that we started in a descendant node of `lastLocation`.
             // If `result === lastSelfReferenceLocation.symbol`, that means that we are somewhere inside `lastSelfReferenceLocation` looking up a name, and resolving to `lastLocation` itself.
@@ -45505,9 +45508,6 @@ namespace ts {
                         collectTsPlusSymbols(file, statement.body.statements);
                     }
                 }
-                if (isImportDeclaration(statement)) {
-                    tryCacheTsPlusGlobalSymbol(statement);
-                }
                 if (collectTypesIfNotExported ||
                     (statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1)) {
                     if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
@@ -45559,6 +45559,17 @@ namespace ts {
                 }
             }
         }
+        
+        function initTsPlusTypeCheckerGlobal() {
+            globalSymbolsCache.clear();
+            for (const file of host.getSourceFiles()) {
+                for (const statement of file.statements) {
+                    if (isImportDeclaration(statement)) {
+                        tryCacheTsPlusGlobalSymbol(statement);
+                    }
+                }
+            }
+        }
         function initTsPlusTypeChecker() {
             fluentCache.clear();
             unresolvedFluentCache.clear();
@@ -45574,11 +45585,9 @@ namespace ts {
             indexAccessExpressionCache.clear();
             pipeableCache.clear();
             inheritanceSymbolCache.clear();
-            globalSymbolsCache.clear();
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);
             }
-
             unresolvedStaticCache.forEach((map, typeName) => {
                 if (!staticCache.has(typeName)) {
                     staticCache.set(typeName, new Map());
@@ -45768,6 +45777,8 @@ namespace ts {
             for (const file of host.getSourceFiles()) {
                 bindSourceFile(file, compilerOptions);
             }
+
+            initTsPlusTypeCheckerGlobal();
 
             amalgamatedDuplicates = new Map();
 
