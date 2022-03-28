@@ -2531,7 +2531,7 @@ namespace ts {
             isUse: boolean,
             excludeGlobals = false,
             getSpellingSuggstions = true): Symbol | undefined {
-            return resolveNameHelper(location, name, meaning, nameNotFoundMessage, nameArg, isUse, excludeGlobals, getSpellingSuggstions, getSymbol);
+            return resolveNameHelper(location, name, meaning, nameNotFoundMessage, nameArg, isUse, excludeGlobals, getSpellingSuggstions, getSymbol, true);
         }
 
         function resolveNameHelper(
@@ -2543,7 +2543,8 @@ namespace ts {
             isUse: boolean,
             excludeGlobals: boolean,
             getSpellingSuggestions: boolean,
-            lookup: typeof getSymbol): Symbol | undefined {
+            lookup: typeof getSymbol,
+            checkTsPlusGlobals = true): Symbol | undefined {
             const originalLocation = location; // needed for did-you-mean error reporting, which gathers candidates starting from the original location
             let result: Symbol | undefined;
             let lastLocation: Node | undefined;
@@ -2848,15 +2849,24 @@ namespace ts {
             }
 
             // TSPLUS EXTENSION START
-            if (!result && originalLocation) {
-                const source = getSourceFileOfNode(originalLocation);
-                const locals = source.locals || emptySymbols;
-                if (!locals.has(name)) {
-                    const globalImport = globalSymbolsCache.get(name as string);
-                    if (globalImport) {
-                        getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalImport.symbol;
-                        
-                        if (globalImport.targetSymbol.flags & meaning) {
+            if (!result && originalLocation && checkTsPlusGlobals) {
+                const globalImport = globalSymbolsCache.get(name as string);
+                if (globalImport) {
+                    if (globalImport.targetSymbol.flags & meaning) {
+                        const withoutGlobals = resolveNameHelper(
+                            originalLocation,
+                            name,
+                            SymbolFlags.All,
+                            void 0,
+                            nameArg,
+                            isUse,
+                            excludeGlobals,
+                            getSpellingSuggestions,
+                            lookup,
+                            false
+                        );
+                        if (!withoutGlobals) {
+                            getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalImport.symbol;
                             result = globalImport.targetSymbol;
                         }
                     }
