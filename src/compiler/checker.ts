@@ -2530,8 +2530,9 @@ namespace ts {
             nameArg: __String | Identifier | undefined,
             isUse: boolean,
             excludeGlobals = false,
-            getSpellingSuggstions = true): Symbol | undefined {
-            return resolveNameHelper(location, name, meaning, nameNotFoundMessage, nameArg, isUse, excludeGlobals, getSpellingSuggstions, getSymbol);
+            getSpellingSuggstions = true,
+            tsPlusExcludeGlobals = false): Symbol | undefined {
+            return resolveNameHelper(location, name, meaning, nameNotFoundMessage, nameArg, isUse, excludeGlobals, getSpellingSuggstions, getSymbol, tsPlusExcludeGlobals);
         }
 
         function resolveNameHelper(
@@ -2543,7 +2544,8 @@ namespace ts {
             isUse: boolean,
             excludeGlobals: boolean,
             getSpellingSuggestions: boolean,
-            lookup: typeof getSymbol): Symbol | undefined {
+            lookup: typeof getSymbol,
+            tsPlusExcludeGlobals: boolean = false): Symbol | undefined {
             const originalLocation = location; // needed for did-you-mean error reporting, which gathers candidates starting from the original location
             let result: Symbol | undefined;
             let lastLocation: Node | undefined;
@@ -2845,6 +2847,18 @@ namespace ts {
                 location = isJSDocTemplateTag(location) ? getEffectiveContainerForJSDocTemplateTag(location) || location.parent :
                     isJSDocParameterTag(location) || isJSDocReturnTag(location) ? getHostSignatureFromJSDoc(location) || location.parent :
                     location.parent;
+
+                // TSPLUS EXTENSION START
+                if (!location && !result) {
+                    const globalImport = globalSymbolsCache.get(name as string);
+
+                    if (globalImport && originalLocation && !tsPlusExcludeGlobals) {
+                        tsPlusExcludeGlobals = true;
+                        getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalImport.symbol;
+                        location = globalImport.importSpecifier;
+                    }
+                }
+                // TSPLUS EXTENSION END
             }
 
             // We just climbed up parents looking for the name, meaning that we started in a descendant node of `lastLocation`.
@@ -2874,19 +2888,6 @@ namespace ts {
                 }
             }
             if (!result) {
-                // TSPLUS EXTENSION START
-                const globalImport = globalSymbolsCache.get(name as string);
-
-                if (globalImport && originalLocation) {
-                    if (!errorLocation ||
-                        !checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation, name, meaning, globalImport) &&
-                        !checkAndReportErrorForUsingTsPlusValueAsType(errorLocation, name, meaning, globalImport)) {
-                        getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalImport.symbol;
-                        return globalImport.symbol;
-                    }
-                    return globalImport.symbol;
-                }
-                // TSPLUS EXTENSION END
                 if (nameNotFoundMessage) {
                     addLazyDiagnostic(() => {
                         if (!errorLocation ||
@@ -3210,57 +3211,6 @@ namespace ts {
             }
             return false;
         }
-
-        // TSPLUS EXTENSION START
-
-        function addRelatedGlobalImportInfo(diagnostic: Diagnostic, globalImport: TsPlusGlobalImport, name: string) {
-            return addRelatedInfo(diagnostic, createDiagnosticForNode(
-                globalImport.importSpecifier,
-                Diagnostics._0_was_imported_here,
-                name
-            ))
-        }
-
-        function checkAndReportErrorForUsingTsPlusTypeAsValue(errorLocation: Node, name: __String, meaning: SymbolFlags, globalImport: TsPlusGlobalImport): boolean {
-            if ((meaning & SymbolFlags.Value) && !(meaning & SymbolFlags.All)) {
-                const isTypeOnlyGlobal = getSymbolLinks(globalImport.symbol).isTsPlusTypeOnlyGlobal;
-                const rawName = unescapeLeadingUnderscores(name);
-                if (isTypeOnlyGlobal) {
-                    const typeOnlyDeclaration = getTypeOnlyAliasDeclaration(globalImport.symbol);
-                    if (typeOnlyDeclaration && !isValidTypeOnlyAliasUseSite(errorLocation)) {
-                        const message = typeOnlyDeclaration.kind === SyntaxKind.ExportSpecifier
-                            ? Diagnostics._0_cannot_be_used_as_a_value_because_it_was_exported_using_export_type
-                            : Diagnostics._0_cannot_be_used_as_a_value_because_it_was_imported_using_import_type;
-                        const unescapedName = unescapeLeadingUnderscores(name);
-                        diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, message, unescapedName), globalImport, rawName));
-                        return true;
-                    }
-                    // Value | ExportValue is the flag ascribed to type queries (typeof)
-                    if (meaning !== (SymbolFlags.Value | SymbolFlags.ExportValue)) {
-                        diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName), globalImport, rawName));
-                        return true;
-                    }
-                }
-                if (!(globalImport.targetSymbol.flags & SymbolFlags.Value)) {
-                    diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, Diagnostics._0_only_refers_to_a_type_but_is_being_used_as_a_value_here, rawName), globalImport, rawName));
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        function checkAndReportErrorForUsingTsPlusValueAsType(errorLocation: Node, name: __String, meaning: SymbolFlags, globalImport: TsPlusGlobalImport): boolean {
-            if ((meaning & SymbolFlags.Type) === SymbolFlags.Type) {
-                const rawName = unescapeLeadingUnderscores(name);
-                if (!(globalImport.targetSymbol.flags & SymbolFlags.Type)) {
-                    diagnostics.add(addRelatedGlobalImportInfo(createError(errorLocation, Diagnostics._0_refers_to_a_value_but_is_being_used_as_a_type_here_Did_you_mean_typeof_0, rawName), globalImport, rawName));
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        // TSPLUS EXTENSION END
 
         function maybeMappedType(node: Node, symbol: Symbol) {
             const container = findAncestor(node.parent, n =>
