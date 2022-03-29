@@ -2384,9 +2384,7 @@ namespace ts.Completions {
             const typeOnlyAliasNeedsPromotion = previousToken && !isValidTypeOnlyAliasUseSite(previousToken);
 
             symbols = concatenate(symbols, typeChecker.getSymbolsInScope(scopeNode, symbolMeanings));
-            // TSPLUS EXTENSION START
-            symbols = concatenate(symbols, typeChecker.getTsPlusGlobals())
-            // TSPLUS EXTENSION END
+
             Debug.assertEachIsDefined(symbols, "getSymbolsInScope() should all be defined");
             for (let i = 0; i < symbols.length; i++) {
                 const symbol = symbols[i];
@@ -2420,6 +2418,9 @@ namespace ts.Completions {
                     ? KeywordCompletionFilters.TypeAssertionKeywords
                     : KeywordCompletionFilters.TypeKeywords;
             }
+            // TSPLUS EXTENSION START
+            symbols = concatenate(symbols, typeChecker.getTsPlusGlobals());
+            // TSPLUS EXTENSION END
         }
 
         function shouldOfferImportCompletions(): boolean {
