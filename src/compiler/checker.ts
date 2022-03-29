@@ -31226,6 +31226,9 @@ namespace ts {
          * Returns the effective arguments for an expression that works like a function invocation.
          */
         function getEffectiveCallArguments(node: CallLikeExpression): readonly Expression[] {
+            if (getNodeLinks(node).isFluentCall && isCallExpression(node)) {
+                return [node.expression, ...node.arguments];
+            }
             if (node.kind === SyntaxKind.TaggedTemplateExpression) {
                 const template = node.template;
                 const args: Expression[] = [createSyntheticExpression(template, getGlobalTemplateStringsArrayType())];
@@ -31951,11 +31954,25 @@ namespace ts {
                 }
                 else {
                     const callExtension = getStaticExtension(apparentType, "__call");
-
+                    
                     if (callExtension) {
                         callSignatures = Array.from(getSignaturesOfType(getTypeOfSymbol(callExtension.patched), SignatureKind.Call));
                         callCache.set(node.expression, callExtension);
                         getNodeLinks(node).tsPlusCallExtension = callExtension;
+                    } else {
+                        const callFluentExtensions = getFluentExtension(apparentType, "__call");
+                        if (callFluentExtensions) {
+                            callSignatures = Array.from(getSignaturesOfType(callFluentExtensions, SignatureKind.Call).map((s) => {
+                                const sig = createTsPlusSignature(
+                                    (s as TsPlusSignature).tsPlusOriginal,
+                                    (s as TsPlusSignature).tsPlusExportName,
+                                    (s as TsPlusSignature).tsPlusFile
+                                );
+                                sig.tsPlusDeclaration = (s as TsPlusSignature).tsPlusDeclaration;
+                                return sig;
+                            }));
+                            getNodeLinks(node).isFluentCall = true;
+                        }
                     }
                 }
             }
@@ -44477,6 +44494,7 @@ namespace ts {
             signature.tsPlusTag = "TsPlusSignature";
             signature.tsPlusFile = file;
             signature.tsPlusExportName = exportName;
+            signature.tsPlusOriginal = call;
             return signature
         }
         function thisifyTsPlusSignature(declaration: FunctionDeclaration | VariableDeclaration, call: Signature, exportName: string, file: SourceFile, reportDiagnostic: (diagnostic: DiagnosticMessage) => void) {

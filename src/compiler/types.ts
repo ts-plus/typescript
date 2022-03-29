@@ -3509,6 +3509,7 @@ namespace ts {
         tsPlusExportName: string;
         tsPlusDeclaration?: Declaration;
         tsPlusPipeable?: boolean;
+        tsPlusOriginal: Signature
     }
 
     export interface TsPlusUniqueIdentifier extends Identifier {
@@ -5421,6 +5422,7 @@ namespace ts {
         tsPlusResolvedType?: Type;
         tsPlusGlobalIdentifier?: Symbol;
         isFluent?: true;
+        isFluentCall?: true;
         // TSPLUS EXTENSION END
     }
 

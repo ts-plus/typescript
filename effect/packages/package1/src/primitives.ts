@@ -99,6 +99,7 @@ export function mapObject<A, B>(self: Record<string, A>, f: (a: A) => B): Record
 /**
  * @tsplus macro pipe
  * @tsplus fluent global via
+ * @tsplus fluent ets/Effect __call
  */
 export function pipe<A>(a: A): A
 export function pipe<A, B>(a: A, ab: (a: A) => B): B
