@@ -45595,6 +45595,9 @@ namespace ts {
             indexAccessExpressionCache.clear();
             pipeableCache.clear();
             inheritanceSymbolCache.clear();
+            
+            initTsPlusTypeCheckerGlobal();
+
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);
             }
@@ -45787,8 +45790,6 @@ namespace ts {
             for (const file of host.getSourceFiles()) {
                 bindSourceFile(file, compilerOptions);
             }
-
-            initTsPlusTypeCheckerGlobal();
 
             amalgamatedDuplicates = new Map();
 
