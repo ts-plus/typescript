@@ -1291,74 +1291,35 @@ namespace ts {
                 }
             }
         }
-        function getOperatorLeftExtensions(leftType: Type, name: string): Signature[] {
-            const symbols = new Set<Symbol>();
-            collectRelevantSymbols(getBaseConstraintOrType(leftType)).forEach((symbol) => {
-                symbols.add(symbol)
-            })
-            const symbolArray: Symbol[] = [];
-            symbols.forEach((symbol) => {
-                symbolArray.push(symbol);
-            });
-            const signatures: Signature[] = [];
-            for (const target of symbolArray) {
+        function getOperatorExtensionsForSymbols(name: string, symbols: readonly Symbol[]): Signature[] {
+            const signatures = new Set<Signature>();
+            for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
-                    const x = typeSymbolCache.get(target)!.flatMap(
-                        (tag) => {
-                            if (operatorCache.has(tag)) {
-                                const cache = operatorCache.get(tag)
-                                if (cache?.has(name)) {
-                                    return cache.get(name)!
+                    for (const tag of typeSymbolCache.get(target)!) {
+                        if (operatorCache.has(tag)) {
+                            const cache = operatorCache.get(tag)
+                            const extensions = cache?.get(name);
+                            if (extensions) {
+                                for (const extension of extensions) {
+                                    for (const signature of getSignaturesOfType(getTypeOfSymbol(extension.patched), SignatureKind.Call)) {
+                                        signatures.add(signature)
+                                    }
                                 }
                             }
-                            return []
                         }
-                    )
-                    if (x.length === 0) {
-                        continue;
-                    }
-                    else {
-                        signatures.push(...x.flatMap(({ patched }) => getSignaturesOfType(getTypeOfSymbol(patched), SignatureKind.Call)))
                     }
                 }
             }
-            return signatures;
+            return arrayFrom(signatures.values());
         }
-        function getOperatorExtensions(leftType: Type, rightType: Type, name: string): Signature[] {
+        function getOperatorExtensionsForTypes(name: string, types: Type[]): Signature[] {
             const symbols = new Set<Symbol>();
-            collectRelevantSymbols(getBaseConstraintOrType(leftType)).forEach((symbol) => {
-                symbols.add(symbol)
-            })
-            collectRelevantSymbols(getBaseConstraintOrType(rightType)).forEach((symbol) => {
-                symbols.add(symbol)
-            })
-            const symbolArray: Symbol[] = [];
-            symbols.forEach((symbol) => {
-                symbolArray.push(symbol);
-            });
-            const signatures: Signature[] = [];
-            for (const target of symbolArray) {
-                if (typeSymbolCache.has(target)) {
-                    const x = typeSymbolCache.get(target)!.flatMap(
-                        (tag) => {
-                            if (operatorCache.has(tag)) {
-                                const cache = operatorCache.get(tag)
-                                if (cache?.has(name)) {
-                                    return cache.get(name)!
-                                }
-                            }
-                            return []
-                        }
-                    )
-                    if (x.length === 0) {
-                        continue;
-                    }
-                    else {
-                        signatures.push(...x.flatMap(({ patched }) => getSignaturesOfType(getTypeOfSymbol(patched), SignatureKind.Call)))
-                    }
-                }
+            for (const type of types) {
+                collectRelevantSymbols(getBaseConstraintOrType(type)).forEach((symbol) => {
+                    symbols.add(symbol)
+                })
             }
-            return signatures;
+            return getOperatorExtensionsForSymbols(name, arrayFrom(symbols.values()));
         }
         function isTransformablePipeableExtension(type: Type): boolean {
             if (type.symbol) {
@@ -34974,7 +34935,7 @@ namespace ts {
             // @ts-expect-error
             const operatorMappingEntry = invertedBinaryOp[operator] as string | undefined
             if (operatorMappingEntry) {
-                const signatures = getOperatorExtensions(leftType, rightType, operatorMappingEntry);
+                const signatures = getOperatorExtensionsForTypes(operatorMappingEntry, [leftType, rightType]);
                 if (signatures.length > 0) {
                     getNodeLinks(operatorToken).isTsPlusOperatorToken = true;
                     return checkTsPlusCustomCallMulti(
@@ -35950,7 +35911,7 @@ namespace ts {
             if (isBinaryExpression(node)) {
                 const operatorMappingEntry = invertedBinaryOp[node.operatorToken.kind as keyof typeof invertedBinaryOp] as string | undefined
                 if (operatorMappingEntry) {
-                    const signatures = getOperatorLeftExtensions(getTypeOfNode(node.left), operatorMappingEntry);
+                    const signatures = getOperatorExtensionsForTypes(operatorMappingEntry, [getTypeOfNode(node.left)]);
                     if (signatures.length > 0) {
                         const resolved = checkTsPlusCustomCallMulti(
                             node.operatorToken,
