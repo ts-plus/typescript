@@ -7422,5 +7422,13 @@
     "Global import path cannot be relative.": {
         "category": "Error",
         "code": 50025
+    },
+    "Cannot derive type '{0}'.": {
+        "category": "Error",
+        "code": 60000
+    },
+    "Cannot derive type '{0}', you may want to try add an implicit for '{1}' in scope.": {
+        "category": "Error",
+        "code": 60001
     }
 }

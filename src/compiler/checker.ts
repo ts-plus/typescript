@@ -32747,11 +32747,137 @@ namespace ts {
                     }
                 }
             }
-        } 
+        }
+
+        function deriveType(errorNode: CallExpression, type: Type): Type {
+            const derivationDiagnostics: Diagnostic[] = [];
+            const derived = deriveTypeWorker(errorNode, type, type, derivationDiagnostics);
+            if (isErrorType(derived)) {
+                derivationDiagnostics.forEach((diagnostic) => {
+                    diagnostics.add(diagnostic);
+                })
+            }
+            return derived;
+        }
+
+        function getSelfExportStatement(location: Node) {
+            let current = location;
+            while (!isVariableStatement(current) && current.parent) {
+                current = current.parent;
+            }
+            if (current.parent) {
+                return current;
+            }
+        }
+
+        function getImplicitScope(location: Node) {
+            const implicits: Type[] = []
+            const selfExport = getSelfExportStatement(location);
+            for (const statement of getSourceFileOfNode(location).statements) {
+                if (statement !== selfExport) {
+                    if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                        const declaration = statement.declarationList.declarations[0]!;
+                        const tags = collectTsPlusImplicitTags(declaration)
+                        if (tags.length > 0) {
+                            implicits.push(getTypeOfNode(declaration))
+                        }
+                    }
+                }
+            }
+            return implicits;
+        }
+
+        function findRulesForTags(location: Node, tags: Set<string>) {
+            const rules: [string, Type][] = []
+            for (const statement of getSourceFileOfNode(location).statements) {
+                if (isFunctionDeclaration(statement)) {
+                    const statementTags = collectTsPlusRuleTags(statement)
+                    for (const tag of statementTags) {
+                        const [, targetTag, ...rest] = tag.comment.split(" ")
+                        if (tags.has(targetTag)) {
+                            rules.push([rest.join(" "), getTypeOfNode(statement)]);
+                        }
+                    }
+                }
+            }
+            return rules;
+        }
+
+        function deriveTypeWorker(location: Node, originalType: Type, type: Type, diagnostics: Diagnostic[]): Type {
+            if (isTypeIdenticalTo(type, emptyObjectType)) {
+                return type;
+            }
+            const implicitScope = getImplicitScope(location);
+            for (const implicitType of implicitScope) {
+                if (isTypeIdenticalTo(type, implicitType)) {
+                    return implicitType;
+                }
+            }
+            let hasRules = false;
+            if ("resolvedTypeArguments" in type && (type as TypeReference).resolvedTypeArguments!.length === 1 && type.symbol && type.symbol.declarations) {
+                const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
+                const rules = findRulesForTags(location, tags);
+                const targetType = (type as TypeReference).resolvedTypeArguments![0];
+                if (rules.length > 0) {
+                    hasRules =  true;
+                }
+                for (const [rule, ruleType] of rules) {
+                    if (rule === "custom") {
+                        const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
+                        for (const signature of signatures) {
+                            const typeParam = signature.typeParameters![0];
+                            const constraint = getConstraintOfTypeParameter(typeParam);
+                            if (!constraint || isTypeAssignableTo(targetType, constraint)) {
+                                const instantiated = getSignatureInstantiation(signature, [targetType], false);
+                                const returnType = getReturnTypeOfSignature(instantiated);
+                                const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
+                                for (const returnSignature of returnSignatures) {
+                                    if (returnSignature.parameters.length === 1 &&
+                                        returnSignature.parameters[0].valueDeclaration &&
+                                        (returnSignature.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
+                                    ) {
+                                        const residualType = getTypeOfSymbol(returnSignature.parameters[0]);
+                                        if (isTupleType(residualType)) {
+                                            const types = getTypeArguments(residualType);
+                                            const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics));
+                                            if (!find(derivations, isErrorType)) {
+                                                return type;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (!hasRules && (type.flags & TypeFlags.Object)) {
+                const call = getSignaturesOfType(type, SignatureKind.Call);
+                const construct = getSignaturesOfType(type, SignatureKind.Construct);
+                if (call.length === 0 && construct.length === 0) {
+                    const props = getPropertiesOfType(type);
+                    const derivations = map(props, (prop) => deriveTypeWorker(location, originalType, getTypeOfSymbol(prop), diagnostics));
+                    if (!find(derivations, isErrorType)) {
+                        return type;
+                    }
+                }
+            }
+            if (diagnostics.length === 0) {
+                if (isTypeIdenticalTo(originalType, type)) {
+                    diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0, typeToString(originalType)));
+                } else {
+                    diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_you_may_want_to_try_add_an_implicit_for_1_in_scope, typeToString(originalType), typeToString(type)));
+                }
+            }
+            return errorType;
+        }
 
         // TSPLUS EXTENSION START
         function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
             const checked = checkCallExpressionOriginal(node, checkMode);
+            if (isTsPlusMacroCall(node, "Derive") && !isErrorType(checked)) {
+                return deriveType(node, checked);
+            }
             if (isTsPlusMacroCall(node, "pipeable") && !isErrorType(checked)) {
                 if (!isVariableDeclaration(node.parent)) {
                   error(node, Diagnostics.Pipeable_macro_is_only_allowed_in_variable_declarations);
@@ -38133,6 +38259,15 @@ namespace ts {
                 checkFunctionOrMethodDeclaration(node);
                 checkGrammarForGenerator(node);
                 checkCollisionsForDeclarationName(node, node.name);
+            }
+
+            if (getSourceFileOfNode(node).fileName.endsWith("derivation.ts")) {
+                if (node?.name?.escapedText === "typeTesting") {
+                    console.log("IDENTICAL:", isTypeSubtypeOf(
+                        getTypeOfNode(node.parameters[0]),
+                        getTypeOfNode(node.parameters[1])
+                    ))
+                }
             }
         }
 
@@ -44433,6 +44568,18 @@ namespace ts {
                 (tag): tag is TsPlusJSDocGlobalTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("global")
             );
         }
+        function collectTsPlusImplicitTags(statement: Declaration) {
+            return getAllJSDocTags(
+                statement,
+                (tag): tag is TsPlusJSDocImplicitTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("implicit")
+            );
+        }
+        function collectTsPlusRuleTags(statement: Declaration) {
+            return getAllJSDocTags(
+                statement,
+                (tag): tag is TsPlusJSDocRuleTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("rule")
+            );
+        }
         function collectTsPlusFluentTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
@@ -44969,6 +45116,12 @@ namespace ts {
             const tags = companionSymbolCache.get(symbol)!
             if (!tags.includes(tag)) {
                 tags.push(tag)
+            }
+        }
+        function tryCacheTsPlusImplicit(declaration: Declaration): void {
+            const tags = collectTsPlusImplicitTags(declaration);
+            if (tags.length > 0) {
+                console.log(typeToString(getTypeOfNode(declaration)));
             }
         }
         function tryCacheTsPlusGlobalSymbol(declaration: ImportDeclaration): void {

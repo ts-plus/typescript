@@ -3281,6 +3281,18 @@ namespace ts {
         readonly comment?: string | NodeArray<JSDocComment>;
     }
 
+    export interface TsPlusJSDocRuleTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `rule ${string} ${string}`
+    }
+    
+    export interface TsPlusJSDocImplicitTag extends JSDocTag {
+        readonly parent: JSDoc | JSDocTypeLiteral;
+        readonly tagName: Identifier;
+        readonly comment: `implicit`
+    }
+
     export interface TsPlusJSDocTypeTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
