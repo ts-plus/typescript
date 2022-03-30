@@ -31,55 +31,52 @@ export class Show<A> {
 /**
  * @tsplus rule Show intersection
  */
-export declare function showIntersection<Types extends unknown[]>(): {
-    (...args: {
+export declare function showIntersection<Types extends unknown[]>(
+    ...args: {
         [k in keyof Types]: Show<Types[k]>
-    }): Show<UnionToIntersection<Types[number]>>
-}
+    }
+): Show<UnionToIntersection<Types[number]>>
 
 /**
  * @tsplus rule Show lazy
  */
-export declare function showLazy<Type>(): {
-    (...args: [
+export declare function showLazy<Type>(
+    ...args: [
         fn: () => Show<Type>
-    ]): Show<Type>
-}
+    ]
+): Show<Type>
 
 /**
  * @tsplus rule Show union
  */
-export declare function showUnion<Types extends unknown[]>(): {
-    (...args: {
+export declare function showUnion<Types extends unknown[]>(
+    ...args: {
         [k in keyof Types]: Show<Types[k]>
-    }): Show<Types[number]>
-}
+    }
+): Show<Types[number]>
 
 /**
  * @tsplus rule Show custom
  */
-export declare function showStruct<Type extends Record<string, any>>(): {
-    (...args: keyof Type extends string ? IsUnion<Type> extends false ? [
+export declare function showStruct<Type extends Record<string, any>>(
+    ...args: keyof Type extends string ? IsUnion<Type> extends false ? [
         requiredFields: {
             [k in RequiredKeys<Type>]: Show<Type[k]>
         },
         optionalFields: {
             [k in OptionalKeys<Type>]: Show<NonNullable<Type[k]>>
         }
-    ] : never : never): Show<Type>
-}
-
-type xx = ReturnType<typeof showStruct<Maybe<number>>>
+    ] : never : never
+): Show<Type>
 
 /**
  * @tsplus rule Show custom
  */
-export declare function showMaybe<Type extends Maybe<any>>(): {
-    (...args: [Type] extends [Maybe<infer A>]
+export declare function showMaybe<Type extends Maybe<any>>(
+    ...args: [Type] extends [Maybe<infer A>]
         ? [element: Show<A>]
         : never
-    ): Show<Type>
-}
+): Show<Type>
 
 /**
  * @tsplus implicit

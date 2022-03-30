@@ -32829,23 +32829,20 @@ namespace ts {
                             const constraint = getConstraintOfTypeParameter(typeParam);
                             if (!constraint || isTypeAssignableTo(targetType, constraint)) {
                                 const instantiated = getSignatureInstantiation(signature, [targetType], false);
-                                const returnType = getReturnTypeOfSignature(instantiated);
-                                const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
-                                for (const returnSignature of returnSignatures) {
-                                    if (returnSignature.parameters.length === 1 &&
-                                        returnSignature.parameters[0].valueDeclaration &&
-                                        (returnSignature.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
-                                    ) {
-                                        const residualType = getTypeOfSymbol(returnSignature.parameters[0]);
-                                        if (isTupleType(residualType)) {
-                                            const types = getTypeArguments(residualType);
-                                            const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics));
-                                            if (!find(derivations, isErrorType)) {
-                                                return type;
-                                            }
+                                if (instantiated.parameters.length === 1 &&
+                                    instantiated.parameters[0].valueDeclaration &&
+                                    (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
+                                ) {
+                                    const residualType = getTypeOfSymbol(instantiated.parameters[0]);
+                                    if (isTupleType(residualType)) {
+                                        const types = getTypeArguments(residualType);
+                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics));
+                                        if (!find(derivations, isErrorType)) {
+                                            return type;
                                         }
                                     }
                                 }
+
                             }
                         }
                     }
