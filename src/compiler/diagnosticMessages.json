@@ -7430,5 +7430,9 @@
     "Cannot derive type '{0}', you may want to try add an implicit for '{1}' in scope.": {
         "category": "Error",
         "code": 60001
+    },
+    "Cannot derive type '{0}', the derivation requires a lazy rule to be in scope as it is cyclic for the type '{1}'.": {
+        "category": "Error",
+        "code": 60002
     }
 }

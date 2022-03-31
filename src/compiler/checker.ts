@@ -32751,7 +32751,7 @@ namespace ts {
 
         function deriveType(errorNode: CallExpression, type: Type): Type {
             const derivationDiagnostics: Diagnostic[] = [];
-            const derived = deriveTypeWorker(errorNode, type, type, derivationDiagnostics);
+            const derived = deriveTypeWorker(errorNode, type, type, derivationDiagnostics, getImplicitScope(errorNode), []);
             if (isErrorType(derived)) {
                 derivationDiagnostics.forEach((diagnostic) => {
                     diagnostics.add(diagnostic);
@@ -32803,14 +32803,21 @@ namespace ts {
             return rules;
         }
 
-        function deriveTypeWorker(location: Node, originalType: Type, type: Type, diagnostics: Diagnostic[]): Type {
+        function deriveTypeWorker(location: Node, originalType: Type, type: Type, diagnostics: Diagnostic[], derivationScope: Type[], prohibited: Type[]): Type {
             if (isTypeIdenticalTo(type, emptyObjectType)) {
                 return type;
             }
-            const implicitScope = getImplicitScope(location);
-            for (const implicitType of implicitScope) {
+            for (const implicitType of derivationScope) {
                 if (isTypeIdenticalTo(type, implicitType)) {
-                    return implicitType;
+                    return type;
+                }
+            }
+            for (const prohibitedType of prohibited) {
+                if (isTypeIdenticalTo(type, prohibitedType)) {
+                    if (diagnostics.length === 0) {
+                        diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_the_derivation_requires_a_lazy_rule_to_be_in_scope_as_it_is_cyclic_for_the_type_1, typeToString(originalType), typeToString(prohibitedType)));
+                    }
+                    return errorType;
                 }
             }
             let hasRules = false;
@@ -32818,6 +32825,9 @@ namespace ts {
                 const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
                 const rules = findRulesForTags(location, tags).sort((a, b) => a[1] - b[1]);
                 const targetType = (type as TypeReference).resolvedTypeArguments![0];
+                const supportsLazy = !!find(rules, ([rule]) => rule.startsWith("lazy"));
+                const newDerivationScope = supportsLazy ? [...derivationScope, type] : derivationScope;
+                const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
                 if (rules.length > 0) {
                     hasRules =  true;
                 }
@@ -32836,7 +32846,7 @@ namespace ts {
                                     const residualType = getTypeOfSymbol(instantiated.parameters[0]);
                                     if (isTupleType(residualType)) {
                                         const types = getTypeArguments(residualType);
-                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics));
+                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics, newDerivationScope, newProhibited));
                                         if (!find(derivations, isErrorType)) {
                                             return type;
                                         }
@@ -32862,7 +32872,7 @@ namespace ts {
                                     const residualType = getTypeOfSymbol(instantiated.parameters[0]);
                                     if (isTupleType(residualType)) {
                                         const types = getTypeArguments(residualType);
-                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics));
+                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics, newDerivationScope, newProhibited));
                                         if (!find(derivations, isErrorType)) {
                                             return type;
                                         }
@@ -32879,7 +32889,7 @@ namespace ts {
                 const construct = getSignaturesOfType(type, SignatureKind.Construct);
                 if (call.length === 0 && construct.length === 0) {
                     const props = getPropertiesOfType(type);
-                    const derivations = map(props, (prop) => deriveTypeWorker(location, originalType, getTypeOfSymbol(prop), diagnostics));
+                    const derivations = map(props, (prop) => deriveTypeWorker(location, originalType, getTypeOfSymbol(prop), diagnostics, derivationScope, prohibited));
                     if (!find(derivations, isErrorType)) {
                         return type;
                     }

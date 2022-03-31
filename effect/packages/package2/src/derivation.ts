@@ -28,25 +28,27 @@ export class Show<A> {
     constructor(readonly show: (a: A) => string) { }
 }
 
-//
-// Utility
-//
-
-/**
- * @tsplus rule Show 0 lazy
- */
- export declare function showLazy<Type>(
-    ...args: [
-        fn: () => Show<Type>
-    ]
-): Show<Type>
 
 //
 // Low priority
 //
 
 /**
- * @tsplus rule Show 100 intersection
+ * @tsplus rule Show 100 union
+ */
+export declare function showUnion<Types extends unknown[]>(
+    ...args: {
+        [k in keyof Types]: Show<Types[k]>
+    }
+): Show<Types[number]>
+
+
+//
+// Mid Priority
+//
+
+/**
+ * @tsplus rule Show 10 intersection
  */
 export declare function showIntersection<Types extends unknown[]>(
     ...args: {
@@ -55,21 +57,7 @@ export declare function showIntersection<Types extends unknown[]>(
 ): Show<UnionToIntersection<Types[number]>>
 
 /**
- * @tsplus rule Show 100 union
- */
- export declare function showUnion<Types extends unknown[]>(
-    ...args: {
-        [k in keyof Types]: Show<Types[k]>
-    }
-): Show<Types[number]>
-
-
-//
-// High Priority
-//
-
-/**
- * @tsplus rule Show 0 custom
+ * @tsplus rule Show 10 custom
  */
 export declare function showStruct<Type extends Record<string, any>>(
     ...args: keyof Type extends string ? IsUnion<Type> extends false ? [
@@ -81,6 +69,22 @@ export declare function showStruct<Type extends Record<string, any>>(
         }
     ] : never : never
 ): Show<Type>
+
+//
+// High Priority
+//
+
+/**
+ * @tsplus rule Show 0 lazy
+ */
+export function showLazy<Type>(
+    ...args: [
+        fn: (_: Show<Type>) => Show<Type>
+    ]
+): Show<Type> {
+    const show = args[0](new Show((type) => show.show(type)));
+    return show;
+}
 
 /**
  * @tsplus rule Show 0 custom
@@ -104,6 +108,21 @@ export function showMaybe<Type extends Maybe<any>>(
 ): Show<Type> {
     return new Show((a) => a.isJust() ? `Maybe.Just(${args[0].show(a)})` : `Maybe.None`)
 }
+
+/**
+ * @tsplus rule Show 0 custom
+ */
+export function showArray<Type extends Array<any>>(
+    ...args: [Type] extends [Array<infer A>] ? [Array<A>] extends [Type] ? [
+        element: Show<A>
+    ] : never : never
+): Show<Type> {
+    return new Show((a) => `Array<{${a.map(args[0].show)}}>`)
+}
+
+//
+// Implicits
+//
 
 /**
  * @tsplus implicit
@@ -131,9 +150,16 @@ export interface Person {
     surname: string
     age: Maybe<number>
     birthDate?: Date
+    bestFriend: Maybe<Person>
+    friends: Person[]
+}
+
+export interface User {
+    id: string
+    owner: Person
 }
 
 /**
  * @tsplus implicit
  */
-export const showPerson = Derive<Show<Person>>()
+export const showPerson = Derive<Show<User>>()
