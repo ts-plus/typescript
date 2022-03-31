@@ -13,7 +13,7 @@ export class Show<A> {
 //
 
 /**
- * @tsplus rule Show 100 union
+ * @tsplus rule Show 20 union
  */
 export declare function deriveShowUnion<Types extends unknown[]>(
     ...args: {
@@ -50,6 +50,15 @@ export declare function deriveShowStruct<Type extends Record<string, any>>(
         }
     ] : never : never
 ): Show<Type>
+
+/**
+ * @tsplus rule Show 10 tuple
+ */
+export declare function deriveShowUnion<Types extends unknown[]>(
+    ...args: {
+        [k in keyof Types]: Show<Types[k]>
+    }
+): Show<Types>
 
 //
 // High Priority

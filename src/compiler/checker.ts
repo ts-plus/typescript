@@ -32891,7 +32891,7 @@ namespace ts {
                 }
             }
             let hasRules = false;
-            if ("resolvedTypeArguments" in type && (type as TypeReference).resolvedTypeArguments!.length === 1 && type.symbol && type.symbol.declarations) {
+            if ("resolvedTypeArguments" in type && !isTupleType(type) && (type as TypeReference).resolvedTypeArguments!.length === 1 && type.symbol && type.symbol.declarations) {
                 const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
                 const rules = findRulesForTags(location, tags).sort((a, b) => a[1] - b[1]);
                 const targetType = (type as TypeReference).resolvedTypeArguments![0];
@@ -32902,7 +32902,7 @@ namespace ts {
                     hasRules =  true;
                 }
                 for (const [rule, _, ruleType] of rules) {
-                    if (rule === "custom") {
+                    if (rule === "custom" || (rule === "tuple" && isTupleType(targetType))) {
                         const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
                         for (const signature of signatures) {
                             const typeParam = signature.typeParameters![0];
@@ -32922,7 +32922,6 @@ namespace ts {
                                         }
                                     }
                                 }
-
                             }
                         }
                     }
@@ -32948,13 +32947,22 @@ namespace ts {
                                         }
                                     }
                                 }
-
                             }
                         }
                     }
+                    if (diagnostics.length > 0) {
+                        break
+                    }
                 }
             }
-            if (!hasRules && (type.flags & TypeFlags.Object)) {
+            if (diagnostics.length === 0 && !hasRules && isTupleType(type)) {
+                const props = getTypeArguments(type);
+                const derivations = map(props, (prop) => deriveTypeWorker(location, originalType, prop, diagnostics, derivationScope, prohibited, newCurrentDerivation));
+                if (!find(derivations, isErrorType)) {
+                    return type;
+                }
+            }
+            if (diagnostics.length === 0 && !hasRules && (type.flags & TypeFlags.Object)) {
                 const call = getSignaturesOfType(type, SignatureKind.Call);
                 const construct = getSignaturesOfType(type, SignatureKind.Construct);
                 if (call.length === 0 && construct.length === 0) {
@@ -32965,7 +32973,7 @@ namespace ts {
                     }
                 }
             }
-            if (!hasRules && (type.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral))) {
+            if (diagnostics.length === 0 && !hasRules && (type.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral))) {
                 return type;
             }
             if (diagnostics.length === 0) {
