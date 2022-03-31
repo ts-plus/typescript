@@ -7423,7 +7423,7 @@
         "category": "Error",
         "code": 50025
     },
-    "Cannot derive type '{0}'.": {
+    "Cannot derive type '{0}' and no derivation rules are found.": {
         "category": "Error",
         "code": 60000
     },
@@ -7434,5 +7434,9 @@
     "Cannot derive type '{0}', the derivation requires a lazy rule to be in scope as it is cyclic for the type '{1}'.": {
         "category": "Error",
         "code": 60002
+    },
+    "Failed derivation of type '{0}'.": {
+        "category": "Error",
+        "code": 60003
     }
 }

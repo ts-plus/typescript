@@ -32752,7 +32752,7 @@ namespace ts {
 
         function deriveType(errorNode: CallExpression, type: Type): Type {
             const derivationDiagnostics: Diagnostic[] = [];
-            const derived = deriveTypeWorker(errorNode, type, type, derivationDiagnostics, getImplicitScope(errorNode), []);
+            const derived = deriveTypeWorker(errorNode, type, type, derivationDiagnostics, getImplicitScope(errorNode), [], []);
             if (isErrorType(derived)) {
                 derivationDiagnostics.forEach((diagnostic) => {
                     diagnostics.add(diagnostic);
@@ -32854,7 +32854,7 @@ namespace ts {
             return rules;
         }
 
-        function deriveTypeWorker(location: Node, originalType: Type, type: Type, diagnostics: Diagnostic[], derivationScope: Type[], prohibited: Type[]): Type {
+        function deriveTypeWorker(location: Node, originalType: Type, type: Type, diagnostics: Diagnostic[], derivationScope: Type[], prohibited: Type[], currentDerivation: Type[]): Type {
             if (isTypeIdenticalTo(type, emptyObjectType)) {
                 return type;
             }
@@ -32863,10 +32863,29 @@ namespace ts {
                     return type;
                 }
             }
+            const newCurrentDerivation = [...currentDerivation, type];
             for (const prohibitedType of prohibited) {
                 if (isTypeIdenticalTo(type, prohibitedType)) {
                     if (diagnostics.length === 0) {
-                        diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_the_derivation_requires_a_lazy_rule_to_be_in_scope_as_it_is_cyclic_for_the_type_1, typeToString(originalType), typeToString(prohibitedType)));
+                        const digs: Diagnostic[] = [];
+                        for (let i = 1; i < newCurrentDerivation.length - 1; i++) {
+                            const step = newCurrentDerivation[i];
+                            digs.push(createError(
+                                location,
+                                Diagnostics.Failed_derivation_of_type_0,
+                                typeToString(step)
+                            ));
+                        }
+                        const diagnostic = createDiagnosticForNodeFromMessageChain(
+                            location,
+                            chainDiagnosticMessages(
+                                map(digs, createDiagnosticMessageChainFromDiagnostic),
+                                Diagnostics.Cannot_derive_type_0_the_derivation_requires_a_lazy_rule_to_be_in_scope_as_it_is_cyclic_for_the_type_1,
+                                typeToString(newCurrentDerivation[0]),
+                                typeToString(newCurrentDerivation[newCurrentDerivation.length - 1])
+                            )
+                        )
+                        diagnostics.push(diagnostic)
                     }
                     return errorType;
                 }
@@ -32897,7 +32916,7 @@ namespace ts {
                                     const residualType = getTypeOfSymbol(instantiated.parameters[0]);
                                     if (isTupleType(residualType)) {
                                         const types = getTypeArguments(residualType);
-                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics, newDerivationScope, newProhibited));
+                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics, newDerivationScope, newProhibited, newCurrentDerivation));
                                         if (!find(derivations, isErrorType)) {
                                             return type;
                                         }
@@ -32923,7 +32942,7 @@ namespace ts {
                                     const residualType = getTypeOfSymbol(instantiated.parameters[0]);
                                     if (isTupleType(residualType)) {
                                         const types = getTypeArguments(residualType);
-                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics, newDerivationScope, newProhibited));
+                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics, newDerivationScope, newProhibited, newCurrentDerivation));
                                         if (!find(derivations, isErrorType)) {
                                             return type;
                                         }
@@ -32940,7 +32959,7 @@ namespace ts {
                 const construct = getSignaturesOfType(type, SignatureKind.Construct);
                 if (call.length === 0 && construct.length === 0) {
                     const props = getPropertiesOfType(type);
-                    const derivations = map(props, (prop) => deriveTypeWorker(location, originalType, getTypeOfSymbol(prop), diagnostics, derivationScope, prohibited));
+                    const derivations = map(props, (prop) => deriveTypeWorker(location, originalType, getTypeOfSymbol(prop), diagnostics, derivationScope, prohibited, newCurrentDerivation));
                     if (!find(derivations, isErrorType)) {
                         return type;
                     }
@@ -32951,9 +32970,27 @@ namespace ts {
             }
             if (diagnostics.length === 0) {
                 if (isTypeIdenticalTo(originalType, type)) {
-                    diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0, typeToString(originalType)));
+                    diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_and_no_derivation_rules_are_found, typeToString(originalType)));
                 } else {
-                    diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_you_may_want_to_try_add_an_implicit_for_1_in_scope, typeToString(originalType), typeToString(type)));
+                    const digs: Diagnostic[] = [];
+                    for (let i = 1; i < newCurrentDerivation.length - 1; i++) {
+                        const step = newCurrentDerivation[i];
+                        digs.push(createError(
+                            location,
+                            Diagnostics.Failed_derivation_of_type_0,
+                            typeToString(step)
+                        ));
+                    }
+                    const diagnostic = createDiagnosticForNodeFromMessageChain(
+                        location,
+                        chainDiagnosticMessages(
+                            map(digs, createDiagnosticMessageChainFromDiagnostic),
+                            Diagnostics.Cannot_derive_type_0_you_may_want_to_try_add_an_implicit_for_1_in_scope,
+                            typeToString(newCurrentDerivation[0]),
+                            typeToString(newCurrentDerivation[newCurrentDerivation.length - 1])
+                        )
+                    )
+                    diagnostics.push(diagnostic)
                 }
             }
             return errorType;

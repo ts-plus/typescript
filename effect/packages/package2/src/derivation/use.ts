@@ -1,10 +1,10 @@
+import { Show } from "./show"
+import { Derive } from "./types"
+import { } from "./guard"
 
 //
 // Usage
 //
-
-import { Show } from "./show"
-import { Derive } from "./types"
 
 export interface Person {
     tag: "Person"

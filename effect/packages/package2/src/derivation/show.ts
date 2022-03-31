@@ -1,3 +1,4 @@
+import { Guard } from "./guard";
 import { IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection } from "./types";
 
 /**
@@ -16,7 +17,10 @@ export class Show<A> {
  */
 export declare function deriveShowUnion<Types extends unknown[]>(
     ...args: {
-        [k in keyof Types]: Show<Types[k]>
+        [k in keyof Types]: {
+            guard: Guard<Types[k]>
+            show: Show<Types[k]>
+        }
     }
 ): Show<Types[number]>
 
@@ -97,11 +101,10 @@ export function deriveShowArray<Type extends Array<any>>(
     return new Show((a) => `Array<{${a.map(args[0].show)}}>`)
 }
 
-
 /**
  * @tsplus implicit
  */
-export const showNumber = new Show((a: number) => `${a}`)
+export const number = new Show((a: number) => `${a}`)
 
 /**
  * @tsplus implicit
@@ -111,9 +114,9 @@ export const string = new Show((a: string) => a)
 /**
  * @tsplus implicit
  */
-export const showDate = new Show((a: Date) => a.toISOString())
+export const date = new Show((a: Date) => a.toISOString())
 
 /**
  * @tsplus implicit
  */
-export const showBoolean = new Show((a: boolean) => a ? "true" : "false")
+export const boolean = new Show((a: boolean) => a ? "true" : "false")
