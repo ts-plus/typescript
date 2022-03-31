@@ -4,7 +4,7 @@ namespace ts {
 
     export const externalHelpersModuleNameText = "tslib";
 
-    export const defaultMaximumTruncationLength = 160;
+    export const defaultMaximumTruncationLength = 1_000;
     export const noTruncationMaximumTruncationLength = 1_000_000;
 
     export function getDeclarationOfKind<T extends Declaration>(symbol: Symbol, kind: T["kind"]): T | undefined {
