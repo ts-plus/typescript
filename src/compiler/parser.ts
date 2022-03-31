@@ -64,9 +64,7 @@ namespace ts {
     export function isFileProbablyExternalModule(sourceFile: SourceFile) {
         // Try to use the first top-level import/export when available, then
         // fall back to looking for an 'import.meta' somewhere in the tree if necessary.
-        // TSPLUS EXTENSION BEGIN
-        return sourceFile.isDeclarationFile ? (forEach(sourceFile.statements, isAnExternalModuleIndicatorNode) || getImportMetaIfNecessary(sourceFile)) : true;
-        // TSPLUS EXTENSION END
+        return forEach(sourceFile.statements, isAnExternalModuleIndicatorNode) || getImportMetaIfNecessary(sourceFile);
     }
 
     function isAnExternalModuleIndicatorNode(node: Node) {
