@@ -32788,14 +32788,14 @@ namespace ts {
         }
 
         function findRulesForTags(location: Node, tags: Set<string>) {
-            const rules: [string, Type][] = []
+            const rules: [string, number, Type][] = []
             for (const statement of getSourceFileOfNode(location).statements) {
                 if (isFunctionDeclaration(statement)) {
                     const statementTags = collectTsPlusRuleTags(statement)
                     for (const tag of statementTags) {
-                        const [, targetTag, ...rest] = tag.comment.split(" ")
+                        const [, targetTag, priority, ...rest] = tag.comment.split(" ")
                         if (tags.has(targetTag)) {
-                            rules.push([rest.join(" "), getTypeOfNode(statement)]);
+                            rules.push([rest.join(" "), Number.parseFloat(priority), getTypeOfNode(statement)]);
                         }
                     }
                 }
@@ -32816,12 +32816,12 @@ namespace ts {
             let hasRules = false;
             if ("resolvedTypeArguments" in type && (type as TypeReference).resolvedTypeArguments!.length === 1 && type.symbol && type.symbol.declarations) {
                 const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
-                const rules = findRulesForTags(location, tags);
+                const rules = findRulesForTags(location, tags).sort((a, b) => a[1] - b[1]);
                 const targetType = (type as TypeReference).resolvedTypeArguments![0];
                 if (rules.length > 0) {
                     hasRules =  true;
                 }
-                for (const [rule, ruleType] of rules) {
+                for (const [rule, _, ruleType] of rules) {
                     if (rule === "custom") {
                         const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
                         for (const signature of signatures) {
@@ -32829,6 +32829,32 @@ namespace ts {
                             const constraint = getConstraintOfTypeParameter(typeParam);
                             if (!constraint || isTypeAssignableTo(targetType, constraint)) {
                                 const instantiated = getSignatureInstantiation(signature, [targetType], false);
+                                if (instantiated.parameters.length === 1 &&
+                                    instantiated.parameters[0].valueDeclaration &&
+                                    (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
+                                ) {
+                                    const residualType = getTypeOfSymbol(instantiated.parameters[0]);
+                                    if (isTupleType(residualType)) {
+                                        const types = getTypeArguments(residualType);
+                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics));
+                                        if (!find(derivations, isErrorType)) {
+                                            return type;
+                                        }
+                                    }
+                                }
+
+                            }
+                        }
+                    }
+                    if (rule === "union" && (targetType.flags & TypeFlags.Union)) {
+                        const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
+                        for (const signature of signatures) {
+                            const typeParam = signature.typeParameters![0];
+                            const constraint = getConstraintOfTypeParameter(typeParam);
+                            const typesInUnion = (targetType as UnionType).types;
+                            const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
+                            if (!constraint || isTypeAssignableTo(typesInUnionTuple, constraint)) {
+                                const instantiated = getSignatureInstantiation(signature, [typesInUnionTuple], false);
                                 if (instantiated.parameters.length === 1 &&
                                     instantiated.parameters[0].valueDeclaration &&
                                     (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
@@ -32858,6 +32884,9 @@ namespace ts {
                         return type;
                     }
                 }
+            }
+            if (!hasRules && (type.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral))) {
+                return type;
             }
             if (diagnostics.length === 0) {
                 if (isTypeIdenticalTo(originalType, type)) {

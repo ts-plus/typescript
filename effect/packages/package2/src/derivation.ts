@@ -28,8 +28,25 @@ export class Show<A> {
     constructor(readonly show: (a: A) => string) { }
 }
 
+//
+// Utility
+//
+
 /**
- * @tsplus rule Show intersection
+ * @tsplus rule Show 0 lazy
+ */
+ export declare function showLazy<Type>(
+    ...args: [
+        fn: () => Show<Type>
+    ]
+): Show<Type>
+
+//
+// Low priority
+//
+
+/**
+ * @tsplus rule Show 100 intersection
  */
 export declare function showIntersection<Types extends unknown[]>(
     ...args: {
@@ -38,25 +55,21 @@ export declare function showIntersection<Types extends unknown[]>(
 ): Show<UnionToIntersection<Types[number]>>
 
 /**
- * @tsplus rule Show lazy
+ * @tsplus rule Show 100 union
  */
-export declare function showLazy<Type>(
-    ...args: [
-        fn: () => Show<Type>
-    ]
-): Show<Type>
-
-/**
- * @tsplus rule Show union
- */
-export declare function showUnion<Types extends unknown[]>(
+ export declare function showUnion<Types extends unknown[]>(
     ...args: {
         [k in keyof Types]: Show<Types[k]>
     }
 ): Show<Types[number]>
 
+
+//
+// High Priority
+//
+
 /**
- * @tsplus rule Show custom
+ * @tsplus rule Show 0 custom
  */
 export declare function showStruct<Type extends Record<string, any>>(
     ...args: keyof Type extends string ? IsUnion<Type> extends false ? [
@@ -70,36 +83,50 @@ export declare function showStruct<Type extends Record<string, any>>(
 ): Show<Type>
 
 /**
- * @tsplus rule Show custom
+ * @tsplus rule Show 0 custom
  */
-export declare function showMaybe<Type extends Maybe<any>>(
+export function showLiteral<Type extends string | number>(
+    ...args: IsUnion<Type> extends false ? [
+        value: Type
+    ] : never
+): Show<Type> {
+    const literalString = typeof args[0] === "number" ? `${args[0]}` : args[0] as string
+    return new Show<Type>(() => literalString)
+}
+
+/**
+ * @tsplus rule Show 0 custom
+ */
+export function showMaybe<Type extends Maybe<any>>(
     ...args: [Type] extends [Maybe<infer A>]
         ? [element: Show<A>]
         : never
-): Show<Type>
+): Show<Type> {
+    return new Show((a) => a.isJust() ? `Maybe.Just(${args[0].show(a)})` : `Maybe.None`)
+}
 
 /**
  * @tsplus implicit
  */
-export declare const showNumber: Show<number>
-
+export const showNumber = new Show((a: number) => `${a}`)
 
 /**
  * @tsplus implicit
  */
 export const string = new Show((a: string) => a)
 
-
 /**
  * @tsplus implicit
  */
-export declare const showDate: Show<Date>
+export const showDate = new Show((a: Date) => a.toISOString())
 
 //
 // Usage
 //
 
 export interface Person {
+    tag: "Person"
+    gender: "M" | "F" | "NB" | "NA"
     name: string
     surname: string
     age: Maybe<number>
@@ -109,4 +136,4 @@ export interface Person {
 /**
  * @tsplus implicit
  */
-export const showPerson: Show<Person> = Derive()
+export const showPerson = Derive<Show<Person>>()
