@@ -1456,12 +1456,13 @@ namespace ts {
             if (!isCallExpression(node)) {
                 return false;
             }
-            const symbol = getSymbolAtLocation(node.expression);
-            if (symbol && symbol.valueDeclaration) {
-                return getAllJSDocTags(
-                    symbol.valueDeclaration,
-                    (_): _ is JSDocTag => _.tagName.escapedText === "tsplus" && _.comment === `macro ${macro}`
-                ).length > 0;
+            const type = getTypeOfNode(node.expression);
+            if (type && type.symbol && type.symbol.declarations) {
+                for (const declaration of type.symbol.declarations) {
+                    if (getAllJSDocTags(declaration, (_): _ is JSDocTag => _.tagName.escapedText === "tsplus" && _.comment === `macro ${macro}`).length > 0) {
+                        return true;
+                    }
+                }
             }
             return false;
         }
@@ -32773,33 +32774,83 @@ namespace ts {
         function getImplicitScope(location: Node) {
             const implicits: Type[] = []
             const selfExport = getSelfExportStatement(location);
-            for (const statement of getSourceFileOfNode(location).statements) {
-                if (statement !== selfExport) {
-                    if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
-                        const declaration = statement.declarationList.declarations[0]!;
-                        const tags = collectTsPlusImplicitTags(declaration)
-                        if (tags.length > 0) {
-                            implicits.push(getTypeOfNode(declaration))
+            const sourceFile = getSourceFileOfNode(location);
+            const exports = sourceFile.symbol.exports;
+            if (exports) {
+                exports.forEach((exportSymbol) => {
+                    forEach(exportSymbol.declarations, (declaration) => {
+                        if (getSelfExportStatement(declaration) !== selfExport) {
+                            const tags = collectTsPlusImplicitTags(declaration)
+                            if (tags.length > 0) {
+                                implicits.push(getTypeOfNode(declaration))
+                            }
+                        }
+                    })
+                })
+            }
+            sourceFile.imports.forEach((token) => {
+                if (sourceFile.resolvedModules) {
+                    const resolvedFull = sourceFile.resolvedModules.get(token.text, void 0);
+                    if (resolvedFull && resolvedFull) {
+                        const sourceOfModule = host.getSourceFile(resolvedFull.resolvedFileName);
+                        if (sourceOfModule) {
+                            const exportsOfModule = getExportsOfModule(sourceOfModule.symbol);
+                            exportsOfModule.forEach((exportSymbol) => {
+                                forEach(exportSymbol.declarations, (declaration) => {
+                                    if (getSelfExportStatement(declaration) !== selfExport) {
+                                        const tags = collectTsPlusImplicitTags(declaration)
+                                        if (tags.length > 0) {
+                                            implicits.push(getTypeOfNode(declaration))
+                                        }
+                                    }
+                                })
+                            })
                         }
                     }
                 }
-            }
+            })
             return implicits;
         }
 
         function findRulesForTags(location: Node, tags: Set<string>) {
             const rules: [string, number, Type][] = []
-            for (const statement of getSourceFileOfNode(location).statements) {
-                if (isFunctionDeclaration(statement)) {
-                    const statementTags = collectTsPlusRuleTags(statement)
-                    for (const tag of statementTags) {
-                        const [, targetTag, priority, ...rest] = tag.comment.split(" ")
-                        if (tags.has(targetTag)) {
-                            rules.push([rest.join(" "), Number.parseFloat(priority), getTypeOfNode(statement)]);
+            const sourceFile = getSourceFileOfNode(location);
+            const exports = sourceFile.symbol.exports;
+            if (exports) {
+                exports.forEach((exportSymbol) => {
+                    forEach(exportSymbol.declarations, (declaration) => {
+                        const statementTags = collectTsPlusRuleTags(declaration)
+                        for (const tag of statementTags) {
+                            const [, targetTag, priority, ...rest] = tag.comment.split(" ")
+                            if (tags.has(targetTag)) {
+                                rules.push([rest.join(" "), Number.parseFloat(priority), getTypeOfNode(declaration)]);
+                            }
+                        }
+                    })
+                })
+            }
+            sourceFile.imports.forEach((token) => {
+                if (sourceFile.resolvedModules) {
+                    const resolvedFull = sourceFile.resolvedModules.get(token.text, void 0);
+                    if (resolvedFull && resolvedFull) {
+                        const sourceOfModule = host.getSourceFile(resolvedFull.resolvedFileName);
+                        if (sourceOfModule) {
+                            const exportsOfModule = getExportsOfModule(sourceOfModule.symbol);
+                            exportsOfModule.forEach((exportSymbol) => {
+                                forEach(exportSymbol.declarations, (declaration) => {
+                                    const statementTags = collectTsPlusRuleTags(declaration)
+                                    for (const tag of statementTags) {
+                                        const [, targetTag, priority, ...rest] = tag.comment.split(" ")
+                                        if (tags.has(targetTag)) {
+                                            rules.push([rest.join(" "), Number.parseFloat(priority), getTypeOfNode(declaration)]);
+                                        }
+                                    }
+                                })
+                            })
                         }
                     }
                 }
-            }
+            })
             return rules;
         }
 
@@ -38295,15 +38346,6 @@ namespace ts {
                 checkFunctionOrMethodDeclaration(node);
                 checkGrammarForGenerator(node);
                 checkCollisionsForDeclarationName(node, node.name);
-            }
-
-            if (getSourceFileOfNode(node).fileName.endsWith("derivation.ts")) {
-                if (node?.name?.escapedText === "typeTesting") {
-                    console.log("IDENTICAL:", isTypeSubtypeOf(
-                        getTypeOfNode(node.parameters[0]),
-                        getTypeOfNode(node.parameters[1])
-                    ))
-                }
             }
         }
 
