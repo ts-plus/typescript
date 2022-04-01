@@ -88,6 +88,9 @@ export declare function deriveGuardArray<Type extends Array<any>>(
     ] : never : never
 ): Guard<Type> 
 
+//
+// Implicits
+//
 
 /**
  * @tsplus implicit
