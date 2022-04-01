@@ -71,10 +71,10 @@ export declare function deriveRefinementIntersection<A, B extends unknown[]>(
 export declare function deriveRefinementStruct<A, B extends Record<string, any> & A>(
     ...args: keyof B extends string ? IsUnion<B> extends false ? [
         requiredFields: {
-            [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Refinement<unknown, B[k]>
+            [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Guard<B[k]>
         },
         optionalFields: {
-            [k in OptionalKeys<B>]: k extends keyof A ? Refinement<A[k], NonNullable<B[k]>> : Refinement<unknown, NonNullable<B[k]>>
+            [k in OptionalKeys<B>]: k extends keyof A ? Refinement<A[k], NonNullable<B[k]>> : Guard<NonNullable<B[k]>>
         }
     ] : never : never
 ): Refinement<A, B>
@@ -86,23 +86,12 @@ export declare function deriveRefinementStruct<A, B extends Record<string, any> 
 /**
  * @tsplus derive Refinement<_, _> 30
  */
-export declare function deriveRefinementFromGuard<A, B extends A>(
-    ...args: unknown extends A ? [guard: Guard<B>] : never
-): Refinement<A, B>
-
-/**
- * @tsplus derive Refinement<_, _> 40
- */
 export declare function deriveRefinementFromUnknown<A, B extends A>(
-    ...args: [refinement: Refinement<unknown, B>]
+    ...args: unknown extends A ? never : [guard: Guard<B>]
 ): Refinement<A, B>
 
 //
 // Usage
 //
 
-export const ok4: Refinement<{
-    a: number | string
-}, {
-    a: string
-}> = Derive()
+export const ok4: Refinement<{ a: number | string }, { a: number }> = Derive()
