@@ -27,10 +27,10 @@ export declare function deriveRefinementLazy<A, B extends A>(
 /**
  * @tsplus derive Refinement<_, _> 10
  */
-export declare function deriveRefinementLiteral<A, B extends A>(
-    ...args: IsUnion<B> extends false ? B extends string | number ? [
+export declare function deriveRefinementLiteral<A, B extends A & (string | number)>(
+    ...args: IsUnion<B> extends false ? [
         value: B
-    ] : never : never
+    ] : never
 ): Refinement<A, B>
 
 /**
