@@ -14,7 +14,7 @@ export class Refinement<A, B extends A> {
 /**
  * @tsplus derive Refinement lazy
  */
- export declare function deriveGuardLazy<A, B extends A>(
+ export declare function deriveRefinementLazy<A, B extends A>(
     ...args: [
         fn: (_: Refinement<A, B>) => Refinement<A, B>
     ]
