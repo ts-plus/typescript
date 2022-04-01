@@ -13,7 +13,7 @@ export class Show<A> {
 //
 
 /**
- * @tsplus derivation Show lazy
+ * @tsplus derive Show lazy
  */
 export function deriveShowLazy<A>(
     ...args: [
@@ -29,7 +29,7 @@ export function deriveShowLazy<A>(
 //
 
 /**
- * @tsplus derivation Show<_> 10
+ * @tsplus derive Show<_> 10
  */
 export function deriveShowLiteral<A extends string | number>(
     ...args: IsUnion<A> extends false ? [
@@ -41,7 +41,7 @@ export function deriveShowLiteral<A extends string | number>(
 }
 
 /**
- * @tsplus derivation Show<_> 10
+ * @tsplus derive Show<_> 10
  */
 export function deriveShowMaybe<A extends Maybe<any>>(
     ...args: [A] extends [Maybe<infer _A>]
@@ -52,7 +52,7 @@ export function deriveShowMaybe<A extends Maybe<any>>(
 }
 
 /**
- * @tsplus derivation Show<_> 10
+ * @tsplus derive Show<_> 10
  */
 export function deriveShowArray<A extends Array<any>>(
     ...args: [A] extends [Array<infer _A>] ? [Array<_A>] extends [A] ? [
@@ -67,7 +67,7 @@ export function deriveShowArray<A extends Array<any>>(
 //
 
 /**
- * @tsplus derivation Show<&> 20
+ * @tsplus derive Show<&> 20
  */
  export declare function deriveShowIntersection<A extends unknown[]>(
     ...args: {
@@ -76,7 +76,7 @@ export function deriveShowArray<A extends Array<any>>(
 ): Show<UnionToIntersection<A[number]>>
 
 /**
- * @tsplus derivation Show<_> 20
+ * @tsplus derive Show<_> 20
  */
 export declare function deriveShowStruct<A extends Record<string, any>>(
     ...args: keyof A extends string ? IsUnion<A> extends false ? [
@@ -90,7 +90,7 @@ export declare function deriveShowStruct<A extends Record<string, any>>(
 ): Show<A>
 
 /**
- * @tsplus derivation Show<|> 10
+ * @tsplus derive Show<|> 10
  */
 export declare function deriveShowLiteralUnion<A extends unknown[]>(
     ...args: A[number] extends string | number ? {
@@ -99,7 +99,7 @@ export declare function deriveShowLiteralUnion<A extends unknown[]>(
 ): Show<A[number]>
 
 /**
- * @tsplus derivation Show<[]> 20
+ * @tsplus derive Show<[]> 20
  */
 export declare function deriveShowTuple<A extends unknown[]>(
     ...args: {
@@ -117,7 +117,7 @@ export interface GuardAndShow<A> {
 }
 
 /**
- * @tsplus derivation Show<|> 10
+ * @tsplus derive Show<|> 10
  */
 export declare function deriveShowUnion<A extends unknown[]>(
     ...args: {

@@ -32831,7 +32831,7 @@ namespace ts {
                     forEach(exportSymbol.declarations, (declaration) => {
                         const statementTags = collectTsPlusDerivationTags(declaration)
                         for (const tag of statementTags) {
-                            const match = tag.comment.match(/^derivation ([^<]*)<([^>]*)> (.*)$/);
+                            const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
                             if (match) {
                                 const [, typeTag, paramActions, priority] = match;
                                 if (tags.has(typeTag)) {
@@ -32841,7 +32841,7 @@ namespace ts {
                                     }, Number.parseFloat(priority), getTypeOfNode(declaration), declaration]);
                                 }
                             } else {
-                                const match = tag.comment.match(/^derivation ([^<]*) lazy$/);
+                                const match = tag.comment.match(/^derive ([^<]*) lazy$/);
                                 if (match) {
                                     const [, typeTag] = match;
                                     if (tags.has(typeTag)) {
@@ -32864,7 +32864,7 @@ namespace ts {
                                 forEach(exportSymbol.declarations, (declaration) => {
                                     const statementTags = collectTsPlusDerivationTags(declaration)
                                     for (const tag of statementTags) {
-                                        const match = tag.comment.match(/^derivation ([^<]*)<([^>]*)> (.*)$/);
+                                        const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
                                         if (match) {
                                             const [, typeTag, paramActions, priority] = match;
                                             if (tags.has(typeTag)) {
@@ -32874,7 +32874,7 @@ namespace ts {
                                                 }, Number.parseFloat(priority), getTypeOfNode(declaration), declaration]);
                                             }
                                         } else {
-                                            const match = tag.comment.match(/^derivation ([^<]*) lazy$/);
+                                            const match = tag.comment.match(/^derive ([^<]*) lazy$/);
                                             if (match) {
                                                 const [, typeTag] = match;
                                                 if (tags.has(typeTag)) {
@@ -44863,7 +44863,7 @@ namespace ts {
         function collectTsPlusDerivationTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
-                (tag): tag is TsPlusJSDocDerivationTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("derivation")
+                (tag): tag is TsPlusJSDocDerivationTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("derive")
             );
         }
         function collectTsPlusFluentTags(statement: Declaration) {

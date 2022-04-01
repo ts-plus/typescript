@@ -13,7 +13,7 @@ export class Guard<A> {
 //
 
 /**
- * @tsplus derivation Guard lazy
+ * @tsplus derive Guard lazy
  */
 export declare function deriveGuardLazy<A>(
     ...args: [
@@ -26,7 +26,7 @@ export declare function deriveGuardLazy<A>(
 //
 
 /**
- * @tsplus derivation Guard<_> 10
+ * @tsplus derive Guard<_> 10
  */
 export declare function deriveGuardLiteral<A extends string | number>(
     ...args: IsUnion<A> extends false ? [
@@ -35,7 +35,7 @@ export declare function deriveGuardLiteral<A extends string | number>(
 ): Guard<A>
 
 /**
- * @tsplus derivation Guard<_> 10
+ * @tsplus derive Guard<_> 10
  */
 export declare function deriveGuardMaybe<A extends Maybe<any>>(
     ...args: [A] extends [Maybe<infer _A>]
@@ -44,7 +44,7 @@ export declare function deriveGuardMaybe<A extends Maybe<any>>(
 ): Guard<A>
 
 /**
- * @tsplus derivation Guard<_> 10
+ * @tsplus derive Guard<_> 10
  */
 export declare function deriveGuardArray<A extends Array<any>>(
     ...args: [A] extends [Array<infer _A>] ? [Array<_A>] extends [A] ? [
@@ -57,7 +57,7 @@ export declare function deriveGuardArray<A extends Array<any>>(
 //
 
 /**
- * @tsplus derivation Guard<&> 20
+ * @tsplus derive Guard<&> 20
  */
 export declare function deriveGuardIntersection<A extends unknown[]>(
     ...args: {
@@ -66,7 +66,7 @@ export declare function deriveGuardIntersection<A extends unknown[]>(
 ): Guard<UnionToIntersection<A[number]>>
 
 /**
- * @tsplus derivation Guard<_> 20
+ * @tsplus derive Guard<_> 20
  */
 export declare function deriveGuardStruct<A extends Record<string, any>>(
     ...args: keyof A extends string ? IsUnion<A> extends false ? [
@@ -84,7 +84,7 @@ export declare function deriveGuardStruct<A extends Record<string, any>>(
 //
 
 /**
- * @tsplus derivation Guard<|> 30
+ * @tsplus derive Guard<|> 30
  */
 export declare function deriveGuardUnion<A extends unknown[]>(
     ...args: {

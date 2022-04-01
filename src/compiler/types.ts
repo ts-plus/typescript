@@ -3284,7 +3284,7 @@ namespace ts {
     export interface TsPlusJSDocDerivationTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
-        readonly comment: `derivation ${string}`
+        readonly comment: `derive ${string}`
     }
     
     export interface TsPlusJSDocImplicitTag extends JSDocTag {
