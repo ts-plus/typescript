@@ -32962,6 +32962,21 @@ namespace ts {
                     return type;
                 }
             }
+            if (diagnostics.length === 0 && !hasRules && (type.flags & TypeFlags.Intersection)) {
+                const props = (type as IntersectionType).types;
+                const canIntersect = !find(props, (p) => {
+                    if ((p.flags & TypeFlags.Object) && getSignaturesOfType(p, SignatureKind.Call).length === 0 && getSignaturesOfType(p, SignatureKind.Construct).length === 0 && !isArrayOrTupleLikeType(p)) {
+                        return false
+                    }
+                    return true
+                })
+                if (canIntersect) {
+                    const derivations = map(props, (prop) => deriveTypeWorker(location, originalType, prop, diagnostics, derivationScope, prohibited, newCurrentDerivation));
+                    if (!find(derivations, isErrorType)) {
+                        return type;
+                    }
+                }
+            }
             if (diagnostics.length === 0 && !hasRules && (type.flags & TypeFlags.Object)) {
                 const call = getSignaturesOfType(type, SignatureKind.Call);
                 const construct = getSignaturesOfType(type, SignatureKind.Construct);

@@ -1,6 +1,6 @@
 import { Show } from "./show"
 import { Derive } from "./types"
-import {} from "./guard"
+import { } from "./guard"
 
 //
 // Usage
@@ -29,6 +29,7 @@ export interface User {
 export const showPerson = Derive<Show<User>>()
 
 export const ok = Derive<{
-    t: { c: [0, 1], a: 0, b: 0 }
+    t: { c: [0, 1] } & { a: 0, b: 0 }
+    z: {} & {}
     a: Show<{ x: [0] }>
 }>()
