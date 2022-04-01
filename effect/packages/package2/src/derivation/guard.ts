@@ -13,84 +13,84 @@ export class Guard<A> {
 //
 
 /**
- * @tsplus rule Guard 0 lazy
+ * @tsplus derivation Guard lazy
  */
-export declare function deriveGuardLazy<Type>(
+export declare function deriveGuardLazy<A>(
     ...args: [
-        fn: (_: Guard<Type>) => Guard<Type>
+        fn: (_: Guard<A>) => Guard<A>
     ]
-): Guard<Type>
+): Guard<A>
 
 //
 // High Priority
 //
 
 /**
- * @tsplus rule Guard 10 custom
+ * @tsplus derivation Guard<_> 10
  */
-export declare function deriveGuardLiteral<Type extends string | number>(
-    ...args: IsUnion<Type> extends false ? [
-        value: Type
+export declare function deriveGuardLiteral<A extends string | number>(
+    ...args: IsUnion<A> extends false ? [
+        value: A
     ] : never
-): Guard<Type>
+): Guard<A>
 
 /**
- * @tsplus rule Guard 10 custom
+ * @tsplus derivation Guard<_> 10
  */
-export declare function deriveGuardMaybe<Type extends Maybe<any>>(
-    ...args: [Type] extends [Maybe<infer A>]
-        ? [element: Guard<A>]
+export declare function deriveGuardMaybe<A extends Maybe<any>>(
+    ...args: [A] extends [Maybe<infer _A>]
+        ? [element: Guard<_A>]
         : never
-): Guard<Type>
+): Guard<A>
 
 /**
- * @tsplus rule Guard 10 custom
+ * @tsplus derivation Guard<_> 10
  */
-export declare function deriveGuardArray<Type extends Array<any>>(
-    ...args: [Type] extends [Array<infer A>] ? [Array<A>] extends [Type] ? [
-        element: Guard<A>
+export declare function deriveGuardArray<A extends Array<any>>(
+    ...args: [A] extends [Array<infer _A>] ? [Array<_A>] extends [A] ? [
+        element: Guard<_A>
     ] : never : never
-): Guard<Type>
+): Guard<A>
 
 //
 // Mid Priority
 //
 
 /**
- * @tsplus rule Guard 20 intersection
+ * @tsplus derivation Guard<&> 20
  */
-export declare function deriveGuardIntersection<Types extends unknown[]>(
+export declare function deriveGuardIntersection<A extends unknown[]>(
     ...args: {
-        [k in keyof Types]: Guard<Types[k]>
+        [k in keyof A]: Guard<A[k]>
     }
-): Guard<UnionToIntersection<Types[number]>>
+): Guard<UnionToIntersection<A[number]>>
 
 /**
- * @tsplus rule Guard 20 custom
+ * @tsplus derivation Guard<_> 20
  */
-export declare function deriveGuardStruct<Type extends Record<string, any>>(
-    ...args: keyof Type extends string ? IsUnion<Type> extends false ? [
+export declare function deriveGuardStruct<A extends Record<string, any>>(
+    ...args: keyof A extends string ? IsUnion<A> extends false ? [
         requiredFields: {
-            [k in RequiredKeys<Type>]: Guard<Type[k]>
+            [k in RequiredKeys<A>]: Guard<A[k]>
         },
         optionalFields: {
-            [k in OptionalKeys<Type>]: Guard<NonNullable<Type[k]>>
+            [k in OptionalKeys<A>]: Guard<NonNullable<A[k]>>
         }
     ] : never : never
-): Guard<Type>
+): Guard<A>
 
 //
 // Low priority
 //
 
 /**
- * @tsplus rule Guard 30 union
+ * @tsplus derivation Guard<|> 30
  */
-export declare function deriveGuardUnion<Types extends unknown[]>(
+export declare function deriveGuardUnion<A extends unknown[]>(
     ...args: {
-        [k in keyof Types]: Guard<Types[k]>
+        [k in keyof A]: Guard<A[k]>
     }
-): Guard<Types[number]>
+): Guard<A[number]>
 
 //
 // Implicits

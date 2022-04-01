@@ -37,7 +37,7 @@ export interface User {
 /**
  * @tsplus implicit
  */
-export const showPerson = Derive<Show<User>>()
+export const showPerson = Derive<Show<Person>>()
 
 interface Ok {
     t: {

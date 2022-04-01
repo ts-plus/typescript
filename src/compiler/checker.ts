@@ -32816,18 +32816,38 @@ namespace ts {
             return implicits;
         }
 
+        interface Rule {
+            typeTag: string
+            paramActions: string[]
+        }
+
         function findRulesForTags(location: Node, tags: Set<string>) {
-            const rules: [string, number, Type, Declaration][] = []
+            const rules: [Rule, number, Type, Declaration][] = []
+            let lazyRule: Declaration | undefined
             const sourceFile = getSourceFileOfNode(location);
             const exports = sourceFile.symbol.exports;
             if (exports) {
                 exports.forEach((exportSymbol) => {
                     forEach(exportSymbol.declarations, (declaration) => {
-                        const statementTags = collectTsPlusRuleTags(declaration)
+                        const statementTags = collectTsPlusDerivationTags(declaration)
                         for (const tag of statementTags) {
-                            const [, targetTag, priority, ...rest] = tag.comment.split(" ")
-                            if (tags.has(targetTag)) {
-                                rules.push([rest.join(" "), Number.parseFloat(priority), getTypeOfNode(declaration), declaration]);
+                            const match = tag.comment.match(/^derivation ([^<]*)<([^>]*)> (.*)$/);
+                            if (match) {
+                                const [, typeTag, paramActions, priority] = match;
+                                if (tags.has(typeTag)) {
+                                    rules.push([{
+                                        typeTag,
+                                        paramActions: paramActions.split(",").map((s) => s.trim())
+                                    }, Number.parseFloat(priority), getTypeOfNode(declaration), declaration]);
+                                }
+                            } else {
+                                const match = tag.comment.match(/^derivation ([^<]*) lazy$/);
+                                if (match) {
+                                    const [, typeTag] = match;
+                                    if (tags.has(typeTag)) {
+                                        lazyRule = declaration
+                                    }
+                                }
                             }
                         }
                     })
@@ -32842,11 +32862,25 @@ namespace ts {
                             const exportsOfModule = getExportsOfModule(sourceOfModule.symbol);
                             exportsOfModule.forEach((exportSymbol) => {
                                 forEach(exportSymbol.declarations, (declaration) => {
-                                    const statementTags = collectTsPlusRuleTags(declaration)
+                                    const statementTags = collectTsPlusDerivationTags(declaration)
                                     for (const tag of statementTags) {
-                                        const [, targetTag, priority, ...rest] = tag.comment.split(" ")
-                                        if (tags.has(targetTag)) {
-                                            rules.push([rest.join(" "), Number.parseFloat(priority), getTypeOfNode(declaration), declaration]);
+                                        const match = tag.comment.match(/^derivation ([^<]*)<([^>]*)> (.*)$/);
+                                        if (match) {
+                                            const [, typeTag, paramActions, priority] = match;
+                                            if (tags.has(typeTag)) {
+                                                rules.push([{
+                                                    typeTag,
+                                                    paramActions: paramActions.split(",").map((s) => s.trim())
+                                                }, Number.parseFloat(priority), getTypeOfNode(declaration), declaration]);
+                                            }
+                                        } else {
+                                            const match = tag.comment.match(/^derivation ([^<]*) lazy$/);
+                                            if (match) {
+                                                const [, typeTag] = match;
+                                                if (tags.has(typeTag)) {
+                                                    lazyRule = declaration
+                                                }
+                                            }
                                         }
                                     }
                                 })
@@ -32855,7 +32889,7 @@ namespace ts {
                     }
                 }
             })
-            return rules;
+            return { rules, lazyRule };
         }
 
         function deriveTypeWorker(
@@ -32925,24 +32959,56 @@ namespace ts {
                 }
             }
             let hasRules = false;
-            if ("resolvedTypeArguments" in type && !isTupleType(type) && (type as TypeReference).resolvedTypeArguments!.length === 1 && type.symbol && type.symbol.declarations) {
+            if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
                 const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
-                const rules = findRulesForTags(location, tags).sort((a, b) => a[1] - b[1]);
-                const targetType = (type as TypeReference).resolvedTypeArguments![0];
-                const lazyRule = find(rules, ([rule]) => rule.startsWith("lazy"));
-                const supportsLazy = !!lazyRule;
+                const foundRules = findRulesForTags(location, tags);
+                const rules = foundRules.rules.sort((a, b) => a[1] - b[1]);
+                const targetTypes = (type as TypeReference).resolvedTypeArguments!;
+                const supportsLazy = !!foundRules.lazyRule;
                 const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
                 if (rules.length > 0) {
                     hasRules =  true;
                 }
-                for (const [rule, _, ruleType, ruleDeclaration] of rules) {
-                    if (rule === "custom" || (rule === "tuple" && isTupleType(targetType))) {
-                        const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
-                        for (const signature of signatures) {
-                            const typeParam = signature.typeParameters![0];
-                            const constraint = getConstraintOfTypeParameter(typeParam);
-                            if (!constraint || isTypeAssignableTo(targetType, constraint)) {
-                                const instantiated = getSignatureInstantiation(signature, [targetType], false);
+                ruleCheck: for (const [rule, _, ruleType, ruleDeclaration] of rules) {
+                    const toCheck: Type[] = [];
+                    if (rule.paramActions.length !== targetTypes.length) {
+                        continue ruleCheck;
+                    }
+                    let index = 0;
+                    for (const paramAction of rule.paramActions) {
+                        if (paramAction === "_") {
+                            toCheck.push(targetTypes[index])
+                        } else if (paramAction === "[]") {
+                            toCheck.push(targetTypes[index])
+                        } else if (paramAction === "|") {
+                            if (targetTypes[index].flags & TypeFlags.Union) {
+                                const typesInUnion = (targetTypes[index] as UnionType).types;
+                                const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
+                                toCheck.push(typesInUnionTuple)
+                            }
+                        } else if (paramAction === "&") {
+                            if (targetTypes[index].flags & TypeFlags.Intersection) {
+                                const typesInUnion = (targetTypes[index] as IntersectionType).types;
+                                const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
+                                toCheck.push(typesInUnionTuple)
+                            }
+                        }
+                        index++;
+                    }
+                    if (toCheck.length !== targetTypes.length) {
+                        continue ruleCheck;
+                    }
+                    const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
+                    for (const signature of signatures) {
+                        if (signature.typeParameters && signature.typeParameters.length === toCheck.length) {
+                            if (every(signature.typeParameters, (param, i) => {
+                                const constraint = getConstraintOfTypeParameter(param);
+                                if (!constraint) {
+                                    return true;
+                                }
+                                return isTypeAssignableTo(toCheck[i], constraint);
+                            })) {
+                                const instantiated = getSignatureInstantiation(signature, toCheck, false);
                                 if (instantiated.parameters.length === 1 &&
                                     instantiated.parameters[0].valueDeclaration &&
                                     (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
@@ -32956,7 +33022,7 @@ namespace ts {
                                             rule: ruleDeclaration,
                                             arguments: [],
                                             usedBy: [],
-                                            lazyRule: lazyRule?.[3]
+                                            lazyRule: foundRules.lazyRule
                                         };
                                         const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
                                         const derivations = map(types, (childType) => deriveTypeWorker(
@@ -32978,51 +33044,8 @@ namespace ts {
                             }
                         }
                     }
-                    if (rule === "union" && (targetType.flags & TypeFlags.Union)) {
-                        const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
-                        for (const signature of signatures) {
-                            const typeParam = signature.typeParameters![0];
-                            const constraint = getConstraintOfTypeParameter(typeParam);
-                            const typesInUnion = (targetType as UnionType).types;
-                            const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
-                            if (!constraint || isTypeAssignableTo(typesInUnionTuple, constraint)) {
-                                const instantiated = getSignatureInstantiation(signature, [typesInUnionTuple], false);
-                                if (instantiated.parameters.length === 1 &&
-                                    instantiated.parameters[0].valueDeclaration &&
-                                    (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
-                                ) {
-                                    const residualType = getTypeOfSymbol(instantiated.parameters[0]);
-                                    if (isTupleType(residualType)) {
-                                        const types = getTypeArguments(residualType);
-                                        const selfRule: FromRule = {
-                                            _tag: "FromRule",
-                                            type,
-                                            rule: ruleDeclaration,
-                                            arguments: [],
-                                            usedBy: [],
-                                            lazyRule: lazyRule?.[3]
-                                        };
-                                        const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
-                                        const derivations = map(types, (childType) => deriveTypeWorker(
-                                            location,
-                                            originalType,
-                                            childType,
-                                            diagnostics,
-                                            implicitScope,
-                                            newDerivationScope,
-                                            newProhibited,
-                                            newCurrentDerivation
-                                        ));
-                                        if (!find(derivations, (d) => isErrorType(d.type))) {
-                                            return selfRule;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
                     if (diagnostics.length > 0) {
-                        break
+                        break ruleCheck;
                     }
                 }
             }
@@ -44837,10 +44860,10 @@ namespace ts {
                 (tag): tag is TsPlusJSDocImplicitTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("implicit")
             );
         }
-        function collectTsPlusRuleTags(statement: Declaration) {
+        function collectTsPlusDerivationTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
-                (tag): tag is TsPlusJSDocRuleTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("rule")
+                (tag): tag is TsPlusJSDocDerivationTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("derivation")
             );
         }
         function collectTsPlusFluentTags(statement: Declaration) {
