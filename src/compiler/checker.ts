@@ -32809,7 +32809,7 @@ namespace ts {
                         location.arguments[0],
                         Diagnostics.Deriving_type_0_1,
                         typeToString(derivation.type),
-                        `intrinsically as a literal ${typeof derivation.value} (${derivation.value})`
+                        `intrinsically as a literal ${typeof derivation.value}`
                     )
                 }
                 case "FromPriorDerivation": {
@@ -32844,16 +32844,16 @@ namespace ts {
             if (!nodeLinks.tsPlusDerivation) {
                 const derivationDiagnostics: Diagnostic[] = [];
                 const derivation = deriveTypeWorker(deriveCallNode, type, type, derivationDiagnostics, getImplicitScope(deriveCallNode), [], [], []);
+                nodeLinks.tsPlusDerivation = derivation;
                 if (isErrorType(derivation.type)) {
                     derivationDiagnostics.forEach((diagnostic) => {
                         diagnostics.add(diagnostic);
                     })
+                    return errorType;
+                } else if (deriveCallNode.arguments.length > 0) {
+                    diagnostics.add(getDerivationDebugDiagnostic(deriveCallNode, nodeLinks.tsPlusDerivation));
+                    return errorType;
                 }
-                nodeLinks.tsPlusDerivation = derivation;
-            }
-            if (deriveCallNode.arguments.length > 0 && !isErrorType(nodeLinks.tsPlusDerivation.type)) {
-                diagnostics.add(getDerivationDebugDiagnostic(deriveCallNode, nodeLinks.tsPlusDerivation));
-                return errorType;
             }
             return nodeLinks.tsPlusDerivation.type;
         }
