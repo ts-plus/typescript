@@ -32869,120 +32869,108 @@ namespace ts {
         }
 
         function getImplicitScope(location: Node) {
-            const implicits: [Type, Declaration, boolean][] = []
-            const selfExport = getSelfExportStatement(location);
-            const sourceFile = getSourceFileOfNode(location);
-            const exports = sourceFile.symbol.exports;
-            if (exports) {
-                exports.forEach((exportSymbol) => {
-                    forEach(exportSymbol.declarations, (declaration) => {
-                        if (getSelfExportStatement(declaration) !== selfExport) {
-                            const tags = collectTsPlusImplicitTags(declaration)
-                            if (tags.length > 0) {
-                                implicits.push([getTypeOfNode(declaration), declaration, true])
-                            }
-                        }
-                    })
-                })
-            }
-            sourceFile.imports.forEach((token) => {
-                if (sourceFile.resolvedModules) {
-                    const resolvedFull = sourceFile.resolvedModules.get(token.text, void 0);
-                    if (resolvedFull && resolvedFull) {
-                        const sourceOfModule = host.getSourceFile(resolvedFull.resolvedFileName);
-                        if (sourceOfModule) {
-                            const exportsOfModule = getExportsOfModule(sourceOfModule.symbol);
-                            exportsOfModule.forEach((exportSymbol) => {
-                                forEach(exportSymbol.declarations, (declaration) => {
-                                    if (getSelfExportStatement(declaration) !== selfExport) {
-                                        const tags = collectTsPlusImplicitTags(declaration)
-                                        if (tags.length > 0) {
-                                            implicits.push([getTypeOfNode(declaration), declaration, false])
+            const nodeLinks = getNodeLinks(getSourceFileOfNode(location));
+            if (!nodeLinks.tsPlusImplicitScope) {
+                if (!nodeLinks.tsPlusDerivationRules) {
+                    nodeLinks.tsPlusDerivationRules = new Map();
+                } else {
+                    nodeLinks.tsPlusDerivationRules.clear();
+                }
+                const derivationRules = nodeLinks.tsPlusDerivationRules!;
+                const implicits: [Type, Declaration, boolean][] = [];
+                const selfExport = getSelfExportStatement(location);
+                const sourceFile = getSourceFileOfNode(location);
+                const exports = sourceFile.symbol.exports;
+                if (exports) {
+                    exports.forEach((exportSymbol) => {
+                        forEach(exportSymbol.declarations, (declaration) => {
+                            if (getSelfExportStatement(declaration) !== selfExport) {
+                                const implicitTags = collectTsPlusImplicitTags(declaration)
+                                if (implicitTags.length > 0) {
+                                    implicits.push([getTypeOfNode(declaration), declaration, true])
+                                }
+                                const deriveTags = collectTsPlusDerivationTags(declaration)
+                                for (const tag of deriveTags) {
+                                    const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
+                                    if (match) {
+                                        const [, typeTag, paramActions, priority] = match;
+                                        if (!derivationRules.has(typeTag)) {
+                                            derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
+                                        }
+                                        derivationRules.get(typeTag)?.rules.push([
+                                            { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) }, 
+                                            Number.parseFloat(priority),
+                                            getTypeOfNode(declaration),
+                                            declaration
+                                        ])
+                                    } else {
+                                        const match = tag.comment.match(/^derive ([^<]*) lazy$/);
+                                        if (match) {
+                                            const [, typeTag] = match;
+                                            if (!derivationRules.has(typeTag)) {
+                                                derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
+                                            }
+                                            derivationRules.get(typeTag)!.lazyRule = declaration;
                                         }
                                     }
-                                })
-                            })
-                        }
-                    }
-                }
-            })
-            return implicits;
-        }
-
-        interface Rule {
-            typeTag: string
-            paramActions: string[]
-        }
-
-        function findRulesForTags(location: Node, tags: Set<string>) {
-            const rules: [Rule, number, Type, Declaration][] = []
-            let lazyRule: Declaration | undefined
-            const sourceFile = getSourceFileOfNode(location);
-            const exports = sourceFile.symbol.exports;
-            if (exports) {
-                exports.forEach((exportSymbol) => {
-                    forEach(exportSymbol.declarations, (declaration) => {
-                        const statementTags = collectTsPlusDerivationTags(declaration)
-                        for (const tag of statementTags) {
-                            const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
-                            if (match) {
-                                const [, typeTag, paramActions, priority] = match;
-                                if (tags.has(typeTag)) {
-                                    rules.push([{
-                                        typeTag,
-                                        paramActions: paramActions.split(",").map((s) => s.trim())
-                                    }, Number.parseFloat(priority), getTypeOfNode(declaration), declaration]);
-                                }
-                            } else {
-                                const match = tag.comment.match(/^derive ([^<]*) lazy$/);
-                                if (match) {
-                                    const [, typeTag] = match;
-                                    if (tags.has(typeTag)) {
-                                        lazyRule = declaration
-                                    }
                                 }
                             }
-                        }
-                    })
-                })
-            }
-            sourceFile.imports.forEach((token) => {
-                if (sourceFile.resolvedModules) {
-                    const resolvedFull = sourceFile.resolvedModules.get(token.text, void 0);
-                    if (resolvedFull && resolvedFull) {
-                        const sourceOfModule = host.getSourceFile(resolvedFull.resolvedFileName);
-                        if (sourceOfModule) {
-                            const exportsOfModule = getExportsOfModule(sourceOfModule.symbol);
-                            exportsOfModule.forEach((exportSymbol) => {
-                                forEach(exportSymbol.declarations, (declaration) => {
-                                    const statementTags = collectTsPlusDerivationTags(declaration)
-                                    for (const tag of statementTags) {
-                                        const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
-                                        if (match) {
-                                            const [, typeTag, paramActions, priority] = match;
-                                            if (tags.has(typeTag)) {
-                                                rules.push([{
-                                                    typeTag,
-                                                    paramActions: paramActions.split(",").map((s) => s.trim())
-                                                }, Number.parseFloat(priority), getTypeOfNode(declaration), declaration]);
+                        })
+                    });
+                }
+                sourceFile.imports.forEach((token) => {
+                    if (sourceFile.resolvedModules) {
+                        const resolvedFull = sourceFile.resolvedModules.get(token.text, void 0);
+                        if (resolvedFull && resolvedFull) {
+                            const sourceOfModule = host.getSourceFile(resolvedFull.resolvedFileName);
+                            if (sourceOfModule) {
+                                const exportsOfModule = getExportsOfModule(sourceOfModule.symbol);
+                                exportsOfModule.forEach((exportSymbol) => {
+                                    forEach(exportSymbol.declarations, (declaration) => {
+                                        if (getSelfExportStatement(declaration) !== selfExport) {
+                                            const implicitTags = collectTsPlusImplicitTags(declaration)
+                                            if (implicitTags.length > 0) {
+                                                implicits.push([getTypeOfNode(declaration), declaration, false])
                                             }
-                                        } else {
-                                            const match = tag.comment.match(/^derive ([^<]*) lazy$/);
-                                            if (match) {
-                                                const [, typeTag] = match;
-                                                if (tags.has(typeTag)) {
-                                                    lazyRule = declaration
+                                            const deriveTags = collectTsPlusDerivationTags(declaration)
+                                            for (const tag of deriveTags) {
+                                                const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
+                                                if (match) {
+                                                    const [, typeTag, paramActions, priority] = match;
+                                                    if (!derivationRules.has(typeTag)) {
+                                                        derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
+                                                    }
+                                                    derivationRules.get(typeTag)!.rules.push([
+                                                        { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) }, 
+                                                        Number.parseFloat(priority),
+                                                        getTypeOfNode(declaration),
+                                                        declaration
+                                                    ])
+                                                } else {
+                                                    const match = tag.comment.match(/^derive ([^<]*) lazy$/);
+                                                    if (match) {
+                                                        const [, typeTag] = match;
+                                                        if (!derivationRules.has(typeTag)) {
+                                                            derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
+                                                        }
+                                                        derivationRules.get(typeTag)!.lazyRule = declaration;
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
+                                    })
                                 })
-                            })
+                            }
                         }
                     }
-                }
-            })
-            return { rules, lazyRule };
+                });
+                nodeLinks.tsPlusImplicitScope = implicits;
+            }
+            return nodeLinks.tsPlusImplicitScope;
+        }
+
+        function findRulesForTag(location: Node, tag: string) {
+            return getNodeLinks(getSourceFileOfNode(location)).tsPlusDerivationRules?.get(tag)
         }
 
         function deriveTypeWorker(
@@ -33054,102 +33042,107 @@ namespace ts {
             let hasRules = false;
             if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
                 const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
-                const foundRules = findRulesForTags(location, tags);
-                const rules = foundRules.rules.sort((a, b) => a[1] - b[1]);
-                const targetTypes = (type as TypeReference).resolvedTypeArguments!;
-                const supportsLazy = !!foundRules.lazyRule;
-                const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
-                if (rules.length > 0) {
-                    hasRules =  true;
-                }
-                ruleCheck: for (const [rule, _, ruleType, ruleDeclaration] of rules) {
-                    const toCheck: Type[] = [];
-                    if (rule.paramActions.length !== targetTypes.length) {
-                        continue ruleCheck;
+                tagCheck: for (const tag of arrayFrom(tags.values())) {
+                    const foundRules = findRulesForTag(location, tag);
+                    if (!foundRules) {
+                        continue tagCheck;
                     }
-                    let index = 0;
-                    for (const paramAction of rule.paramActions) {
-                        if (paramAction === "_") {
-                            toCheck.push(targetTypes[index])
-                        } else if (paramAction === "[]") {
-                            if (isTupleType(targetTypes[index])) {
-                                toCheck.push(targetTypes[index])
-                            } else {
-                                continue ruleCheck;
-                            }
-                        } else if (paramAction === "|") {
-                            if (targetTypes[index].flags & TypeFlags.Union) {
-                                const typesInUnion = (targetTypes[index] as UnionType).types;
-                                const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
-                                toCheck.push(typesInUnionTuple)
-                            } else {
-                                continue ruleCheck;
-                            }
-                        } else if (paramAction === "&") {
-                            if (targetTypes[index].flags & TypeFlags.Intersection) {
-                                const typesInUnion = (targetTypes[index] as IntersectionType).types;
-                                const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
-                                toCheck.push(typesInUnionTuple)
-                            } else {
-                                continue ruleCheck;
-                            }
-                        } else {
+                    const rules = foundRules.rules.sort((a, b) => a[1] - b[1]);
+                    const supportsLazy = !!foundRules.lazyRule;
+                    const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
+                    const targetTypes = (type as TypeReference).resolvedTypeArguments!;
+                    if (rules.length > 0) {
+                        hasRules =  true;
+                    }
+                    ruleCheck: for (const [rule, _, ruleType, ruleDeclaration] of rules) {
+                        const toCheck: Type[] = [];
+                        if (rule.paramActions.length !== targetTypes.length) {
                             continue ruleCheck;
                         }
-                        index++;
-                    }
-                    if (toCheck.length !== targetTypes.length) {
-                        continue ruleCheck;
-                    }
-                    const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
-                    for (const signature of signatures) {
-                        if (signature.typeParameters && signature.typeParameters.length === toCheck.length) {
-                            const mapper = createTypeMapper(signature.typeParameters, toCheck);
-                            if (every(signature.typeParameters, (param, i) => {
-                                const constraint = instantiateType(getConstraintOfTypeParameter(param), mapper);
-                                if (!constraint) {
-                                    return true;
+                        let index = 0;
+                        for (const paramAction of rule.paramActions) {
+                            if (paramAction === "_") {
+                                toCheck.push(targetTypes[index])
+                            } else if (paramAction === "[]") {
+                                if (isTupleType(targetTypes[index])) {
+                                    toCheck.push(targetTypes[index])
+                                } else {
+                                    continue ruleCheck;
                                 }
-                                return isTypeAssignableTo(toCheck[i], constraint);
-                            })) {
-                                const instantiated = getSignatureInstantiation(signature, toCheck, false);
-                                if (instantiated.parameters.length === 1 &&
-                                    instantiated.parameters[0].valueDeclaration &&
-                                    (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
-                                ) {
-                                    const residualType = getTypeOfSymbol(instantiated.parameters[0]);
-                                    if (isTupleType(residualType)) {
-                                        const types = getTypeArguments(residualType);
-                                        const selfRule: FromRule = {
-                                            _tag: "FromRule",
-                                            type,
-                                            rule: ruleDeclaration,
-                                            arguments: [],
-                                            usedBy: [],
-                                            lazyRule: foundRules.lazyRule
-                                        };
-                                        const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
-                                        const derivations = map(types, (childType) => deriveTypeWorker(
-                                            location,
-                                            originalType,
-                                            childType,
-                                            diagnostics,
-                                            implicitScope,
-                                            newDerivationScope,
-                                            newProhibited,
-                                            newCurrentDerivation
-                                        ));
-                                        if (!find(derivations, (d) => isErrorType(d.type))) {
-                                            selfRule.arguments.push(...derivations);
-                                            return selfRule;
+                            } else if (paramAction === "|") {
+                                if (targetTypes[index].flags & TypeFlags.Union) {
+                                    const typesInUnion = (targetTypes[index] as UnionType).types;
+                                    const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
+                                    toCheck.push(typesInUnionTuple)
+                                } else {
+                                    continue ruleCheck;
+                                }
+                            } else if (paramAction === "&") {
+                                if (targetTypes[index].flags & TypeFlags.Intersection) {
+                                    const typesInUnion = (targetTypes[index] as IntersectionType).types;
+                                    const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
+                                    toCheck.push(typesInUnionTuple)
+                                } else {
+                                    continue ruleCheck;
+                                }
+                            } else {
+                                continue ruleCheck;
+                            }
+                            index++;
+                        }
+                        if (toCheck.length !== targetTypes.length) {
+                            continue ruleCheck;
+                        }
+                        const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
+                        for (const signature of signatures) {
+                            if (signature.typeParameters && signature.typeParameters.length === toCheck.length) {
+                                const mapper = createTypeMapper(signature.typeParameters, toCheck);
+                                if (every(signature.typeParameters, (param, i) => {
+                                    const constraint = instantiateType(getConstraintOfTypeParameter(param), mapper);
+                                    if (!constraint) {
+                                        return true;
+                                    }
+                                    return isTypeAssignableTo(toCheck[i], constraint);
+                                })) {
+                                    const instantiated = getSignatureInstantiation(signature, toCheck, false);
+                                    if (instantiated.parameters.length === 1 &&
+                                        instantiated.parameters[0].valueDeclaration &&
+                                        (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
+                                    ) {
+                                        const residualType = getTypeOfSymbol(instantiated.parameters[0]);
+                                        if (isTupleType(residualType)) {
+                                            const types = getTypeArguments(residualType);
+                                            const selfRule: FromRule = {
+                                                _tag: "FromRule",
+                                                type,
+                                                rule: ruleDeclaration,
+                                                arguments: [],
+                                                usedBy: [],
+                                                lazyRule: foundRules.lazyRule
+                                            };
+                                            const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
+                                            const derivations = map(types, (childType) => deriveTypeWorker(
+                                                location,
+                                                originalType,
+                                                childType,
+                                                diagnostics,
+                                                implicitScope,
+                                                newDerivationScope,
+                                                newProhibited,
+                                                newCurrentDerivation
+                                            ));
+                                            if (!find(derivations, (d) => isErrorType(d.type))) {
+                                                selfRule.arguments.push(...derivations);
+                                                return selfRule;
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                    if (diagnostics.length > 0) {
-                        break ruleCheck;
+                        if (diagnostics.length > 0) {
+                            break tagCheck;
+                        }
                     }
                 }
             }

@@ -16,6 +16,11 @@ export interface Personal {
 
 export type ClientType = Business | Personal
 
+/**
+ * @tsplus implicit
+ */
+export const showClientType: Show<ClientType> = Derive()
+
 export interface Person {
     readonly tag: "Person"
     readonly gender: "M" | "F" | "NB" | "NA"
@@ -28,16 +33,16 @@ export interface Person {
     readonly isUkResident: boolean
 }
 
+/**
+ * @tsplus implicit
+ */
+export const showPerson: Show<Person> = Derive()
+
 export interface User {
     readonly id: string
     readonly owner: Person
     readonly clientType: ClientType
 }
-
-/**
- * @tsplus implicit
- */
-export const showPerson: Show<Person> = Derive()
 
 /**
  * @tsplus implicit

@@ -5397,6 +5397,11 @@ namespace ts {
         InCheckIdentifier                        = 0x10000000,
     }
 
+    export interface Rule {
+        typeTag: string
+        paramActions: string[]
+    }
+
     /* @internal */
     export interface NodeLinks {
         flags: NodeCheckFlags;              // Set of flags specific to Node
@@ -5435,6 +5440,8 @@ namespace ts {
         tsPlusResolvedType?: Type;
         tsPlusGlobalIdentifier?: Symbol;
         tsPlusDerivation?: Derivation
+        tsPlusImplicitScope?: [Type, Declaration, boolean][]
+        tsPlusDerivationRules?: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration][] }>
         isFluent?: true;
         isFluentCall?: true;
         // TSPLUS EXTENSION END
