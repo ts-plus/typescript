@@ -43,6 +43,10 @@ export declare function deriveRefinementLiteralNumber<A, B extends A & number>(
     ] : never
 ): Refinement<A, B>
 
+//
+// Mid priority
+//
+
 /**
  * @tsplus derive Refinement<_, |> 20
  */
@@ -75,11 +79,22 @@ export declare function deriveRefinementStruct<A, B extends Record<string, any> 
     ] : never : never
 ): Refinement<A, B>
 
+//
+// Low priority
+//
+
 /**
  * @tsplus derive Refinement<_, _> 30
  */
 export declare function deriveRefinementFromGuard<A, B extends A>(
-    ...args: [guard: Guard<B>]
+    ...args: unknown extends A ? [guard: Guard<B>] : never
+): Refinement<A, B>
+
+/**
+ * @tsplus derive Refinement<_, _> 40
+ */
+export declare function deriveRefinementFromUnknown<A, B extends A>(
+    ...args: [refinement: Refinement<unknown, B>]
 ): Refinement<A, B>
 
 //
