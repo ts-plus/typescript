@@ -17,7 +17,7 @@ export type StringIndexedRecord = Record<string, any>
 /**
  * @tsplus macro Derive
  */
-export declare function Derive<A>(): A
+export declare function Derive<A>(explain?: "explain"): A
 
 type EqualsWrapped<T> = T extends infer R & {}
     ? {

@@ -7438,5 +7438,9 @@
     "Failed derivation of type '{0}'.": {
         "category": "Error",
         "code": 60003
+    },
+    "Deriving type '{0}' {1}.": {
+        "category": "Error",
+        "code": 60004
     }
 }

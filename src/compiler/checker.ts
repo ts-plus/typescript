@@ -32750,6 +32750,95 @@ namespace ts {
             }
         }
 
+        function getDerivationDebugDiagnostic(location: CallExpression, derivation: Derivation): Diagnostic {
+            switch(derivation._tag) {
+                case "EmptyObjectDerivation": {
+                    return createError(
+                        location.arguments[0],
+                        Diagnostics.Deriving_type_0_1,
+                        typeToString(derivation.type),
+                        "intrinsically as it is an empty object"
+                    )
+                }
+                case "InvalidDerivation": {
+                    throw new Error("Bug, derivation debug called with InvalidDerivation")
+                }
+                case "FromImplicitScope": {
+                    return createError(
+                        location.arguments[0],
+                        Diagnostics.Deriving_type_0_1,
+                        typeToString(derivation.type),
+                        "implicitly from scope"
+                    )
+                }
+                case "FromIntersectionStructure": {
+                    return createDiagnosticForNodeFromMessageChain(
+                        location.arguments[0],
+                        chainDiagnosticMessages(
+                            derivation.fields.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
+                            Diagnostics.Deriving_type_0_1,
+                            typeToString(derivation.type),
+                            "intrinsically as an intersection"
+                        )
+                    )
+                }
+                case "FromObjectStructure": {
+                    return createDiagnosticForNodeFromMessageChain(
+                        location.arguments[0],
+                        chainDiagnosticMessages(
+                            derivation.fields.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d.value))),
+                            Diagnostics.Deriving_type_0_1,
+                            typeToString(derivation.type),
+                            "intrinsically as an object structure"
+                        )
+                    )
+                }
+                case "FromTupleStructure": {
+                    return createDiagnosticForNodeFromMessageChain(
+                        location.arguments[0],
+                        chainDiagnosticMessages(
+                            derivation.fields.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
+                            Diagnostics.Deriving_type_0_1,
+                            typeToString(derivation.type),
+                            "intrinsically as a tuple structure"
+                        )
+                    )
+                }
+                case "FromLiteral": {
+                    return createError(
+                        location.arguments[0],
+                        Diagnostics.Deriving_type_0_1,
+                        typeToString(derivation.type),
+                        `intrinsically as a literal ${typeof derivation.value} (${derivation.value})`
+                    )
+                }
+                case "FromPriorDerivation": {
+                    return createError(
+                        location.arguments[0],
+                        Diagnostics.Deriving_type_0_1,
+                        typeToString(derivation.type),
+                        `from derivation scope`
+                    )
+                }
+                case "FromRule": {
+                    return createDiagnosticForNodeFromMessageChain(
+                        location.arguments[0],
+                        chainDiagnosticMessages(
+                            derivation.arguments.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
+                            Diagnostics.Deriving_type_0_1,
+                            typeToString(derivation.type),
+                            `using rule ${derivation.rule.symbol.escapedName}` + (derivation.usedBy.length > 0 ? " (recursive)" : "")
+                        )
+                    )
+                }
+                default: {
+                    // @ts-expect-error
+                    derivation._tag
+                }
+                throw new Error("Bug, unreachable")
+            }
+        }
+
         function deriveType(deriveCallNode: CallExpression, type: Type): Type {
             const nodeLinks = getNodeLinks(deriveCallNode);
             if (!nodeLinks.tsPlusDerivation) {
@@ -32761,6 +32850,10 @@ namespace ts {
                     })
                 }
                 nodeLinks.tsPlusDerivation = derivation;
+            }
+            if (deriveCallNode.arguments.length > 0 && !isErrorType(nodeLinks.tsPlusDerivation.type)) {
+                diagnostics.add(getDerivationDebugDiagnostic(deriveCallNode, nodeLinks.tsPlusDerivation));
+                return errorType;
             }
             return nodeLinks.tsPlusDerivation.type;
         }
