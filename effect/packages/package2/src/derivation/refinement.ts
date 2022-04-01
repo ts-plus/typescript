@@ -29,32 +29,28 @@ export declare function deriveRefinementLazy<A, B extends A>(
  * @tsplus derive Refinement<_, _> 10
  */
 export declare function deriveRefinementEmptyRecord<A, B extends A>(
-    ...args: TypeEquals<B, {}> extends true ? [] : never
+    ...[]: TypeEquals<B, {}> extends true ? [] : never
 ): Refinement<A, B>
 
 /**
  * @tsplus derive Refinement<_, _> 10
  */
 export declare function deriveRefinementAlwaysTrue<A, B extends A>(
-    ...args: TypeEquals<A, B> extends true ? [] : never
+    ...[]: TypeEquals<A, B> extends true ? [] : never
 ): Refinement<A, B>
 
 /**
  * @tsplus derive Refinement<_, _> 10
  */
 export declare function deriveRefinementLiteralString<A, B extends A & string>(
-    ...args: IsUnion<B> extends false ? string extends B ? never : [
-        value: B
-    ] : never
+    ...[value]: IsUnion<B> extends false ? string extends B ? never : [value: B] : never
 ): Refinement<A, B>
 
 /**
  * @tsplus derive Refinement<_, _> 10
  */
 export declare function deriveRefinementLiteralNumber<A, B extends A & number>(
-    ...args: IsUnion<B> extends false ? number extends B ? never : [
-        value: B
-    ] : never
+    ...[value]: IsUnion<B> extends false ? number extends B ? never : [value: B] : never
 ): Refinement<A, B>
 
 //
@@ -65,7 +61,7 @@ export declare function deriveRefinementLiteralNumber<A, B extends A & number>(
  * @tsplus derive Refinement<_, |> 20
  */
 export declare function deriveRefinementUnion<A, B extends A[]>(
-    ...args: {
+    ...members: {
         [k in keyof B]: B[k] extends A ? Refinement<A, B[k]> : never
     }
 ): Refinement<A, B[number]>
@@ -74,7 +70,7 @@ export declare function deriveRefinementUnion<A, B extends A[]>(
  * @tsplus derive Refinement<_, &> 20
  */
 export declare function deriveRefinementIntersection<A, B extends unknown[]>(
-    ...args: UnionToIntersection<B[number]> extends A ? {
+    ...members: UnionToIntersection<B[number]> extends A ? {
         [k in keyof B]: B[k] extends A ? Refinement<A, B[k]> : never
     } : never
 ): UnionToIntersection<B[number]> extends A ? Refinement<A, UnionToIntersection<B[number]>> : never
@@ -82,8 +78,8 @@ export declare function deriveRefinementIntersection<A, B extends unknown[]>(
 /**
  * @tsplus derive Refinement<_, _> 20
  */
-export function deriveRefinementStruct<A, B extends Record<string, any> & A>(
-    ...[req, opt, obj]: keyof B extends string ? IsUnion<B> extends false ?
+export declare function deriveRefinementStruct<A, B extends Record<string, any> & A>(
+    ...[requiredFields, optionalFields, objectRefinement]: keyof B extends string ? IsUnion<B> extends false ?
         A extends {} ? [
             requiredFields: {
                 [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Guard<B[k]>
@@ -101,12 +97,7 @@ export function deriveRefinementStruct<A, B extends Record<string, any> & A>(
             objectRefinement: Refinement<unknown, {}>
         ]
         : never : never
-): Refinement<A, B> {
-    req;
-    opt;
-    obj;
-    throw new Error("NI");
-}
+): Refinement<A, B>
 
 //
 // Low priority
@@ -116,7 +107,7 @@ export function deriveRefinementStruct<A, B extends Record<string, any> & A>(
  * @tsplus derive Refinement<_, _> 30
  */
 export declare function deriveRefinementFromUnknown<A, B extends A>(
-    ...args: unknown extends A ? never : [guard: Guard<B>]
+    ...[guard]: unknown extends A ? never : [Guard<B>]
 ): Refinement<A, B>
 
 //
