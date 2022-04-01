@@ -52,9 +52,18 @@ export declare function deriveShowStruct<Type extends Record<string, any>>(
 ): Show<Type>
 
 /**
+ * @tsplus rule Show 10 union
+ */
+ export declare function deriveShowLiteralUnion<Types extends unknown[]>(
+    ...args: Types[number] extends string | number ? {
+        [k in keyof Types]: Show<Types[k]>
+    } : never
+): Show<Types[number]>
+
+/**
  * @tsplus rule Show 10 tuple
  */
-export declare function deriveShowUnion<Types extends unknown[]>(
+export declare function deriveShowTuple<Types extends unknown[]>(
     ...args: {
         [k in keyof Types]: Show<Types[k]>
     }
