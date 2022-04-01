@@ -9,70 +9,7 @@ export class Show<A> {
 }
 
 //
-// Low priority
-//
-
-export interface GuardAndShow<A> {
-    guard: Guard<A>
-    show: Show<A>
-}
-
-/**
- * @tsplus rule Show 20 union
- */
-export declare function deriveShowUnion<Types extends unknown[]>(
-    ...args: {
-        [k in keyof Types]: GuardAndShow<Types[k]>
-    }
-): Show<Types[number]>
-
-//
-// Mid Priority
-//
-
-/**
- * @tsplus rule Show 10 intersection
- */
-export declare function deriveShowIntersection<Types extends unknown[]>(
-    ...args: {
-        [k in keyof Types]: Show<Types[k]>
-    }
-): Show<UnionToIntersection<Types[number]>>
-
-/**
- * @tsplus rule Show 10 custom
- */
-export declare function deriveShowStruct<Type extends Record<string, any>>(
-    ...args: keyof Type extends string ? IsUnion<Type> extends false ? [
-        requiredFields: {
-            [k in RequiredKeys<Type>]: Show<Type[k]>
-        },
-        optionalFields: {
-            [k in OptionalKeys<Type>]: Show<NonNullable<Type[k]>>
-        }
-    ] : never : never
-): Show<Type>
-
-/**
- * @tsplus rule Show 10 union
- */
- export declare function deriveShowLiteralUnion<Types extends unknown[]>(
-    ...args: Types[number] extends string | number ? {
-        [k in keyof Types]: Show<Types[k]>
-    } : never
-): Show<Types[number]>
-
-/**
- * @tsplus rule Show 10 tuple
- */
-export declare function deriveShowTuple<Types extends unknown[]>(
-    ...args: {
-        [k in keyof Types]: Show<Types[k]>
-    }
-): Show<Types>
-
-//
-// High Priority
+// Top Priority
 //
 
 /**
@@ -87,8 +24,12 @@ export function deriveShowLazy<Type>(
     return show;
 }
 
+//
+// High Priority
+//
+
 /**
- * @tsplus rule Show 0 custom
+ * @tsplus rule Show 10 custom
  */
 export function deriveShowLiteral<Type extends string | number>(
     ...args: IsUnion<Type> extends false ? [
@@ -100,7 +41,7 @@ export function deriveShowLiteral<Type extends string | number>(
 }
 
 /**
- * @tsplus rule Show 0 custom
+ * @tsplus rule Show 10 custom
  */
 export function deriveShowMaybe<Type extends Maybe<any>>(
     ...args: [Type] extends [Maybe<infer A>]
@@ -111,7 +52,7 @@ export function deriveShowMaybe<Type extends Maybe<any>>(
 }
 
 /**
- * @tsplus rule Show 0 custom
+ * @tsplus rule Show 10 custom
  */
 export function deriveShowArray<Type extends Array<any>>(
     ...args: [Type] extends [Array<infer A>] ? [Array<A>] extends [Type] ? [
@@ -120,6 +61,69 @@ export function deriveShowArray<Type extends Array<any>>(
 ): Show<Type> {
     return new Show((a) => `Array<{${a.map(args[0].show)}}>`)
 }
+
+//
+// Mid Priority
+//
+
+/**
+ * @tsplus rule Show 20 intersection
+ */
+ export declare function deriveShowIntersection<Types extends unknown[]>(
+    ...args: {
+        [k in keyof Types]: Show<Types[k]>
+    }
+): Show<UnionToIntersection<Types[number]>>
+
+/**
+ * @tsplus rule Show 20 custom
+ */
+export declare function deriveShowStruct<Type extends Record<string, any>>(
+    ...args: keyof Type extends string ? IsUnion<Type> extends false ? [
+        requiredFields: {
+            [k in RequiredKeys<Type>]: Show<Type[k]>
+        },
+        optionalFields: {
+            [k in OptionalKeys<Type>]: Show<NonNullable<Type[k]>>
+        }
+    ] : never : never
+): Show<Type>
+
+/**
+ * @tsplus rule Show 20 union
+ */
+export declare function deriveShowLiteralUnion<Types extends unknown[]>(
+    ...args: Types[number] extends string | number ? {
+        [k in keyof Types]: Show<Types[k]>
+    } : never
+): Show<Types[number]>
+
+/**
+ * @tsplus rule Show 20 tuple
+ */
+export declare function deriveShowTuple<Types extends unknown[]>(
+    ...args: {
+        [k in keyof Types]: Show<Types[k]>
+    }
+): Show<Types>
+
+//
+// Low priority
+//
+
+export interface GuardAndShow<A> {
+    guard: Guard<A>
+    show: Show<A>
+}
+
+/**
+ * @tsplus rule Show 30 union
+ */
+export declare function deriveShowUnion<Types extends unknown[]>(
+    ...args: {
+        [k in keyof Types]: GuardAndShow<Types[k]>
+    }
+): Show<Types[number]>
 
 /**
  * @tsplus implicit
