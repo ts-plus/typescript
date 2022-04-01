@@ -37,19 +37,9 @@ export interface User {
 /**
  * @tsplus implicit
  */
-export const showPerson = Derive<Show<User>>()
+export const showPerson: Show<Person> = Derive()
 
-interface Ok {
-    t: {
-        c: [0, 1]
-    } & {
-        a: 0
-        b: 0
-    }
-    z: {} & {}
-    a: Show<{
-        x: [0]
-    }>
-}
-
-export const ok: Ok = Derive()
+/**
+ * @tsplus implicit
+ */
+export const showUser: Show<User> = Derive()
