@@ -32871,7 +32871,8 @@ namespace ts {
             if (isTypeIdenticalTo(type, emptyObjectType)) {
                 return {
                     _tag: "EmptyObjectDerivation",
-                    type
+                    type,
+                    usedBy: []
                 };
             }
             for (const [implicitType, declaration] of implicitScope) {
@@ -32879,17 +32880,21 @@ namespace ts {
                     return {
                         _tag: "FromImplicitScope",
                         type,
-                        implicit: declaration
+                        implicit: declaration,
+                        usedBy: []
                     };
                 }
             }
             for (const derivedType of derivationScope) {
                 if (isTypeIdenticalTo(type, derivedType.type)) {
-                    return {
+                    const rule: FromPriorDerivation = {
                         _tag: "FromPriorDerivation",
                         derivation: derivedType,
-                        type
+                        type,
+                        usedBy: []
                     };
+                    derivedType.usedBy.push(rule);
+                    return rule;
                 }
             }
             const newCurrentDerivation = [...currentDerivation, type];
@@ -32918,7 +32923,8 @@ namespace ts {
                     }
                     return {
                         _tag: "InvalidDerivation",
-                        type: errorType
+                        type: errorType,
+                        usedBy: []
                     };
                 }
             }
@@ -32951,7 +32957,8 @@ namespace ts {
                                             _tag: "FromRule",
                                             type,
                                             rule: ruleDeclaration,
-                                            arguments: []
+                                            arguments: [],
+                                            usedBy: []
                                         };
                                         const newDerivationScope: Derivation[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
                                         const derivations = map(types, (childType) => deriveTypeWorker(
@@ -32993,7 +33000,8 @@ namespace ts {
                                             _tag: "FromRule",
                                             type,
                                             rule: ruleDeclaration,
-                                            arguments: []
+                                            arguments: [],
+                                            usedBy: []
                                         };
                                         const newDerivationScope: Derivation[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
                                         const derivations = map(types, (childType) => deriveTypeWorker(
@@ -33035,7 +33043,8 @@ namespace ts {
                     return {
                         _tag: "FromTupleStructure",
                         type,
-                        fields: derivations
+                        fields: derivations,
+                        usedBy: []
                     };
                 }
             }
@@ -33062,7 +33071,8 @@ namespace ts {
                         return {
                             _tag: "FromIntersectionStructure",
                             type,
-                            fields: derivations
+                            fields: derivations,
+                            usedBy: []
                         };
                     }
                 }
@@ -33093,7 +33103,8 @@ namespace ts {
                             return {
                                 _tag: "FromObjectStructure",
                                 type,
-                                fields
+                                fields,
+                                usedBy: []
                             };
                         }
                     }
@@ -33103,7 +33114,8 @@ namespace ts {
                 return {
                     _tag: "FromLiteral",
                     type,
-                    value: (type as StringLiteralType | NumberLiteralType).value
+                    value: (type as StringLiteralType | NumberLiteralType).value,
+                    usedBy: []
                 };
             }
             if (diagnostics.length === 0) {
@@ -33133,7 +33145,8 @@ namespace ts {
             }
             return {
                 _tag: "InvalidDerivation",
-                type: errorType
+                type: errorType,
+                usedBy: []
             };;
         }
 
