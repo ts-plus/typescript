@@ -39,8 +39,17 @@ export interface User {
  */
 export const showPerson = Derive<Show<User>>()
 
-export const ok = Derive<{
-    t: { c: [0, 1] } & { a: 0, b: 0 }
+interface Ok {
+    t: {
+        c: [0, 1]
+    } & {
+        a: 0
+        b: 0
+    }
     z: {} & {}
-    a: Show<{ x: [0] }>
-}>()
+    a: Show<{
+        x: [0]
+    }>
+}
+
+export const ok: Ok = Derive()

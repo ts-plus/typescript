@@ -5434,10 +5434,62 @@ namespace ts {
         tsPlusOptimizedDataFirst?: { definition: SourceFile, exportName: string };
         tsPlusResolvedType?: Type;
         tsPlusGlobalIdentifier?: Symbol;
+        tsPlusDerivation?: Derivation
         isFluent?: true;
         isFluentCall?: true;
         // TSPLUS EXTENSION END
     }
+
+    // TSPLUS EXTENSION START
+    export type Derivation = FromImplicitScope | FromRule | FromObjectStructure | FromTupleStructure | FromIntersectionStructure | InvalidDerivation | EmptyObjectDerivation | FromPriorDerivation | FromLiteral
+    export interface FromImplicitScope {
+        readonly _tag: "FromImplicitScope"
+        readonly type: Type
+        readonly implicit: Declaration
+    }
+    export interface FromPriorDerivation {
+        readonly _tag: "FromPriorDerivation"
+        readonly type: Type
+        readonly derivation: Derivation
+    }
+    export interface FromRule {
+        readonly _tag: "FromRule"
+        readonly type: Type
+        readonly rule: Declaration
+        readonly arguments: Derivation[]
+    }
+    export interface FromObjectStructure {
+        readonly _tag: "FromObjectStructure"
+        readonly type: Type
+        readonly fields: {
+            prop: Symbol
+            value: Derivation
+        }[]
+    }
+    export interface FromTupleStructure {
+        readonly _tag: "FromTupleStructure"
+        readonly type: Type
+        readonly fields: Derivation[]
+    }
+    export interface FromIntersectionStructure {
+        readonly _tag: "FromIntersectionStructure"
+        readonly type: Type
+        readonly fields: Derivation[]
+    }
+    export interface InvalidDerivation {
+        readonly _tag: "InvalidDerivation"
+        readonly type: Type
+    }
+    export interface EmptyObjectDerivation {
+        readonly _tag: "EmptyObjectDerivation"
+        readonly type: Type
+    }
+    export interface FromLiteral {
+        readonly _tag: "FromLiteral"
+        readonly type: Type
+        readonly value: string | number
+    }
+    // TSPLUS EXTENSION END
 
     export const enum TypeFlags {
         Any             = 1 << 0,

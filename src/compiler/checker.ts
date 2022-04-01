@@ -32750,15 +32750,19 @@ namespace ts {
             }
         }
 
-        function deriveType(errorNode: CallExpression, type: Type): Type {
+        function deriveType(deriveCallNode: CallExpression, type: Type): Type {
+            if (getSourceFileOfNode(deriveCallNode).fileName.endsWith("debug.ts")) {
+                console.log("here");
+            }
             const derivationDiagnostics: Diagnostic[] = [];
-            const derived = deriveTypeWorker(errorNode, type, type, derivationDiagnostics, getImplicitScope(errorNode), [], []);
-            if (isErrorType(derived)) {
+            const derivation = deriveTypeWorker(deriveCallNode, type, type, derivationDiagnostics, getImplicitScope(deriveCallNode), [], [], []);
+            if (isErrorType(derivation.type)) {
                 derivationDiagnostics.forEach((diagnostic) => {
                     diagnostics.add(diagnostic);
                 })
             }
-            return derived;
+            getNodeLinks(deriveCallNode).tsPlusDerivation = derivation;
+            return derivation.type;
         }
 
         function getSelfExportStatement(location: Node) {
@@ -32772,7 +32776,7 @@ namespace ts {
         }
 
         function getImplicitScope(location: Node) {
-            const implicits: Type[] = []
+            const implicits: [Type, Declaration][] = []
             const selfExport = getSelfExportStatement(location);
             const sourceFile = getSourceFileOfNode(location);
             const exports = sourceFile.symbol.exports;
@@ -32782,7 +32786,7 @@ namespace ts {
                         if (getSelfExportStatement(declaration) !== selfExport) {
                             const tags = collectTsPlusImplicitTags(declaration)
                             if (tags.length > 0) {
-                                implicits.push(getTypeOfNode(declaration))
+                                implicits.push([getTypeOfNode(declaration), declaration])
                             }
                         }
                     })
@@ -32800,7 +32804,7 @@ namespace ts {
                                     if (getSelfExportStatement(declaration) !== selfExport) {
                                         const tags = collectTsPlusImplicitTags(declaration)
                                         if (tags.length > 0) {
-                                            implicits.push(getTypeOfNode(declaration))
+                                            implicits.push([getTypeOfNode(declaration), declaration])
                                         }
                                     }
                                 })
@@ -32813,7 +32817,7 @@ namespace ts {
         }
 
         function findRulesForTags(location: Node, tags: Set<string>) {
-            const rules: [string, number, Type][] = []
+            const rules: [string, number, Type, Declaration][] = []
             const sourceFile = getSourceFileOfNode(location);
             const exports = sourceFile.symbol.exports;
             if (exports) {
@@ -32823,7 +32827,7 @@ namespace ts {
                         for (const tag of statementTags) {
                             const [, targetTag, priority, ...rest] = tag.comment.split(" ")
                             if (tags.has(targetTag)) {
-                                rules.push([rest.join(" "), Number.parseFloat(priority), getTypeOfNode(declaration)]);
+                                rules.push([rest.join(" "), Number.parseFloat(priority), getTypeOfNode(declaration), declaration]);
                             }
                         }
                     })
@@ -32842,7 +32846,7 @@ namespace ts {
                                     for (const tag of statementTags) {
                                         const [, targetTag, priority, ...rest] = tag.comment.split(" ")
                                         if (tags.has(targetTag)) {
-                                            rules.push([rest.join(" "), Number.parseFloat(priority), getTypeOfNode(declaration)]);
+                                            rules.push([rest.join(" "), Number.parseFloat(priority), getTypeOfNode(declaration), declaration]);
                                         }
                                     }
                                 })
@@ -32854,13 +32858,38 @@ namespace ts {
             return rules;
         }
 
-        function deriveTypeWorker(location: Node, originalType: Type, type: Type, diagnostics: Diagnostic[], derivationScope: Type[], prohibited: Type[], currentDerivation: Type[]): Type {
+        function deriveTypeWorker(
+            location: Node,
+            originalType: Type,
+            type: Type,
+            diagnostics: Diagnostic[],
+            implicitScope: [Type, Declaration][],
+            derivationScope: Derivation[],
+            prohibited: Type[],
+            currentDerivation: Type[]
+        ): Derivation {
             if (isTypeIdenticalTo(type, emptyObjectType)) {
-                return type;
+                return {
+                    _tag: "EmptyObjectDerivation",
+                    type
+                };
             }
-            for (const implicitType of derivationScope) {
+            for (const [implicitType, declaration] of implicitScope) {
                 if (isTypeIdenticalTo(type, implicitType)) {
-                    return type;
+                    return {
+                        _tag: "FromImplicitScope",
+                        type,
+                        implicit: declaration
+                    };
+                }
+            }
+            for (const derivedType of derivationScope) {
+                if (isTypeIdenticalTo(type, derivedType.type)) {
+                    return {
+                        _tag: "FromPriorDerivation",
+                        derivation: derivedType,
+                        type
+                    };
                 }
             }
             const newCurrentDerivation = [...currentDerivation, type];
@@ -32887,7 +32916,10 @@ namespace ts {
                         )
                         diagnostics.push(diagnostic)
                     }
-                    return errorType;
+                    return {
+                        _tag: "InvalidDerivation",
+                        type: errorType
+                    };
                 }
             }
             let hasRules = false;
@@ -32896,12 +32928,11 @@ namespace ts {
                 const rules = findRulesForTags(location, tags).sort((a, b) => a[1] - b[1]);
                 const targetType = (type as TypeReference).resolvedTypeArguments![0];
                 const supportsLazy = !!find(rules, ([rule]) => rule.startsWith("lazy"));
-                const newDerivationScope = supportsLazy ? [...derivationScope, type] : derivationScope;
                 const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
                 if (rules.length > 0) {
                     hasRules =  true;
                 }
-                for (const [rule, _, ruleType] of rules) {
+                for (const [rule, _, ruleType, ruleDeclaration] of rules) {
                     if (rule === "custom" || (rule === "tuple" && isTupleType(targetType))) {
                         const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
                         for (const signature of signatures) {
@@ -32916,9 +32947,26 @@ namespace ts {
                                     const residualType = getTypeOfSymbol(instantiated.parameters[0]);
                                     if (isTupleType(residualType)) {
                                         const types = getTypeArguments(residualType);
-                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics, newDerivationScope, newProhibited, newCurrentDerivation));
-                                        if (!find(derivations, isErrorType)) {
-                                            return type;
+                                        const selfRule: FromRule = {
+                                            _tag: "FromRule",
+                                            type,
+                                            rule: ruleDeclaration,
+                                            arguments: []
+                                        };
+                                        const newDerivationScope: Derivation[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
+                                        const derivations = map(types, (childType) => deriveTypeWorker(
+                                            location,
+                                            originalType,
+                                            childType,
+                                            diagnostics,
+                                            implicitScope,
+                                            newDerivationScope,
+                                            newProhibited,
+                                            newCurrentDerivation
+                                        ));
+                                        if (!find(derivations, (d) => isErrorType(d.type))) {
+                                            selfRule.arguments.push(...derivations);
+                                            return selfRule;
                                         }
                                     }
                                 }
@@ -32941,9 +32989,25 @@ namespace ts {
                                     const residualType = getTypeOfSymbol(instantiated.parameters[0]);
                                     if (isTupleType(residualType)) {
                                         const types = getTypeArguments(residualType);
-                                        const derivations = map(types, (childType) => deriveTypeWorker(location, originalType, childType, diagnostics, newDerivationScope, newProhibited, newCurrentDerivation));
-                                        if (!find(derivations, isErrorType)) {
-                                            return type;
+                                        const selfRule: FromRule = {
+                                            _tag: "FromRule",
+                                            type,
+                                            rule: ruleDeclaration,
+                                            arguments: []
+                                        };
+                                        const newDerivationScope: Derivation[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
+                                        const derivations = map(types, (childType) => deriveTypeWorker(
+                                            location,
+                                            originalType,
+                                            childType,
+                                            diagnostics,
+                                            implicitScope,
+                                            newDerivationScope,
+                                            newProhibited,
+                                            newCurrentDerivation
+                                        ));
+                                        if (!find(derivations, (d) => isErrorType(d.type))) {
+                                            return selfRule;
                                         }
                                     }
                                 }
@@ -32957,9 +33021,22 @@ namespace ts {
             }
             if (diagnostics.length === 0 && !hasRules && isTupleType(type)) {
                 const props = getTypeArguments(type);
-                const derivations = map(props, (prop) => deriveTypeWorker(location, originalType, prop, diagnostics, derivationScope, prohibited, newCurrentDerivation));
-                if (!find(derivations, isErrorType)) {
-                    return type;
+                const derivations = map(props, (prop) => deriveTypeWorker(
+                    location,
+                    originalType,
+                    prop,
+                    diagnostics,
+                    implicitScope,
+                    derivationScope,
+                    prohibited,
+                    newCurrentDerivation
+                ));
+                if (!find(derivations, (d) => isErrorType(d.type))) {
+                    return {
+                        _tag: "FromTupleStructure",
+                        type,
+                        fields: derivations
+                    };
                 }
             }
             if (diagnostics.length === 0 && !hasRules && (type.flags & TypeFlags.Intersection)) {
@@ -32971,9 +33048,22 @@ namespace ts {
                     return true
                 })
                 if (canIntersect) {
-                    const derivations = map(props, (prop) => deriveTypeWorker(location, originalType, prop, diagnostics, derivationScope, prohibited, newCurrentDerivation));
-                    if (!find(derivations, isErrorType)) {
-                        return type;
+                    const derivations = map(props, (prop) => deriveTypeWorker(
+                        location,
+                        originalType,
+                        prop,
+                        diagnostics,
+                        implicitScope,
+                        derivationScope,
+                        prohibited,
+                        newCurrentDerivation
+                    ));
+                    if (!find(derivations, (d) => isErrorType(d.type))) {
+                        return {
+                            _tag: "FromIntersectionStructure",
+                            type,
+                            fields: derivations
+                        };
                     }
                 }
             }
@@ -32982,14 +33072,39 @@ namespace ts {
                 const construct = getSignaturesOfType(type, SignatureKind.Construct);
                 if (call.length === 0 && construct.length === 0) {
                     const props = getPropertiesOfType(type);
-                    const derivations = map(props, (prop) => deriveTypeWorker(location, originalType, getTypeOfSymbol(prop), diagnostics, derivationScope, prohibited, newCurrentDerivation));
-                    if (!find(derivations, isErrorType)) {
-                        return type;
+                    if (!find(props, (p) => p.escapedName.toString().startsWith("__@"))) {
+                        const fields: FromObjectStructure["fields"] = [];
+                        for (const prop of props) {
+                            fields.push({
+                                prop,
+                                value: deriveTypeWorker(
+                                    location,
+                                    originalType,
+                                    getTypeOfSymbol(prop),
+                                    diagnostics,
+                                    implicitScope,
+                                    derivationScope,
+                                    prohibited,
+                                    newCurrentDerivation
+                                )
+                            })
+                        }
+                        if (!find(fields, (d) => isErrorType(d.value.type))) {
+                            return {
+                                _tag: "FromObjectStructure",
+                                type,
+                                fields
+                            };
+                        }
                     }
                 }
             }
             if (diagnostics.length === 0 && !hasRules && (type.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral))) {
-                return type;
+                return {
+                    _tag: "FromLiteral",
+                    type,
+                    value: (type as StringLiteralType | NumberLiteralType).value
+                };
             }
             if (diagnostics.length === 0) {
                 if (isTypeIdenticalTo(originalType, type)) {
@@ -33016,7 +33131,10 @@ namespace ts {
                     diagnostics.push(diagnostic)
                 }
             }
-            return errorType;
+            return {
+                _tag: "InvalidDerivation",
+                type: errorType
+            };;
         }
 
         // TSPLUS EXTENSION START
