@@ -32864,15 +32864,14 @@ namespace ts {
             type: Type,
             diagnostics: Diagnostic[],
             implicitScope: [Type, Declaration][],
-            derivationScope: Derivation[],
+            derivationScope: FromRule[],
             prohibited: Type[],
             currentDerivation: Type[]
         ): Derivation {
             if (isTypeIdenticalTo(type, emptyObjectType)) {
                 return {
                     _tag: "EmptyObjectDerivation",
-                    type,
-                    usedBy: []
+                    type
                 };
             }
             for (const [implicitType, declaration] of implicitScope) {
@@ -32880,8 +32879,7 @@ namespace ts {
                     return {
                         _tag: "FromImplicitScope",
                         type,
-                        implicit: declaration,
-                        usedBy: []
+                        implicit: declaration
                     };
                 }
             }
@@ -32890,8 +32888,7 @@ namespace ts {
                     const rule: FromPriorDerivation = {
                         _tag: "FromPriorDerivation",
                         derivation: derivedType,
-                        type,
-                        usedBy: []
+                        type
                     };
                     derivedType.usedBy.push(rule);
                     return rule;
@@ -32923,8 +32920,7 @@ namespace ts {
                     }
                     return {
                         _tag: "InvalidDerivation",
-                        type: errorType,
-                        usedBy: []
+                        type: errorType
                     };
                 }
             }
@@ -32933,7 +32929,8 @@ namespace ts {
                 const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
                 const rules = findRulesForTags(location, tags).sort((a, b) => a[1] - b[1]);
                 const targetType = (type as TypeReference).resolvedTypeArguments![0];
-                const supportsLazy = !!find(rules, ([rule]) => rule.startsWith("lazy"));
+                const lazyRule = find(rules, ([rule]) => rule.startsWith("lazy"));
+                const supportsLazy = !!lazyRule;
                 const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
                 if (rules.length > 0) {
                     hasRules =  true;
@@ -32958,9 +32955,10 @@ namespace ts {
                                             type,
                                             rule: ruleDeclaration,
                                             arguments: [],
-                                            usedBy: []
+                                            usedBy: [],
+                                            lazyRule: lazyRule?.[3]
                                         };
-                                        const newDerivationScope: Derivation[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
+                                        const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
                                         const derivations = map(types, (childType) => deriveTypeWorker(
                                             location,
                                             originalType,
@@ -33001,9 +32999,10 @@ namespace ts {
                                             type,
                                             rule: ruleDeclaration,
                                             arguments: [],
-                                            usedBy: []
+                                            usedBy: [],
+                                            lazyRule: lazyRule?.[3]
                                         };
-                                        const newDerivationScope: Derivation[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
+                                        const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
                                         const derivations = map(types, (childType) => deriveTypeWorker(
                                             location,
                                             originalType,
@@ -33043,8 +33042,7 @@ namespace ts {
                     return {
                         _tag: "FromTupleStructure",
                         type,
-                        fields: derivations,
-                        usedBy: []
+                        fields: derivations
                     };
                 }
             }
@@ -33071,8 +33069,7 @@ namespace ts {
                         return {
                             _tag: "FromIntersectionStructure",
                             type,
-                            fields: derivations,
-                            usedBy: []
+                            fields: derivations
                         };
                     }
                 }
@@ -33103,8 +33100,7 @@ namespace ts {
                             return {
                                 _tag: "FromObjectStructure",
                                 type,
-                                fields,
-                                usedBy: []
+                                fields
                             };
                         }
                     }
@@ -33114,8 +33110,7 @@ namespace ts {
                 return {
                     _tag: "FromLiteral",
                     type,
-                    value: (type as StringLiteralType | NumberLiteralType).value,
-                    usedBy: []
+                    value: (type as StringLiteralType | NumberLiteralType).value
                 };
             }
             if (diagnostics.length === 0) {
@@ -33145,8 +33140,7 @@ namespace ts {
             }
             return {
                 _tag: "InvalidDerivation",
-                type: errorType,
-                usedBy: []
+                type: errorType
             };;
         }
 

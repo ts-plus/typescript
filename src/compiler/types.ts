@@ -5446,13 +5446,11 @@ namespace ts {
         readonly _tag: "FromImplicitScope"
         readonly type: Type
         readonly implicit: Declaration
-        readonly usedBy: FromPriorDerivation[]
     }
     export interface FromPriorDerivation {
         readonly _tag: "FromPriorDerivation"
         readonly type: Type
         readonly derivation: Derivation
-        readonly usedBy: FromPriorDerivation[]
     }
     export interface FromRule {
         readonly _tag: "FromRule"
@@ -5460,6 +5458,7 @@ namespace ts {
         readonly rule: Declaration
         readonly arguments: Derivation[]
         readonly usedBy: FromPriorDerivation[]
+        readonly lazyRule: Declaration | undefined
     }
     export interface FromObjectStructure {
         readonly _tag: "FromObjectStructure"
@@ -5468,35 +5467,29 @@ namespace ts {
             prop: Symbol
             value: Derivation
         }[]
-        readonly usedBy: FromPriorDerivation[]
     }
     export interface FromTupleStructure {
         readonly _tag: "FromTupleStructure"
         readonly type: Type
         readonly fields: Derivation[]
-        readonly usedBy: FromPriorDerivation[]
     }
     export interface FromIntersectionStructure {
         readonly _tag: "FromIntersectionStructure"
         readonly type: Type
         readonly fields: Derivation[]
-        readonly usedBy: FromPriorDerivation[]
     }
     export interface InvalidDerivation {
         readonly _tag: "InvalidDerivation"
         readonly type: Type
-        readonly usedBy: FromPriorDerivation[]
     }
     export interface EmptyObjectDerivation {
         readonly _tag: "EmptyObjectDerivation"
         readonly type: Type
-        readonly usedBy: FromPriorDerivation[]
     }
     export interface FromLiteral {
         readonly _tag: "FromLiteral"
         readonly type: Type
         readonly value: string | number
-        readonly usedBy: FromPriorDerivation[]
     }
     // TSPLUS EXTENSION END
 
