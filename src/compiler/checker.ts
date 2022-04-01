@@ -45415,12 +45415,6 @@ namespace ts {
                 tags.push(tag)
             }
         }
-        function tryCacheTsPlusImplicit(declaration: Declaration): void {
-            const tags = collectTsPlusImplicitTags(declaration);
-            if (tags.length > 0) {
-                console.log(typeToString(getTypeOfNode(declaration)));
-            }
-        }
         function tryCacheTsPlusGlobalSymbol(declaration: ImportDeclaration): void {
             if (declaration.importClause && declaration.importClause.namedBindings && isNamedImports(declaration.importClause.namedBindings) && isStringLiteral(declaration.moduleSpecifier)) {
                 const location = declaration.moduleSpecifier.text;

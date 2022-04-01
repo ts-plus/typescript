@@ -4,7 +4,7 @@ import { Derive, IsUnion } from "./types";
  * @tsplus type Refinement
  */
 export class Refinement<A, B extends A> {
-    constructor(readonly is: (a: A) => a is B) {}
+    constructor(readonly is: (a: A) => a is B) { }
 }
 
 //
@@ -14,7 +14,7 @@ export class Refinement<A, B extends A> {
 /**
  * @tsplus derive Refinement lazy
  */
- export declare function deriveRefinementLazy<A, B extends A>(
+export declare function deriveRefinementLazy<A, B extends A>(
     ...args: [
         fn: (_: Refinement<A, B>) => Refinement<A, B>
     ]
@@ -33,4 +33,17 @@ export declare function deriveRefinementLiteral<A, B extends A>(
     ] : never : never
 ): Refinement<A, B>
 
-export const ok: Refinement<unknown, "ok"> = Derive()
+/**
+ * @tsplus derive Refinement<_, |> 20
+ */
+export declare function deriveRefinementUnion<A, B extends A[]>(
+    ...args: {
+        [k in keyof B]: B[k] extends A ? Refinement<A, B[k]> : never
+    }
+): Refinement<A, B[number]>
+
+//
+// Usage
+//
+
+export const ok: Refinement<unknown, "ok" | "yes"> = Derive()
