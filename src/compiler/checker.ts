@@ -32776,7 +32776,7 @@ namespace ts {
         }
 
         function getImplicitScope(location: Node) {
-            const implicits: [Type, Declaration][] = []
+            const implicits: [Type, Declaration, boolean][] = []
             const selfExport = getSelfExportStatement(location);
             const sourceFile = getSourceFileOfNode(location);
             const exports = sourceFile.symbol.exports;
@@ -32786,7 +32786,7 @@ namespace ts {
                         if (getSelfExportStatement(declaration) !== selfExport) {
                             const tags = collectTsPlusImplicitTags(declaration)
                             if (tags.length > 0) {
-                                implicits.push([getTypeOfNode(declaration), declaration])
+                                implicits.push([getTypeOfNode(declaration), declaration, true])
                             }
                         }
                     })
@@ -32804,7 +32804,7 @@ namespace ts {
                                     if (getSelfExportStatement(declaration) !== selfExport) {
                                         const tags = collectTsPlusImplicitTags(declaration)
                                         if (tags.length > 0) {
-                                            implicits.push([getTypeOfNode(declaration), declaration])
+                                            implicits.push([getTypeOfNode(declaration), declaration, false])
                                         }
                                     }
                                 })
@@ -32863,7 +32863,7 @@ namespace ts {
             originalType: Type,
             type: Type,
             diagnostics: Diagnostic[],
-            implicitScope: [Type, Declaration][],
+            implicitScope: [Type, Declaration, boolean][],
             derivationScope: FromRule[],
             prohibited: Type[],
             currentDerivation: Type[]
@@ -32874,8 +32874,8 @@ namespace ts {
                     type
                 };
             }
-            for (const [implicitType, declaration] of implicitScope) {
-                if (isTypeIdenticalTo(type, implicitType)) {
+            for (const [implicitType, declaration, local] of implicitScope) {
+                if (isTypeIdenticalTo(type, implicitType) && (!local || isBlockScopedNameDeclaredBeforeUse(declaration, location))) {
                     return {
                         _tag: "FromImplicitScope",
                         type,
