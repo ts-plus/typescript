@@ -28,8 +28,17 @@ export declare function deriveGuardLazy<A>(
 /**
  * @tsplus derive Guard<_> 10
  */
-export declare function deriveGuardLiteral<A extends string | number>(
-    ...args: IsUnion<A> extends false ? [
+export declare function deriveGuardLiteralNumber<A extends number>(
+    ...args: IsUnion<A> extends false ? number extends A ? never : [
+        value: A
+    ] : never
+): Guard<A>
+
+/**
+ * @tsplus derive Guard<_> 10
+ */
+export declare function deriveGuardLiteralString<A extends string>(
+    ...args: IsUnion<A> extends false ? string extends A ? never : [
         value: A
     ] : never
 ): Guard<A>

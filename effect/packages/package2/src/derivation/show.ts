@@ -1,5 +1,5 @@
 import { Guard } from "./guard";
-import { IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection } from "./types";
+import { IsTypeEqualToAnyOf, IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection } from "./types";
 
 /**
  * @tsplus type Show
@@ -31,13 +31,23 @@ export function deriveShowLazy<A>(
 /**
  * @tsplus derive Show<_> 10
  */
-export function deriveShowLiteral<A extends string | number>(
-    ...args: IsUnion<A> extends false ? [
+export function deriveShowLiteralNumber<A extends number>(
+    ...args: IsUnion<A> extends false ? number extends A ? never : [
         value: A
     ] : never
 ): Show<A> {
-    const literalString = typeof args[0] === "number" ? `${args[0]}` : args[0] as string
-    return new Show(() => literalString)
+    return new Show(() => `${args[0]}`)
+}
+
+/**
+ * @tsplus derive Show<_> 10
+ */
+export function deriveShowLiteralString<A extends string>(
+    ...args: IsUnion<A> extends false ? string extends A ? never : [
+        value: A
+    ] : never
+): Show<A> {
+    return new Show(() => args[0])
 }
 
 /**
@@ -69,7 +79,7 @@ export function deriveShowArray<A extends Array<any>>(
 /**
  * @tsplus derive Show<&> 20
  */
- export declare function deriveShowIntersection<A extends unknown[]>(
+export declare function deriveShowIntersection<A extends unknown[]>(
     ...args: {
         [k in keyof A]: Show<A[k]>
     }
@@ -93,7 +103,7 @@ export declare function deriveShowStruct<A extends Record<string, any>>(
  * @tsplus derive Show<|> 10
  */
 export declare function deriveShowLiteralUnion<A extends unknown[]>(
-    ...args: A[number] extends string | number ? {
+    ...args: A[number] extends string | number ? IsTypeEqualToAnyOf<A[number], [string, number, number | string]> extends true ? never : {
         [k in keyof A]: Show<A[k]>
     } : never
 ): Show<A[number]>

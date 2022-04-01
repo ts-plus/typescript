@@ -18,3 +18,19 @@ export type StringIndexedRecord = Record<string, any>
  * @tsplus macro Derive
  */
 export declare function Derive<A>(): A
+
+type EqualsWrapped<T> = T extends infer R & {}
+    ? {
+          [P in keyof R]: R[P]
+      }
+    : never
+
+export type TypeEquals<A, B> = (<T>() => T extends EqualsWrapped<A> ? 1 : 2) extends <
+    T
+>() => T extends EqualsWrapped<B> ? 1 : 2
+    ? true
+    : false
+
+export type IsTypeEqualToAnyOf<X, Y extends unknown[]> = Y["length"] extends 0 ? false : ({
+    [k in keyof Y]: TypeEquals<X, Y[k]>
+}[number] extends false ? false : true)

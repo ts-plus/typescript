@@ -1,4 +1,5 @@
-import { Derive, IsUnion } from "./types";
+import { Guard } from "./guard";
+import { Derive, IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection } from "./types";
 
 /**
  * @tsplus type Refinement
@@ -27,8 +28,17 @@ export declare function deriveRefinementLazy<A, B extends A>(
 /**
  * @tsplus derive Refinement<_, _> 10
  */
-export declare function deriveRefinementLiteral<A, B extends A & (string | number)>(
-    ...args: IsUnion<B> extends false ? [
+export declare function deriveRefinementLiteralString<A, B extends A & string>(
+    ...args: IsUnion<B> extends false ? string extends B ? never : [
+        value: B
+    ] : never
+): Refinement<A, B>
+
+/**
+ * @tsplus derive Refinement<_, _> 10
+ */
+export declare function deriveRefinementLiteralNumber<A, B extends A & number>(
+    ...args: IsUnion<B> extends false ? number extends B ? never : [
         value: B
     ] : never
 ): Refinement<A, B>
@@ -42,8 +52,42 @@ export declare function deriveRefinementUnion<A, B extends A[]>(
     }
 ): Refinement<A, B[number]>
 
+/**
+ * @tsplus derive Refinement<_, &> 20
+ */
+export declare function deriveRefinementIntersection<A, B extends unknown[]>(
+    ...args: UnionToIntersection<B[number]> extends A ? {
+        [k in keyof B]: B[k] extends A ? Refinement<A, B[k]> : never
+    } : never
+): UnionToIntersection<B[number]> extends A ? Refinement<A, UnionToIntersection<B[number]>> : never
+
+/**
+ * @tsplus derive Refinement<_, _> 20
+ */
+export declare function deriveRefinementStruct<A, B extends Record<string, any> & A>(
+    ...args: keyof B extends string ? IsUnion<B> extends false ? [
+        requiredFields: {
+            [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Refinement<unknown, B[k]>
+        },
+        optionalFields: {
+            [k in OptionalKeys<B>]: k extends keyof A ? Refinement<A[k], NonNullable<B[k]>> : Refinement<unknown, NonNullable<B[k]>>
+        }
+    ] : never : never
+): Refinement<A, B>
+
+/**
+ * @tsplus derive Refinement<_, _> 30
+ */
+export declare function deriveRefinementFromGuard<A, B extends A>(
+    ...args: [guard: Guard<B>]
+): Refinement<A, B>
+
 //
 // Usage
 //
 
-export const ok: Refinement<unknown, "ok" | "yes"> = Derive()
+export const ok4: Refinement<{
+    a: number | string
+}, {
+    a: string
+}> = Derive()
