@@ -12,15 +12,17 @@ export class Show<A> {
 // Low priority
 //
 
+export interface GuardAndShow<A> {
+    guard: Guard<A>
+    show: Show<A>
+}
+
 /**
  * @tsplus rule Show 20 union
  */
 export declare function deriveShowUnion<Types extends unknown[]>(
     ...args: {
-        [k in keyof Types]: {
-            guard: Guard<Types[k]>
-            show: Show<Types[k]>
-        }
+        [k in keyof Types]: GuardAndShow<Types[k]>
     }
 ): Show<Types[number]>
 
