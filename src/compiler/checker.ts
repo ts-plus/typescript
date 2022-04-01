@@ -33011,8 +33011,9 @@ namespace ts {
                     const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
                     for (const signature of signatures) {
                         if (signature.typeParameters && signature.typeParameters.length === toCheck.length) {
+                            const mapper = createTypeMapper(signature.typeParameters, toCheck);
                             if (every(signature.typeParameters, (param, i) => {
-                                const constraint = getConstraintOfTypeParameter(param);
+                                const constraint = instantiateType(getConstraintOfTypeParameter(param), mapper);
                                 if (!constraint) {
                                     return true;
                                 }
