@@ -1,5 +1,5 @@
 import { Guard } from "./guard";
-import { Derive, IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection } from "./types";
+import { Derive, IsUnion, OptionalKeys, RequiredKeys, TypeEquals, UnionToIntersection } from "./types";
 
 /**
  * @tsplus type Refinement
@@ -24,6 +24,20 @@ export declare function deriveRefinementLazy<A, B extends A>(
 //
 // High Priority
 //
+
+/**
+ * @tsplus derive Refinement<_, _> 10
+ */
+export declare function deriveRefinementEmptyRecord<A, B extends A>(
+    ...args: TypeEquals<B, {}> extends true ? [] : never
+): Refinement<A, B>
+
+/**
+ * @tsplus derive Refinement<_, _> 10
+ */
+ export declare function deriveRefinementAlwaysTrue<A, B extends A>(
+    ...args: TypeEquals<A, B> extends true ? [] : never
+): Refinement<A, B>
 
 /**
  * @tsplus derive Refinement<_, _> 10
@@ -69,14 +83,24 @@ export declare function deriveRefinementIntersection<A, B extends unknown[]>(
  * @tsplus derive Refinement<_, _> 20
  */
 export declare function deriveRefinementStruct<A, B extends Record<string, any> & A>(
-    ...args: keyof B extends string ? IsUnion<B> extends false ? [
-        requiredFields: {
-            [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Guard<B[k]>
-        },
-        optionalFields: {
-            [k in OptionalKeys<B>]: k extends keyof A ? Refinement<A[k], NonNullable<B[k]>> : Guard<NonNullable<B[k]>>
-        }
-    ] : never : never
+    ...args: keyof B extends string ? IsUnion<B> extends false ?
+        A extends {} ? [
+            requiredFields: {
+                [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Guard<B[k]>
+            },
+            optionalFields: {
+                [k in OptionalKeys<B>]: k extends keyof A ? Refinement<A[k], NonNullable<B[k]>> : Guard<NonNullable<B[k]>>
+            }
+        ] : [
+            requiredFields: {
+                [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Guard<B[k]>
+            },
+            optionalFields: {
+                [k in OptionalKeys<B>]: k extends keyof A ? Refinement<A[k], NonNullable<B[k]>> : Guard<NonNullable<B[k]>>
+            },
+            objectRefinement: Refinement<unknown, {}>
+        ]
+        : never : never
 ): Refinement<A, B>
 
 //
@@ -94,4 +118,4 @@ export declare function deriveRefinementFromUnknown<A, B extends A>(
 // Usage
 //
 
-export const ok4: Refinement<{ a: number | string }, { a: number }> = Derive()
+export const ok4: Refinement<unknown, { a: number, b?: string }> = Derive()
