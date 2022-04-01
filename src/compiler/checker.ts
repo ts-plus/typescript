@@ -32751,18 +32751,18 @@ namespace ts {
         }
 
         function deriveType(deriveCallNode: CallExpression, type: Type): Type {
-            if (getSourceFileOfNode(deriveCallNode).fileName.endsWith("debug.ts")) {
-                console.log("here");
+            const nodeLinks = getNodeLinks(deriveCallNode);
+            if (!nodeLinks.tsPlusDerivation) {
+                const derivationDiagnostics: Diagnostic[] = [];
+                const derivation = deriveTypeWorker(deriveCallNode, type, type, derivationDiagnostics, getImplicitScope(deriveCallNode), [], [], []);
+                if (isErrorType(derivation.type)) {
+                    derivationDiagnostics.forEach((diagnostic) => {
+                        diagnostics.add(diagnostic);
+                    })
+                }
+                nodeLinks.tsPlusDerivation = derivation;
             }
-            const derivationDiagnostics: Diagnostic[] = [];
-            const derivation = deriveTypeWorker(deriveCallNode, type, type, derivationDiagnostics, getImplicitScope(deriveCallNode), [], [], []);
-            if (isErrorType(derivation.type)) {
-                derivationDiagnostics.forEach((diagnostic) => {
-                    diagnostics.add(diagnostic);
-                })
-            }
-            getNodeLinks(deriveCallNode).tsPlusDerivation = derivation;
-            return derivation.type;
+            return nodeLinks.tsPlusDerivation.type;
         }
 
         function getSelfExportStatement(location: Node) {
