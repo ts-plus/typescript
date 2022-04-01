@@ -32979,19 +32979,29 @@ namespace ts {
                         if (paramAction === "_") {
                             toCheck.push(targetTypes[index])
                         } else if (paramAction === "[]") {
-                            toCheck.push(targetTypes[index])
+                            if (isTupleType(targetTypes[index])) {
+                                toCheck.push(targetTypes[index])
+                            } else {
+                                continue ruleCheck;
+                            }
                         } else if (paramAction === "|") {
                             if (targetTypes[index].flags & TypeFlags.Union) {
                                 const typesInUnion = (targetTypes[index] as UnionType).types;
                                 const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
                                 toCheck.push(typesInUnionTuple)
+                            } else {
+                                continue ruleCheck;
                             }
                         } else if (paramAction === "&") {
                             if (targetTypes[index].flags & TypeFlags.Intersection) {
                                 const typesInUnion = (targetTypes[index] as IntersectionType).types;
                                 const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
                                 toCheck.push(typesInUnionTuple)
+                            } else {
+                                continue ruleCheck;
                             }
+                        } else {
+                            continue ruleCheck;
                         }
                         index++;
                     }
