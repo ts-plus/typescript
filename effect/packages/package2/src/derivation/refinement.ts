@@ -35,7 +35,7 @@ export declare function deriveRefinementEmptyRecord<A, B extends A>(
 /**
  * @tsplus derive Refinement<_, _> 10
  */
- export declare function deriveRefinementAlwaysTrue<A, B extends A>(
+export declare function deriveRefinementAlwaysTrue<A, B extends A>(
     ...args: TypeEquals<A, B> extends true ? [] : never
 ): Refinement<A, B>
 
@@ -82,8 +82,8 @@ export declare function deriveRefinementIntersection<A, B extends unknown[]>(
 /**
  * @tsplus derive Refinement<_, _> 20
  */
-export declare function deriveRefinementStruct<A, B extends Record<string, any> & A>(
-    ...args: keyof B extends string ? IsUnion<B> extends false ?
+export function deriveRefinementStruct<A, B extends Record<string, any> & A>(
+    ...[req, opt, obj]: keyof B extends string ? IsUnion<B> extends false ?
         A extends {} ? [
             requiredFields: {
                 [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Guard<B[k]>
@@ -101,7 +101,12 @@ export declare function deriveRefinementStruct<A, B extends Record<string, any> 
             objectRefinement: Refinement<unknown, {}>
         ]
         : never : never
-): Refinement<A, B>
+): Refinement<A, B> {
+    req;
+    opt;
+    obj;
+    throw new Error("NI");
+}
 
 //
 // Low priority
