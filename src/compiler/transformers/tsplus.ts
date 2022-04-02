@@ -27,11 +27,22 @@ namespace ts {
             }
         }
     }
+    class UniqueNameOfDerivation {
+        readonly cache = new Map<Derivation, Identifier>()
+        constructor(readonly factory: NodeFactory) { }
+        get(d: Derivation) {
+            if (!this.cache.has(d)) {
+                this.cache.set(d, this.factory.createUniqueName("derive"))
+            }
+            return this.cache.get(d)!
+        }
+    }
     export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
         const fileMap: [string, RegExp][] = getFileMap(options, host);
         const traceMap: [string, RegExp][] = getTraceMap(options, host);
         return function (context: TransformationContext) {
             const importer = new TsPlusImporter(context.factory);
+            const uniqueNameOfDerivation = new UniqueNameOfDerivation(context.factory);
             const localUniqueExtensionNames = new Map<string, Identifier>();
             const fileVar = factory.createUniqueName("fileName");
             let fileVarUsed = false;
@@ -336,6 +347,111 @@ namespace ts {
                 }
                 return node
             }
+            function produceDerivation(derivation: Derivation | undefined, context: TransformationContext, importer: TsPlusImporter, source: SourceFile, localUniqueExtensionNames: ESMap<string, Identifier>): Expression {
+                if (derivation) {
+                    switch (derivation._tag) {
+                        case "FromImplicitScope": {
+                            return getPathOfImplicitOrRule(context, importer, derivation.implicit, source, localUniqueExtensionNames);
+                        }
+                        case "EmptyObjectDerivation": {
+                            return factory.createObjectLiteralExpression(
+                                [],
+                                false
+                            );
+                        }
+                        case "FromLiteral": {
+                            return typeof derivation.value === "number" ? factory.createNumericLiteral(derivation.value) : factory.createStringLiteral(derivation.value);
+                        }
+                        case "FromIntersectionStructure": {
+                            return factory.createObjectLiteralExpression(
+                                derivation.fields.map((child) => factory.createSpreadAssignment(produceDerivation(child, context, importer, source, localUniqueExtensionNames))),
+                                false
+                            );
+                        }
+                        case "FromObjectStructure": {
+                            return factory.createObjectLiteralExpression(
+                                derivation.fields.map((child) => factory.createPropertyAssignment(
+                                    child.prop.escapedName as string,
+                                    produceDerivation(child.value, context, importer, source, localUniqueExtensionNames)
+                                )),
+                                false
+                            );
+                        }
+                        case "FromTupleStructure": {
+                            return factory.createArrayLiteralExpression(
+                                derivation.fields.map((child) => produceDerivation(child, context, importer, source, localUniqueExtensionNames)),
+                                false
+                            );
+                        }
+                        case "FromPriorDerivation": {
+                            const name = uniqueNameOfDerivation.get(derivation.derivation);
+                            if (name) {
+                                return name;
+                            }
+                            break
+                        }
+                        case "FromRule": {
+                            if (derivation.usedBy.length === 0) {
+                                return factory.createCallExpression(
+                                    getPathOfImplicitOrRule(context, importer, derivation.rule, source, localUniqueExtensionNames),
+                                    undefined,
+                                    derivation.arguments.map((child) => produceDerivation(child, context, importer, source, localUniqueExtensionNames))
+                                );
+                            } else if (derivation.lazyRule) {
+                                const name = uniqueNameOfDerivation.get(derivation);
+                                const lazy = getPathOfImplicitOrRule(context, importer, derivation.lazyRule, source, localUniqueExtensionNames);
+                                return factory.createCallExpression(
+                                    lazy,
+                                    undefined,
+                                    [factory.createArrowFunction(
+                                        undefined,
+                                        undefined,
+                                        [factory.createParameterDeclaration(
+                                            undefined,
+                                            undefined,
+                                            undefined,
+                                            name,
+                                            undefined,
+                                            undefined,
+                                            undefined
+                                        )],
+                                        undefined,
+                                        factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                                        factory.createCallExpression(
+                                            getPathOfImplicitOrRule(context, importer, derivation.rule, source, localUniqueExtensionNames),
+                                            undefined,
+                                            derivation.arguments.map((child) => produceDerivation(child, context, importer, source, localUniqueExtensionNames))
+                                        )
+                                    )]
+                                );
+                            }
+                            break
+                        }
+                        case "InvalidDerivation": {
+                            break
+                        }
+                    }
+                }
+                return factory.createCallExpression(
+                    factory.createParenthesizedExpression(factory.createArrowFunction(
+                        undefined,
+                        undefined,
+                        [],
+                        undefined,
+                        factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                        factory.createBlock(
+                            [factory.createThrowStatement(factory.createNewExpression(
+                                factory.createIdentifier("Error"),
+                                undefined,
+                                [factory.createStringLiteral("Not Implemented")]
+                            ))],
+                            false
+                        )
+                    )),
+                    undefined,
+                    []
+                );
+            }
             function visitCallExpressionOrFluentCallExpression(source: SourceFile, traceInScope: Identifier | undefined, node: CallExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
                 if (checker.isPipeCall(node)) {
                     return optimizePipe(visitNodes(node.arguments, visitor), context.factory, source);
@@ -344,7 +460,10 @@ namespace ts {
                     return optimizeIdentity(visitEachChild(node, visitor, context));
                 }
                 if (checker.isTsPlusMacroCall(node, "remove")) {
-                    return factory.createVoidZero()
+                    return factory.createVoidZero();
+                }
+                if (checker.isTsPlusMacroCall(node, "Derive")) {
+                    return produceDerivation(checker.getNodeLinks(node).tsPlusDerivation, context, importer, source, localUniqueExtensionNames);
                 }
                 if (node.arguments.length === 1 && isCallExpression(node.expression)) {
                     const optimizedPipeable = tryGetOptimizedPipeableCall(node.expression);
@@ -596,6 +715,39 @@ namespace ts {
             const node = factory.createPropertyAccessExpression(id, identifier);
             (node as ExpressionWithReferencedImport<PropertyAccessExpression>).tsPlusReferencedImport = location;
             (node as ExpressionWithReferencedGlobalImport<PropertyAccessExpression>).tsPlusReferencedGlobalImport = location;
+            return node;
+        }
+
+        function getPathOfImplicitOrRule(context: TransformationContext, importer: TsPlusImporter, implicitOrRule: Declaration, source: SourceFile, localUniqueExtensionNames: ESMap<string, Identifier>) {
+            const factory = context.factory;
+            const sourceExtension = getSourceFileOfNode(implicitOrRule);
+            // TODO(Mike): carry over proper export name don't rely on the symbol of the declaration being exported
+            const exportName = implicitOrRule.symbol.escapedName as string;
+            if (source.fileName === sourceExtension.fileName) {
+                if (localUniqueExtensionNames.has(exportName)) {
+                    return localUniqueExtensionNames.get(exportName)!;
+                }
+                const uniqueIdentifier = factory.createTsPlusUniqueName(exportName);
+                localUniqueExtensionNames.set(exportName, uniqueIdentifier);
+                return uniqueIdentifier;
+            }
+            let path: string | undefined;
+            const locationTag = getAllJSDocTags(implicitOrRule, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && tag.comment?.toString().startsWith("location") === true)[0];
+            if (locationTag) {
+                const match = locationTag.comment!.toString().match(/^location "(.*)"/);
+                if (match) {
+                    path = match[1]
+                }
+            }
+            if (!path) {
+                path = getImportLocation(fileMap, sourceExtension.fileName);
+            }
+            const id = importer.get(path);
+            const node = factory.createPropertyAccessExpression(
+                id,
+                factory.createIdentifier(exportName)
+            );
+            (node as ExpressionWithReferencedImport<PropertyAccessExpression>).tsPlusReferencedImport = path;
             return node;
         }
 

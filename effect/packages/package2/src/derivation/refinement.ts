@@ -1,5 +1,5 @@
 import { Guard } from "./guard";
-import { Derive, IsUnion, OptionalKeys, RequiredKeys, TypeEquals, UnionToIntersection } from "./types";
+import { IsUnion, OptionalKeys, RequiredKeys, TypeEquals, UnionToIntersection } from "./types";
 
 /**
  * @tsplus type Refinement

@@ -14,11 +14,6 @@ export type OptionalKeys<T> = { [K in keyof T]-?:
 
 export type StringIndexedRecord = Record<string, any>
 
-/**
- * @tsplus macro Derive
- */
-export declare function Derive<A>(explain?: "explain"): A
-
 type EqualsWrapped<T> = T extends infer R & {}
     ? {
           [P in keyof R]: R[P]

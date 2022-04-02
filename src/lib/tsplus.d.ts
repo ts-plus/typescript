@@ -7,3 +7,8 @@ declare type PipeableFirst<A extends any[]> = A extends [infer X, ...infer Rest]
  * @tsplus macro pipeable
  */
 declare function Pipeable<F extends (self: any, ...rest: any) => any>(f: F): (...rest: PipeableShift<Parameters<F>>) => (self: PipeableFirst<Parameters<F>>) => ReturnType<F>
+
+/**
+ * @tsplus macro Derive
+ */
+declare function Derive<A>(explain?: "explain"): A
