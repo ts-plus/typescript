@@ -1,5 +1,5 @@
 import { Guard } from "./guard";
-import { IsTypeEqualToAnyOf, IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection } from "./types";
+import { IsTypeEqualToAnyOf, IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection, UnionToTuple } from "./types";
 
 /**
  * @tsplus type Show
@@ -129,6 +129,23 @@ export function deriveShowTuple<A extends unknown[]>(
     throw new Error("Not Implemented")
 }
 
+/**
+ * @tsplus derive Show<|> 20
+ */
+export function deriveShowUnionTagged<A extends { _tag: string }[]>(
+    ...args: UnionToTuple<A[number]["_tag"]> extends infer T ? T extends { length: A["length"] } ? [
+        tags: {
+            [k in keyof A]: A[k] extends { _tag: string } ? A[k]["_tag"] : never
+        },
+        members: {
+            [k in keyof A]: A[k] extends { _tag: string } ? Show<A[k]> : never
+        }
+    ] : never : never
+): Show<A[number]> {
+    args
+    throw new Error("Not Implemented")
+}
+
 //
 // Low priority
 //
@@ -139,7 +156,7 @@ export interface GuardAndShow<A> {
 }
 
 /**
- * @tsplus derive Show<|> 10
+ * @tsplus derive Show<|> 30
  */
 export function deriveShowUnion<A extends unknown[]>(
     ...args: {
