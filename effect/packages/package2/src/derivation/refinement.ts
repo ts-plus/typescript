@@ -15,11 +15,14 @@ export class Refinement<A, B extends A> {
 /**
  * @tsplus derive Refinement lazy
  */
-export declare function deriveRefinementLazy<A, B extends A>(
+export function deriveRefinementLazy<A, B extends A>(
     ...args: [
         fn: (_: Refinement<A, B>) => Refinement<A, B>
     ]
-): Refinement<A, B>
+): Refinement<A, B> {
+    args
+    throw new Error("Not Implemented")
+}
 
 //
 // High Priority
@@ -28,30 +31,40 @@ export declare function deriveRefinementLazy<A, B extends A>(
 /**
  * @tsplus derive Refinement<_, _> 10
  */
-export declare function deriveRefinementEmptyRecord<A, B extends A>(
+export function deriveRefinementEmptyRecord<A, B extends A>(
     ...[]: TypeEquals<B, {}> extends true ? [] : never
-): Refinement<A, B>
+): Refinement<A, B> {
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Refinement<_, _> 10
  */
-export declare function deriveRefinementAlwaysTrue<A, B extends A>(
+export function deriveRefinementAlwaysTrue<A, B extends A>(
     ...[]: TypeEquals<A, B> extends true ? [] : never
-): Refinement<A, B>
+): Refinement<A, B> {
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Refinement<_, _> 10
  */
-export declare function deriveRefinementLiteralString<A, B extends A & string>(
+export function deriveRefinementLiteralString<A, B extends A & string>(
     ...[value]: IsUnion<B> extends false ? string extends B ? never : [value: B] : never
-): Refinement<A, B>
+): Refinement<A, B> {
+    value
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Refinement<_, _> 10
  */
-export declare function deriveRefinementLiteralNumber<A, B extends A & number>(
+export function deriveRefinementLiteralNumber<A, B extends A & number>(
     ...[value]: IsUnion<B> extends false ? number extends B ? never : [value: B] : never
-): Refinement<A, B>
+): Refinement<A, B> {
+    value
+    throw new Error("Not Implemented")
+}
 
 //
 // Mid priority
@@ -60,25 +73,31 @@ export declare function deriveRefinementLiteralNumber<A, B extends A & number>(
 /**
  * @tsplus derive Refinement<_, |> 20
  */
-export declare function deriveRefinementUnion<A, B extends A[]>(
+export function deriveRefinementUnion<A, B extends A[]>(
     ...members: {
         [k in keyof B]: B[k] extends A ? Refinement<A, B[k]> : never
     }
-): Refinement<A, B[number]>
+): Refinement<A, B[number]> {
+    members
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Refinement<_, &> 20
  */
-export declare function deriveRefinementIntersection<A, B extends unknown[]>(
+export function deriveRefinementIntersection<A, B extends unknown[]>(
     ...members: UnionToIntersection<B[number]> extends A ? {
         [k in keyof B]: B[k] extends A ? Refinement<A, B[k]> : never
     } : never
-): UnionToIntersection<B[number]> extends A ? Refinement<A, UnionToIntersection<B[number]>> : never
+): UnionToIntersection<B[number]> extends A ? Refinement<A, UnionToIntersection<B[number]>> : never {
+    members
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Refinement<_, _> 20
  */
-export declare function deriveRefinementStruct<A, B extends Record<string, any> & A>(
+export function deriveRefinementStruct<A, B extends Record<string, any> & A>(
     ...[requiredFields, optionalFields, objectRefinement]: keyof B extends string ? IsUnion<B> extends false ?
         A extends {} ? [
             requiredFields: {
@@ -97,7 +116,12 @@ export declare function deriveRefinementStruct<A, B extends Record<string, any> 
             objectRefinement: Refinement<unknown, {}>
         ]
         : never : never
-): Refinement<A, B>
+): Refinement<A, B>  {
+    requiredFields
+    optionalFields
+    objectRefinement
+    throw new Error("Not Implemented")
+}
 
 //
 // Low priority
@@ -106,9 +130,12 @@ export declare function deriveRefinementStruct<A, B extends Record<string, any> 
 /**
  * @tsplus derive Refinement<_, _> 30
  */
-export declare function deriveRefinementFromUnknown<A, B extends A>(
+export function deriveRefinementFromUnknown<A, B extends A>(
     ...[guard]: unknown extends A ? never : [Guard<B>]
-): Refinement<A, B>
+): Refinement<A, B> {
+    guard
+    throw new Error("Not Implemented")
+}
 
 //
 // Usage

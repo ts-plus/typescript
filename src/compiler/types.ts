@@ -3281,7 +3281,7 @@ namespace ts {
         readonly comment?: string | NodeArray<JSDocComment>;
     }
 
-    export interface TsPlusJSDocDerivationTag extends JSDocTag {
+    export interface TsPlusJSDocDeriveTag extends JSDocTag {
         readonly parent: JSDoc | JSDocTypeLiteral;
         readonly tagName: Identifier;
         readonly comment: `derive ${string}`
@@ -4713,7 +4713,7 @@ namespace ts {
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isClassCompanionReference(node: Expression): boolean
         collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocFluentTag[]
-        collectTsPlusAnyValueTags(statement: Declaration): readonly (TsPlusJSDocFluentTag | TsPlusJSDocGetterTag | TsPlusJSDocOperatorTag | TsPlusJSDocStaticTag)[]
+        collectTsPlusAnyValueTags(statement: Declaration): readonly (TsPlusJSDocFluentTag | TsPlusJSDocGetterTag | TsPlusJSDocOperatorTag | TsPlusJSDocStaticTag | TsPlusJSDocImplicitTag | TsPlusJSDocDeriveTag)[]
         getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
         getPrimitiveTypeName(type: Type): string | undefined
         getResolvedOperator(node: BinaryExpression): Signature | undefined

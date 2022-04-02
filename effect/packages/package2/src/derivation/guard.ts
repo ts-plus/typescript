@@ -15,11 +15,14 @@ export class Guard<A> {
 /**
  * @tsplus derive Guard lazy
  */
-export declare function deriveGuardLazy<A>(
+export function deriveGuardLazy<A>(
     ...args: [
         fn: (_: Guard<A>) => Guard<A>
     ]
-): Guard<A>
+): Guard<A> {
+    args
+    throw new Error("Not Implemented")
+}
 
 //
 // High Priority
@@ -28,38 +31,50 @@ export declare function deriveGuardLazy<A>(
 /**
  * @tsplus derive Guard<_> 10
  */
-export declare function deriveGuardLiteralNumber<A extends number>(
+export function deriveGuardLiteralNumber<A extends number>(
     ...args: IsUnion<A> extends false ? number extends A ? never : [
         value: A
     ] : never
-): Guard<A>
+): Guard<A> {
+    args
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Guard<_> 10
  */
-export declare function deriveGuardLiteralString<A extends string>(
+export function deriveGuardLiteralString<A extends string>(
     ...args: IsUnion<A> extends false ? string extends A ? never : [
         value: A
     ] : never
-): Guard<A>
+): Guard<A> {
+    args
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Guard<_> 10
  */
-export declare function deriveGuardMaybe<A extends Maybe<any>>(
+export function deriveGuardMaybe<A extends Maybe<any>>(
     ...args: [A] extends [Maybe<infer _A>]
         ? [element: Guard<_A>]
         : never
-): Guard<A>
+): Guard<A> {
+    args
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Guard<_> 10
  */
-export declare function deriveGuardArray<A extends Array<any>>(
+export function deriveGuardArray<A extends Array<any>>(
     ...args: [A] extends [Array<infer _A>] ? [Array<_A>] extends [A] ? [
         element: Guard<_A>
     ] : never : never
-): Guard<A>
+): Guard<A> {
+    args
+    throw new Error("Not Implemented")
+}
 
 //
 // Mid Priority
@@ -68,16 +83,19 @@ export declare function deriveGuardArray<A extends Array<any>>(
 /**
  * @tsplus derive Guard<&> 20
  */
-export declare function deriveGuardIntersection<A extends unknown[]>(
+export function deriveGuardIntersection<A extends unknown[]>(
     ...args: {
         [k in keyof A]: Guard<A[k]>
     }
-): Guard<UnionToIntersection<A[number]>>
+): Guard<UnionToIntersection<A[number]>> {
+    args
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Guard<_> 20
  */
-export declare function deriveGuardStruct<A extends Record<string, any>>(
+export function deriveGuardStruct<A extends Record<string, any>>(
     ...args: keyof A extends string ? IsUnion<A> extends false ? [
         requiredFields: {
             [k in RequiredKeys<A>]: Guard<A[k]>
@@ -86,7 +104,10 @@ export declare function deriveGuardStruct<A extends Record<string, any>>(
             [k in OptionalKeys<A>]: Guard<NonNullable<A[k]>>
         }
     ] : never : never
-): Guard<A>
+): Guard<A> {
+    args
+    throw new Error("Not Implemented")
+}
 
 //
 // Low priority
@@ -95,11 +116,14 @@ export declare function deriveGuardStruct<A extends Record<string, any>>(
 /**
  * @tsplus derive Guard<|> 30
  */
-export declare function deriveGuardUnion<A extends unknown[]>(
+export function deriveGuardUnion<A extends unknown[]>(
     ...args: {
         [k in keyof A]: Guard<A[k]>
     }
-): Guard<A[number]>
+): Guard<A[number]> {
+    args
+    throw new Error("Not Implemented")
+}
 
 //
 // Implicits
@@ -108,19 +132,19 @@ export declare function deriveGuardUnion<A extends unknown[]>(
 /**
  * @tsplus implicit
  */
-export declare const number: Guard<number>
+export const number: Guard<number> = 0 as any
 
 /**
  * @tsplus implicit
  */
-export declare const string: Guard<string>
+export const string: Guard<string> = 0 as any
 
 /**
  * @tsplus implicit
  */
-export declare const date: Guard<Date>
+export const date: Guard<Date> = 0 as any
 
 /**
  * @tsplus implicit
  */
-export declare const boolean: Guard<boolean>
+export const boolean: Guard<boolean> = 0 as any

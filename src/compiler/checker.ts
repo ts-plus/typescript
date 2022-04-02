@@ -815,7 +815,9 @@ namespace ts {
                 ...collectTsPlusGetterTags(statement),
                 ...collectTsPlusOperatorTags(statement),
                 ...collectTsPlusPipeableTags(statement),
-                ...collectTsPlusStaticTags(statement)
+                ...collectTsPlusStaticTags(statement),
+                ...collectTsPlusImplicitTags(statement),
+                ...collectTsPlusDeriveTags(statement)
             ],
             getFluentExtensionForPipeableSymbol,
             getPrimitiveTypeName,
@@ -32889,7 +32891,7 @@ namespace ts {
                                 if (implicitTags.length > 0) {
                                     implicits.push([getTypeOfNode(declaration), declaration, true])
                                 }
-                                const deriveTags = collectTsPlusDerivationTags(declaration)
+                                const deriveTags = collectTsPlusDeriveTags(declaration)
                                 for (const tag of deriveTags) {
                                     const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
                                     if (match) {
@@ -32932,7 +32934,7 @@ namespace ts {
                                             if (implicitTags.length > 0) {
                                                 implicits.push([getTypeOfNode(declaration), declaration, false])
                                             }
-                                            const deriveTags = collectTsPlusDerivationTags(declaration)
+                                            const deriveTags = collectTsPlusDeriveTags(declaration)
                                             for (const tag of deriveTags) {
                                                 const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
                                                 if (match) {
@@ -44957,10 +44959,10 @@ namespace ts {
                 (tag): tag is TsPlusJSDocImplicitTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("implicit")
             );
         }
-        function collectTsPlusDerivationTags(statement: Declaration) {
+        function collectTsPlusDeriveTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
-                (tag): tag is TsPlusJSDocDerivationTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("derive")
+                (tag): tag is TsPlusJSDocDeriveTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("derive")
             );
         }
         function collectTsPlusFluentTags(statement: Declaration) {

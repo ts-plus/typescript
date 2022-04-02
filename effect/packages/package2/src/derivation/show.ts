@@ -79,16 +79,19 @@ export function deriveShowArray<A extends Array<any>>(
 /**
  * @tsplus derive Show<&> 20
  */
-export declare function deriveShowIntersection<A extends unknown[]>(
+export function deriveShowIntersection<A extends unknown[]>(
     ...args: {
         [k in keyof A]: Show<A[k]>
     }
-): Show<UnionToIntersection<A[number]>>
+): Show<UnionToIntersection<A[number]>> {
+    args
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Show<_> 20
  */
-export declare function deriveShowStruct<A extends Record<string, any>>(
+export function deriveShowStruct<A extends Record<string, any>>(
     ...args: keyof A extends string ? IsUnion<A> extends false ? [
         requiredFields: {
             [k in RequiredKeys<A>]: Show<A[k]>
@@ -97,25 +100,34 @@ export declare function deriveShowStruct<A extends Record<string, any>>(
             [k in OptionalKeys<A>]: Show<NonNullable<A[k]>>
         }
     ] : never : never
-): Show<A>
+): Show<A> {
+    args
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Show<|> 10
  */
-export declare function deriveShowLiteralUnion<A extends unknown[]>(
+export function deriveShowLiteralUnion<A extends unknown[]>(
     ...args: A[number] extends string | number ? IsTypeEqualToAnyOf<A[number], [string, number, number | string]> extends true ? never : {
         [k in keyof A]: Show<A[k]>
     } : never
-): Show<A[number]>
+): Show<A[number]> {
+    args
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus derive Show<[]> 20
  */
-export declare function deriveShowTuple<A extends unknown[]>(
+export function deriveShowTuple<A extends unknown[]>(
     ...args: {
         [k in keyof A]: Show<A[k]>
     }
-): Show<A>
+): Show<A> {
+    args
+    throw new Error("Not Implemented")
+}
 
 //
 // Low priority
@@ -129,11 +141,14 @@ export interface GuardAndShow<A> {
 /**
  * @tsplus derive Show<|> 10
  */
-export declare function deriveShowUnion<A extends unknown[]>(
+export function deriveShowUnion<A extends unknown[]>(
     ...args: {
         [k in keyof A]: GuardAndShow<A[k]>
     }
-): Show<A[number]>
+): Show<A[number]> {
+    args
+    throw new Error("Not Implemented")
+}
 
 /**
  * @tsplus implicit
