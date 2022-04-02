@@ -32875,11 +32875,6 @@ namespace ts {
         }
 
         function hashTypeWorker(type: Type, _seen: Set<string>): number {
-            console.log("HASH", typeToString(
-                type,
-                undefined,
-                TypeFormatFlags.None
-            ))
             // TODO(Mike): Figure a batter way to hash, this doesn't consider structural equivalency
             return hashing.hashString(typeToString(
                 type,
