@@ -1,6 +1,5 @@
 import { Show } from "./show"
 import { } from "./guard"
-import * as external from "@tsplus-test/package1/external"
 
 //
 // Usage
@@ -48,5 +47,3 @@ export interface User {
  * @tsplus implicit
  */
 export const showUser: Show<User> = Derive()
-
-export const ok2: external.External = Derive()
