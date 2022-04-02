@@ -5440,8 +5440,14 @@ namespace ts {
         tsPlusResolvedType?: Type;
         tsPlusGlobalIdentifier?: Symbol;
         tsPlusDerivation?: Derivation;
-        tsPlusLocalImplicits?: ESMap<number, [Type, Declaration, boolean][]>;
-        tsPlusLocalDeriveRules?: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration][] }>;
+        tsPlusLocalScope?: {
+            implicits: ESMap<number, [Type, Declaration, boolean][]>;
+            rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration][] }>;
+        }
+        tsPlusExportedScope?: {
+            implicits: ESMap<number, [Type, Declaration, boolean][]>;
+            rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration][] }>;
+        }
         tsPlusImplicitScope?: {
             implicits: ESMap<number, [Type, Declaration, boolean][]>;
             rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration][] }>;
