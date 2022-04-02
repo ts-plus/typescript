@@ -358,6 +358,7 @@ namespace ts {
             deferredDiagnosticsCallbacks.push(arg);
         };
         // TSPLUS EXTENSION START
+        const typeHashCache = new Map<Type, number>();
         const typeSymbolCache = new Map<Symbol, string[]>();
         const companionSymbolCache = new Map<Symbol, string[]>();
         const resolvedFluentCache = new Map<string, ESMap<string, TsPlusFluentExtension>>();
@@ -32871,16 +32872,14 @@ namespace ts {
         }
 
         function hashType(type: Type) {
-            return hashTypeWorker(type, new Set());
-        }
-
-        function hashTypeWorker(type: Type, _seen: Set<string>): number {
-            // TODO(Mike): Figure a batter way to hash, this doesn't consider structural equivalency
-            return hashing.hashString(typeToString(
-                type,
-                undefined,
-                TypeFormatFlags.None
-            ));
+            if (!typeHashCache.has(type)) {
+                typeHashCache.set(type, hashing.hashString(typeToString(
+                    type,
+                    undefined,
+                    TypeFormatFlags.None
+                )))!;
+            }
+            return typeHashCache.get(type)!;
         }
 
         function getImplicitScope(location: Node) {
@@ -33000,6 +32999,10 @@ namespace ts {
             return getNodeLinks(getSourceFileOfNode(location)).tsPlusDerivationRules?.get(tag)
         }
 
+        function isIdenticalForDerivation(self: Type, that: Type) {
+            return isTypeIdenticalTo(self, that) && hashType(self) === hashType(that);
+        }
+
         function deriveTypeWorker(
             location: Node,
             originalType: Type,
@@ -33016,10 +33019,11 @@ namespace ts {
                     type
                 };
             }
-            const implicitScope = implicitScopeMap.get(hashType(type));
+            const typeHash = hashType(type);
+            const implicitScope = implicitScopeMap.get(typeHash);
             if (implicitScope) {
                 for (const [implicitType, declaration, local] of implicitScope) {
-                    if (isTypeIdenticalTo(type, implicitType) && (!local || isBlockScopedNameDeclaredBeforeUse(declaration, location))) {
+                    if (isIdenticalForDerivation(type, implicitType) && (!local || isBlockScopedNameDeclaredBeforeUse(declaration, location))) {
                         return {
                             _tag: "FromImplicitScope",
                             type,
@@ -33029,7 +33033,7 @@ namespace ts {
                 }
             }
             for (const derivedType of derivationScope) {
-                if (isTypeIdenticalTo(type, derivedType.type)) {
+                if (isIdenticalForDerivation(type, derivedType.type)) {
                     const rule: FromPriorDerivation = {
                         _tag: "FromPriorDerivation",
                         derivation: derivedType,
@@ -33041,7 +33045,7 @@ namespace ts {
             }
             const newCurrentDerivation = [...currentDerivation, type];
             for (const prohibitedType of prohibited) {
-                if (isTypeIdenticalTo(type, prohibitedType)) {
+                if (isIdenticalForDerivation(type, prohibitedType)) {
                     if (diagnostics.length === 0) {
                         const digs: Diagnostic[] = [];
                         for (let i = 1; i < newCurrentDerivation.length - 1; i++) {
@@ -33264,7 +33268,7 @@ namespace ts {
                 };
             }
             if (diagnostics.length === 0) {
-                if (isTypeIdenticalTo(originalType, type)) {
+                if (isIdenticalForDerivation(originalType, type)) {
                     diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_and_no_derivation_rules_are_found, typeToString(originalType)));
                 } else {
                     const digs: Diagnostic[] = [];
@@ -46146,6 +46150,7 @@ namespace ts {
             unresolvedFluentCache.clear();
             operatorCache.clear();
             typeSymbolCache.clear();
+            typeHashCache.clear();
             staticFunctionCache.clear();
             staticValueCache.clear();
             unresolvedStaticCache.clear();

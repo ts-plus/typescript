@@ -101,17 +101,17 @@ export function deriveRefinementStruct<A, B extends Record<string, any> & A>(
     ...[requiredFields, optionalFields, objectRefinement]: keyof B extends string ? IsUnion<B> extends false ?
         A extends {} ? [
             requiredFields: {
-                [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Guard<B[k]>
+                [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Refinement<unknown, B[k]>
             },
             optionalFields: {
-                [k in OptionalKeys<B>]: k extends keyof A ? Refinement<A[k], NonNullable<B[k]>> : Guard<NonNullable<B[k]>>
+                [k in OptionalKeys<B>]: k extends keyof A ? Refinement<A[k], NonNullable<B[k]>> : Refinement<unknown, NonNullable<B[k]>>
             }
         ] : [
             requiredFields: {
-                [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Guard<B[k]>
+                [k in RequiredKeys<B>]: k extends keyof A ? Refinement<A[k], B[k]> : Refinement<unknown, B[k]>
             },
             optionalFields: {
-                [k in OptionalKeys<B>]: k extends keyof A ? Refinement<A[k], NonNullable<B[k]>> : Guard<NonNullable<B[k]>>
+                [k in OptionalKeys<B>]: k extends keyof A ? Refinement<A[k], NonNullable<B[k]>> : Refinement<unknown, NonNullable<B[k]>>
             },
             objectRefinement: Refinement<unknown, {}>
         ]
@@ -131,7 +131,7 @@ export function deriveRefinementStruct<A, B extends Record<string, any> & A>(
  * @tsplus derive Refinement<_, _> 30
  */
 export function deriveRefinementFromUnknown<A, B extends A>(
-    ...[guard]: unknown extends A ? never : [Guard<B>]
+    ...[guard]: [Guard<B>]
 ): Refinement<A, B> {
     guard
     throw new Error("Not Implemented")
@@ -141,4 +141,4 @@ export function deriveRefinementFromUnknown<A, B extends A>(
 // Usage
 //
 
-export const ok4: Refinement<unknown, { a: number, b?: string }> = Derive()
+export const ok4: Refinement<unknown, { a: number }> = Derive()
