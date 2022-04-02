@@ -285,9 +285,12 @@ namespace ts {
             function tryGetOptimizedPipeableCall(call: CallExpression): { definition: SourceFile, exportName: string } | undefined {
                 const original = getOriginalNode(call);
                 const optimized = checker.getNodeLinks(original).tsPlusOptimizedDataFirst;
-                if (optimized && isExpressionWithReferencedImport(call.expression)) {
+                if (optimized) {
                     if (isExpressionWithReferencedImport(call.expression)) {
                         importer.remove(call.expression.tsPlusReferencedImport);
+                    }
+                    if (isExpressionWithReferencedGlobalImport(call.expression)) {
+                        importer.remove(call.expression.tsPlusReferencedGlobalImport);
                     }
                 }
                 return optimized;
@@ -351,6 +354,9 @@ namespace ts {
                 const nodeLinks = checker.getNodeLinks(node);
                 if (nodeLinks.tsPlusCallExtension) {
                     const visited = visitCallExpression(source, traceInScope, node, visitor, context);
+                    if (isExpressionWithReferencedGlobalImport(visited.expression)) {
+                        importer.remove(visited.expression.tsPlusReferencedGlobalImport);
+                    }
                     return factory.updateCallExpression(
                         visited,
                         getPathOfExtension(context, importer, nodeLinks.tsPlusCallExtension, source, localUniqueExtensionNames),
@@ -384,6 +390,9 @@ namespace ts {
                         }
                     }
                     const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
+                    if (isExpressionWithReferencedGlobalImport(visited.expression)) {
+                        importer.remove(visited.expression.tsPlusReferencedGlobalImport);
+                    }
                     if (fluentExtension.tsPlusPipeable) {
                         return factory.updateCallExpression(
                             visited,
@@ -428,6 +437,9 @@ namespace ts {
                         }
                     }
                     const visited = visitCallExpression(source, traceInScope, node as CallExpression, visitor, context) as CallExpression;
+                    if (isExpressionWithReferencedGlobalImport(visited.expression)) {
+                        importer.remove(visited.expression.tsPlusReferencedGlobalImport);
+                    }
                     if (fluentExtension.tsPlusPipeable) {
                         return factory.updateCallExpression(
                             visited,
@@ -572,6 +584,7 @@ namespace ts {
             const id = importer.get(location);
             const node = factory.createPropertyAccessExpression(id, identifier);
             (node as ExpressionWithReferencedImport<PropertyAccessExpression>).tsPlusReferencedImport = location;
+            (node as ExpressionWithReferencedGlobalImport<PropertyAccessExpression>).tsPlusReferencedGlobalImport = location;
             return node;
         }
 
@@ -620,4 +633,9 @@ namespace ts {
         return !!(node as ExpressionWithReferencedImport).tsPlusReferencedImport;
     }
 
+    type ExpressionWithReferencedGlobalImport<T extends Expression = Expression> = T & { tsPlusReferencedGlobalImport: string };
+
+    function isExpressionWithReferencedGlobalImport(node: Expression): node is ExpressionWithReferencedGlobalImport {
+        return !!(node as ExpressionWithReferencedGlobalImport).tsPlusReferencedGlobalImport;
+    }
 }
