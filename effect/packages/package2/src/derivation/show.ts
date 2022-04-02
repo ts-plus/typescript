@@ -72,6 +72,18 @@ export function deriveShowArray<A extends Array<any>>(
     return new Show((a) => `Array<{${a.map(args[0].show)}}>`)
 }
 
+/**
+ * @tsplus derive Show<|> 10
+ */
+export function deriveShowLiteralUnion<A extends unknown[]>(
+    ...args: A[number] extends string | number ? IsTypeEqualToAnyOf<A[number], [string, number, number | string]> extends true ? never : {
+        [k in keyof A]: Show<A[k]>
+    } : never
+): Show<A[number]> {
+    args
+    throw new Error("Not Implemented")
+}
+
 //
 // Mid Priority
 //
@@ -106,18 +118,6 @@ export function deriveShowStruct<A extends Record<string, any>>(
 }
 
 /**
- * @tsplus derive Show<|> 10
- */
-export function deriveShowLiteralUnion<A extends unknown[]>(
-    ...args: A[number] extends string | number ? IsTypeEqualToAnyOf<A[number], [string, number, number | string]> extends true ? never : {
-        [k in keyof A]: Show<A[k]>
-    } : never
-): Show<A[number]> {
-    args
-    throw new Error("Not Implemented")
-}
-
-/**
  * @tsplus derive Show<[]> 20
  */
 export function deriveShowTuple<A extends unknown[]>(
@@ -133,14 +133,11 @@ export function deriveShowTuple<A extends unknown[]>(
  * @tsplus derive Show<|> 20
  */
 export function deriveShowUnionTagged<A extends { _tag: string }[]>(
-    ...args: UnionToTuple<A[number]["_tag"]> extends infer T ? T extends { length: A["length"] } ? [
-        tags: {
-            [k in keyof A]: A[k] extends { _tag: string } ? A[k]["_tag"] : never
-        },
+    ...args: UnionToTuple<A[number]["_tag"]>["length"] extends A["length"] ? [
         members: {
-            [k in keyof A]: A[k] extends { _tag: string } ? Show<A[k]> : never
+            [k in A[number]["_tag"]]: Show<Extract<A[number], { _tag: k }>>
         }
-    ] : never : never
+    ] : never
 ): Show<A[number]> {
     args
     throw new Error("Not Implemented")
