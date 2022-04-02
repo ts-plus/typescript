@@ -5439,9 +5439,9 @@ namespace ts {
         tsPlusOptimizedDataFirst?: { definition: SourceFile, exportName: string };
         tsPlusResolvedType?: Type;
         tsPlusGlobalIdentifier?: Symbol;
-        tsPlusDerivation?: Derivation
-        tsPlusImplicitScope?: [Type, Declaration, boolean][]
-        tsPlusDerivationRules?: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration][] }>
+        tsPlusDerivation?: Derivation;
+        tsPlusImplicitScope?: ESMap<number, [Type, Declaration, boolean][]>;
+        tsPlusDerivationRules?: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration][] }>;
         isFluent?: true;
         isFluentCall?: true;
         // TSPLUS EXTENSION END

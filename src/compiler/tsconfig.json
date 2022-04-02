@@ -10,6 +10,8 @@
     ],
 
     "files": [
+        "hashing.ts",
+        
         "corePublic.ts",
         "core.ts",
         "debug.ts",

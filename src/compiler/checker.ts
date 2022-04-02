@@ -32870,6 +32870,15 @@ namespace ts {
             }
         }
 
+        function hashType(type: Type) {
+            return hashTypeWorker(type, new Set());
+        }
+
+        function hashTypeWorker(type: Type, _seen: Set<string>): number {
+            // TODO(Mike): Figure a batter way to hash, this doesn't consider structural equivalency
+            return hashing.hashString(typeToString(type, undefined, TypeFormatFlags.NodeBuilderFlagsMask));
+        }
+
         function getImplicitScope(location: Node) {
             const nodeLinks = getNodeLinks(getSourceFileOfNode(location));
             if (!nodeLinks.tsPlusImplicitScope) {
@@ -32879,7 +32888,7 @@ namespace ts {
                     nodeLinks.tsPlusDerivationRules.clear();
                 }
                 const derivationRules = nodeLinks.tsPlusDerivationRules!;
-                const implicits: [Type, Declaration, boolean][] = [];
+                const indexedImplicits = new Map<number, [Type, Declaration, boolean][]>();
                 const selfExport = getSelfExportStatement(location);
                 const sourceFile = getSourceFileOfNode(location);
                 const exports = sourceFile.symbol.exports;
@@ -32889,7 +32898,12 @@ namespace ts {
                             if (getSelfExportStatement(declaration) !== selfExport) {
                                 const implicitTags = collectTsPlusImplicitTags(declaration)
                                 if (implicitTags.length > 0) {
-                                    implicits.push([getTypeOfNode(declaration), declaration, true])
+                                    const typeOfNode = getTypeOfNode(declaration);
+                                    const hash = hashType(typeOfNode);
+                                    if (!indexedImplicits.has(hash)) {
+                                        indexedImplicits.set(hash, []);
+                                    }
+                                    indexedImplicits.get(hash)!.push([typeOfNode, declaration, true]);
                                 }
                                 const deriveTags = collectTsPlusDeriveTags(declaration)
                                 for (const tag of deriveTags) {
@@ -32899,10 +32913,11 @@ namespace ts {
                                         if (!derivationRules.has(typeTag)) {
                                             derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
                                         }
+                                        const typeOfNode = getTypeOfNode(declaration);
                                         derivationRules.get(typeTag)?.rules.push([
                                             { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) }, 
                                             Number.parseFloat(priority),
-                                            getTypeOfNode(declaration),
+                                            typeOfNode,
                                             declaration
                                         ])
                                     } else {
@@ -32932,7 +32947,12 @@ namespace ts {
                                         if (getSelfExportStatement(declaration) !== selfExport) {
                                             const implicitTags = collectTsPlusImplicitTags(declaration)
                                             if (implicitTags.length > 0) {
-                                                implicits.push([getTypeOfNode(declaration), declaration, false])
+                                                const typeOfNode = getTypeOfNode(declaration);
+                                                const hash = hashType(typeOfNode);
+                                                if (!indexedImplicits.has(hash)) {
+                                                    indexedImplicits.set(hash, []);
+                                                }
+                                                indexedImplicits.get(hash)!.push([typeOfNode, declaration, false]);
                                             }
                                             const deriveTags = collectTsPlusDeriveTags(declaration)
                                             for (const tag of deriveTags) {
@@ -32942,10 +32962,11 @@ namespace ts {
                                                     if (!derivationRules.has(typeTag)) {
                                                         derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
                                                     }
+                                                    const typeOfNode = getTypeOfNode(declaration);
                                                     derivationRules.get(typeTag)!.rules.push([
                                                         { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) }, 
                                                         Number.parseFloat(priority),
-                                                        getTypeOfNode(declaration),
+                                                        typeOfNode,
                                                         declaration
                                                     ])
                                                 } else {
@@ -32966,7 +32987,7 @@ namespace ts {
                         }
                     }
                 });
-                nodeLinks.tsPlusImplicitScope = implicits;
+                nodeLinks.tsPlusImplicitScope = indexedImplicits;
             }
             return nodeLinks.tsPlusImplicitScope;
         }
@@ -32980,7 +33001,7 @@ namespace ts {
             originalType: Type,
             type: Type,
             diagnostics: Diagnostic[],
-            implicitScope: [Type, Declaration, boolean][],
+            implicitScopeMap: ESMap<number, [Type, Declaration, boolean][]>,
             derivationScope: FromRule[],
             prohibited: Type[],
             currentDerivation: Type[]
@@ -32991,13 +33012,16 @@ namespace ts {
                     type
                 };
             }
-            for (const [implicitType, declaration, local] of implicitScope) {
-                if (isTypeIdenticalTo(type, implicitType) && (!local || isBlockScopedNameDeclaredBeforeUse(declaration, location))) {
-                    return {
-                        _tag: "FromImplicitScope",
-                        type,
-                        implicit: declaration
-                    };
+            const implicitScope = implicitScopeMap.get(hashType(type));
+            if (implicitScope) {
+                for (const [implicitType, declaration, local] of implicitScope) {
+                    if (isTypeIdenticalTo(type, implicitType) && (!local || isBlockScopedNameDeclaredBeforeUse(declaration, location))) {
+                        return {
+                            _tag: "FromImplicitScope",
+                            type,
+                            implicit: declaration
+                        };
+                    }
                 }
             }
             for (const derivedType of derivationScope) {
@@ -33128,7 +33152,7 @@ namespace ts {
                                                 originalType,
                                                 childType,
                                                 diagnostics,
-                                                implicitScope,
+                                                implicitScopeMap,
                                                 newDerivationScope,
                                                 newProhibited,
                                                 newCurrentDerivation
@@ -33155,7 +33179,7 @@ namespace ts {
                     originalType,
                     prop,
                     diagnostics,
-                    implicitScope,
+                    implicitScopeMap,
                     derivationScope,
                     prohibited,
                     newCurrentDerivation
@@ -33182,7 +33206,7 @@ namespace ts {
                         originalType,
                         prop,
                         diagnostics,
-                        implicitScope,
+                        implicitScopeMap,
                         derivationScope,
                         prohibited,
                         newCurrentDerivation
@@ -33211,7 +33235,7 @@ namespace ts {
                                     originalType,
                                     getTypeOfSymbol(prop),
                                     diagnostics,
-                                    implicitScope,
+                                    implicitScopeMap,
                                     derivationScope,
                                     prohibited,
                                     newCurrentDerivation
