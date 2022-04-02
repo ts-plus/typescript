@@ -32881,122 +32881,65 @@ namespace ts {
             }
             return typeHashCache.get(type)!;
         }
-
+        interface ImplicitScope {
+            implicits: ESMap<number, [Type, Declaration, boolean][]>;
+            rules: ESMap<string, {
+                lazyRule: Declaration | undefined;
+                rules: [Rule, number, Type, Declaration][];
+            }>;
+        }
         function getImplicitScope(location: Node) {
             const nodeLinks = getNodeLinks(getSourceFileOfNode(location));
             if (!nodeLinks.tsPlusImplicitScope) {
-                if (!nodeLinks.tsPlusDerivationRules) {
-                    nodeLinks.tsPlusDerivationRules = new Map();
-                } else {
-                    nodeLinks.tsPlusDerivationRules.clear();
+                nodeLinks.tsPlusImplicitScope = {
+                    implicits: new Map(),
+                    rules: new Map()
                 }
-                const derivationRules = nodeLinks.tsPlusDerivationRules!;
-                const indexedImplicits = new Map<number, [Type, Declaration, boolean][]>();
+                const derivationRules = nodeLinks.tsPlusImplicitScope!.rules;
+                const indexedImplicits = nodeLinks.tsPlusImplicitScope!.implicits;
                 const selfExport = getSelfExportStatement(location);
                 const sourceFile = getSourceFileOfNode(location);
-                const exports = sourceFile.symbol.exports;
-                if (exports) {
-                    exports.forEach((exportSymbol) => {
-                        forEach(exportSymbol.declarations, (declaration) => {
-                            if (getSelfExportStatement(declaration) !== selfExport) {
-                                const implicitTags = collectTsPlusImplicitTags(declaration)
-                                if (implicitTags.length > 0) {
-                                    const typeOfNode = getTypeOfNode(declaration);
-                                    const hash = hashType(typeOfNode);
-                                    if (!indexedImplicits.has(hash)) {
-                                        indexedImplicits.set(hash, []);
-                                    }
-                                    indexedImplicits.get(hash)!.push([typeOfNode, declaration, true]);
-                                }
-                                const deriveTags = collectTsPlusDeriveTags(declaration)
-                                for (const tag of deriveTags) {
-                                    const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
-                                    if (match) {
-                                        const [, typeTag, paramActions, priority] = match;
-                                        if (!derivationRules.has(typeTag)) {
-                                            derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
-                                        }
-                                        const typeOfNode = getTypeOfNode(declaration);
-                                        derivationRules.get(typeTag)?.rules.push([
-                                            { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) }, 
-                                            Number.parseFloat(priority),
-                                            typeOfNode,
-                                            declaration
-                                        ])
-                                    } else {
-                                        const match = tag.comment.match(/^derive ([^<]*) lazy$/);
-                                        if (match) {
-                                            const [, typeTag] = match;
-                                            if (!derivationRules.has(typeTag)) {
-                                                derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
-                                            }
-                                            derivationRules.get(typeTag)!.lazyRule = declaration;
-                                        }
-                                    }
-                                }
+                nodeLinks.tsPlusLocalImplicits?.forEach((implicits, hash) => {
+                    implicits.forEach((implicit) => {
+                        if (getSelfExportStatement(implicit[1]) !== selfExport) {
+                            if (!indexedImplicits.get(hash)) {
+                                indexedImplicits.set(hash, []);
                             }
-                        })
-                    });
-                }
+                            indexedImplicits.get(hash)!.push(implicit);
+                        }
+                    })
+                })
+                nodeLinks.tsPlusLocalDeriveRules?.forEach((rule, key) => {
+                    derivationRules.set(key, rule);
+                })
                 sourceFile.imports.forEach((token) => {
                     if (sourceFile.resolvedModules) {
                         const resolvedFull = sourceFile.resolvedModules.get(token.text, void 0);
                         if (resolvedFull && resolvedFull) {
                             const sourceOfModule = host.getSourceFile(resolvedFull.resolvedFileName);
                             if (sourceOfModule) {
-                                const exportsOfModule = getExportsOfModule(sourceOfModule.symbol);
-                                exportsOfModule.forEach((exportSymbol) => {
-                                    forEach(exportSymbol.declarations, (declaration) => {
-                                        if (getSelfExportStatement(declaration) !== selfExport) {
-                                            const implicitTags = collectTsPlusImplicitTags(declaration)
-                                            if (implicitTags.length > 0) {
-                                                const typeOfNode = getTypeOfNode(declaration);
-                                                const hash = hashType(typeOfNode);
-                                                if (!indexedImplicits.has(hash)) {
-                                                    indexedImplicits.set(hash, []);
-                                                }
-                                                indexedImplicits.get(hash)!.push([typeOfNode, declaration, false]);
-                                            }
-                                            const deriveTags = collectTsPlusDeriveTags(declaration)
-                                            for (const tag of deriveTags) {
-                                                const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
-                                                if (match) {
-                                                    const [, typeTag, paramActions, priority] = match;
-                                                    if (!derivationRules.has(typeTag)) {
-                                                        derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
-                                                    }
-                                                    const typeOfNode = getTypeOfNode(declaration);
-                                                    derivationRules.get(typeTag)!.rules.push([
-                                                        { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) }, 
-                                                        Number.parseFloat(priority),
-                                                        typeOfNode,
-                                                        declaration
-                                                    ])
-                                                } else {
-                                                    const match = tag.comment.match(/^derive ([^<]*) lazy$/);
-                                                    if (match) {
-                                                        const [, typeTag] = match;
-                                                        if (!derivationRules.has(typeTag)) {
-                                                            derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
-                                                        }
-                                                        derivationRules.get(typeTag)!.lazyRule = declaration;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    })
-                                })
+                                const linksOfModule = getNodeLinks(sourceOfModule);
+                                linksOfModule.tsPlusLocalImplicits?.forEach((implicits, hash) => {
+                                    if (!indexedImplicits.has(hash)) {
+                                        indexedImplicits.set(hash, []);
+                                    }
+                                    indexedImplicits.get(hash)!.push(...implicits);
+                                });
+                                linksOfModule.tsPlusLocalDeriveRules?.forEach((rule, tag) => {
+                                    if (!derivationRules.has(tag)) {
+                                        derivationRules.set(tag, { lazyRule: void 0, rules: [] })
+                                    }
+                                    derivationRules.get(tag)!.rules.push(...rule.rules);
+                                    if (rule.lazyRule) {
+                                        derivationRules.get(tag)!.lazyRule = rule.lazyRule;
+                                    }
+                                });
                             }
                         }
                     }
                 });
-                nodeLinks.tsPlusImplicitScope = indexedImplicits;
             }
             return nodeLinks.tsPlusImplicitScope;
-        }
-
-        function findRulesForTag(location: Node, tag: string) {
-            return getNodeLinks(getSourceFileOfNode(location)).tsPlusDerivationRules?.get(tag)
         }
 
         function isIdenticalForDerivation(self: Type, that: Type) {
@@ -33008,7 +32951,7 @@ namespace ts {
             originalType: Type,
             type: Type,
             diagnostics: Diagnostic[],
-            implicitScopeMap: ESMap<number, [Type, Declaration, boolean][]>,
+            implicitScope: ImplicitScope,
             derivationScope: FromRule[],
             prohibited: Type[],
             currentDerivation: Type[]
@@ -33020,9 +32963,9 @@ namespace ts {
                 };
             }
             const typeHash = hashType(type);
-            const implicitScope = implicitScopeMap.get(typeHash);
-            if (implicitScope) {
-                for (const [implicitType, declaration, local] of implicitScope) {
+            const implicits = implicitScope.implicits.get(typeHash);
+            if (implicits) {
+                for (const [implicitType, declaration, local] of implicits) {
                     if (isIdenticalForDerivation(type, implicitType) && (!local || isBlockScopedNameDeclaredBeforeUse(declaration, location))) {
                         return {
                             _tag: "FromImplicitScope",
@@ -33077,7 +33020,7 @@ namespace ts {
             if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
                 const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
                 tagCheck: for (const tag of arrayFrom(tags.values())) {
-                    const foundRules = findRulesForTag(location, tag);
+                    const foundRules = implicitScope.rules.get(tag);
                     if (!foundRules) {
                         continue tagCheck;
                     }
@@ -33160,7 +33103,7 @@ namespace ts {
                                                 originalType,
                                                 childType,
                                                 diagnostics,
-                                                implicitScopeMap,
+                                                implicitScope,
                                                 newDerivationScope,
                                                 newProhibited,
                                                 newCurrentDerivation
@@ -33187,7 +33130,7 @@ namespace ts {
                     originalType,
                     prop,
                     diagnostics,
-                    implicitScopeMap,
+                    implicitScope,
                     derivationScope,
                     prohibited,
                     newCurrentDerivation
@@ -33214,7 +33157,7 @@ namespace ts {
                         originalType,
                         prop,
                         diagnostics,
-                        implicitScopeMap,
+                        implicitScope,
                         derivationScope,
                         prohibited,
                         newCurrentDerivation
@@ -33243,7 +33186,7 @@ namespace ts {
                                     originalType,
                                     getTypeOfSymbol(prop),
                                     diagnostics,
-                                    implicitScopeMap,
+                                    implicitScope,
                                     derivationScope,
                                     prohibited,
                                     newCurrentDerivation
@@ -46138,9 +46081,62 @@ namespace ts {
         function initTsPlusTypeCheckerGlobal() {
             globalSymbolsCache.clear();
             for (const file of host.getSourceFiles()) {
+                const links = getNodeLinks(file)
+                if (!links.tsPlusLocalImplicits) {
+                    links.tsPlusLocalImplicits = new Map()
+                }
+                if (!links.tsPlusLocalDeriveRules) {
+                    links.tsPlusLocalDeriveRules = new Map()
+                }
                 for (const statement of file.statements) {
                     if (isImportDeclaration(statement)) {
                         tryCacheTsPlusGlobalSymbol(statement);
+                    }
+                }
+                const indexedImplicits = links.tsPlusLocalImplicits!;
+                const derivationRules = links.tsPlusLocalDeriveRules!;
+                if (file.symbol) {
+                    const exports = file.symbol.exports;
+                    if (exports) {
+                        exports.forEach((exportSymbol) => {
+                            forEach(exportSymbol.declarations, (declaration) => {
+                                const implicitTags = collectTsPlusImplicitTags(declaration)
+                                if (implicitTags.length > 0) {
+                                    const typeOfNode = getTypeOfNode(declaration);
+                                    const hash = hashType(typeOfNode);
+                                    if (!indexedImplicits.has(hash)) {
+                                        indexedImplicits.set(hash, []);
+                                    }
+                                    indexedImplicits.get(hash)!.push([typeOfNode, declaration, true]);
+                                }
+                                const deriveTags = collectTsPlusDeriveTags(declaration)
+                                for (const tag of deriveTags) {
+                                    const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
+                                    if (match) {
+                                        const [, typeTag, paramActions, priority] = match;
+                                        if (!derivationRules.has(typeTag)) {
+                                            derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
+                                        }
+                                        const typeOfNode = getTypeOfNode(declaration);
+                                        derivationRules.get(typeTag)?.rules.push([
+                                            { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) }, 
+                                            Number.parseFloat(priority),
+                                            typeOfNode,
+                                            declaration
+                                        ])
+                                    } else {
+                                        const match = tag.comment.match(/^derive ([^<]*) lazy$/);
+                                        if (match) {
+                                            const [, typeTag] = match;
+                                            if (!derivationRules.has(typeTag)) {
+                                                derivationRules.set(typeTag, { lazyRule: void 0, rules: [] })
+                                            }
+                                            derivationRules.get(typeTag)!.lazyRule = declaration;
+                                        }
+                                    }
+                                }
+                            })
+                        });
                     }
                 }
             }
