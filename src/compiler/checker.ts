@@ -32778,7 +32778,7 @@ namespace ts {
                         location.arguments[0],
                         Diagnostics.Deriving_type_0_1,
                         typeToString(derivation.type),
-                        "implicitly from scope"
+                        `using implicit ${derivation.implicit.symbol.escapedName} (${getRelativePathFromFile(getSourceFileOfNode(location).fileName, getSourceFileOfNode(derivation.implicit).fileName, normalizePath)})`
                     )
                 }
                 case "FromIntersectionStructure": {
@@ -32837,7 +32837,9 @@ namespace ts {
                             derivation.arguments.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
                             Diagnostics.Deriving_type_0_1,
                             typeToString(derivation.type),
-                            `using rule ${derivation.rule.symbol.escapedName}` + (derivation.usedBy.length > 0 ? " (recursive)" : "")
+                            `using rule ${derivation.rule.symbol.escapedName}` +
+                            (derivation.usedBy.length > 0 ? " (recursive)" : "") +
+                            ` (${getRelativePathFromFile(getSourceFileOfNode(location).fileName, getSourceFileOfNode(derivation.rule).fileName, normalizePath)})`
                         )
                     )
                 }
