@@ -363,6 +363,13 @@ namespace ts {
         const companionSymbolCache = new Map<Symbol, string[]>();
         const resolvedFluentCache = new Map<string, ESMap<string, TsPlusFluentExtension>>();
         const fluentCache = new Map<string, ESMap<string, () => TsPlusFluentExtension | undefined>>();
+        const tsPlusWorldScope: {
+            implicits: ESMap<number, [Type, Declaration][]>;
+            rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration][] }>;
+        } = {
+            implicits: new Map(),
+            rules: new Map()
+        };
         const unresolvedFluentCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
         const operatorCache = new Map<string, ESMap<string, TsPlusOperatorExtension[]>>();
@@ -32846,7 +32853,7 @@ namespace ts {
             const nodeLinks = getNodeLinks(deriveCallNode);
             if (!nodeLinks.tsPlusDerivation) {
                 const derivationDiagnostics: Diagnostic[] = [];
-                const derivation = deriveTypeWorker(deriveCallNode, type, type, derivationDiagnostics, getImplicitScope(deriveCallNode), [], [], []);
+                const derivation = deriveTypeWorker(deriveCallNode, type, type, derivationDiagnostics, [], [], []);
                 nodeLinks.tsPlusDerivation = derivation;
                 if (isErrorType(derivation.type)) {
                     derivationDiagnostics.forEach((diagnostic) => {
@@ -32881,66 +32888,6 @@ namespace ts {
             }
             return typeHashCache.get(type)!;
         }
-        interface ImplicitScope {
-            implicits: ESMap<number, [Type, Declaration, boolean][]>;
-            rules: ESMap<string, {
-                lazyRule: Declaration | undefined;
-                rules: [Rule, number, Type, Declaration][];
-            }>;
-        }
-        function getImplicitScope(location: Node) {
-            const nodeLinks = getNodeLinks(getSourceFileOfNode(location));
-            if (!nodeLinks.tsPlusImplicitScope) {
-                nodeLinks.tsPlusImplicitScope = {
-                    implicits: new Map(),
-                    rules: new Map()
-                }
-                const derivationRules = nodeLinks.tsPlusImplicitScope!.rules;
-                const indexedImplicits = nodeLinks.tsPlusImplicitScope!.implicits;
-                const selfExport = getSelfExportStatement(location);
-                const sourceFile = getSourceFileOfNode(location);
-                nodeLinks.tsPlusLocalScope?.implicits.forEach((implicits, hash) => {
-                    implicits.forEach((implicit) => {
-                        if (getSelfExportStatement(implicit[1]) !== selfExport) {
-                            if (!indexedImplicits.get(hash)) {
-                                indexedImplicits.set(hash, []);
-                            }
-                            indexedImplicits.get(hash)!.push(implicit);
-                        }
-                    })
-                })
-                nodeLinks.tsPlusLocalScope?.rules.forEach((rule, key) => {
-                    derivationRules.set(key, rule);
-                })
-                sourceFile.imports.forEach((token) => {
-                    if (sourceFile.resolvedModules) {
-                        const resolvedFull = sourceFile.resolvedModules.get(token.text, void 0);
-                        if (resolvedFull && resolvedFull) {
-                            const sourceOfModule = host.getSourceFile(resolvedFull.resolvedFileName);
-                            if (sourceOfModule) {
-                                const linksOfModule = getNodeLinks(sourceOfModule);
-                                linksOfModule.tsPlusExportedScope?.implicits.forEach((implicits, hash) => {
-                                    if (!indexedImplicits.has(hash)) {
-                                        indexedImplicits.set(hash, []);
-                                    }
-                                    indexedImplicits.get(hash)!.push(...implicits);
-                                });
-                                linksOfModule.tsPlusExportedScope?.rules.forEach((rule, tag) => {
-                                    if (!derivationRules.has(tag)) {
-                                        derivationRules.set(tag, { lazyRule: void 0, rules: [] })
-                                    }
-                                    derivationRules.get(tag)!.rules.push(...rule.rules);
-                                    if (rule.lazyRule) {
-                                        derivationRules.get(tag)!.lazyRule = rule.lazyRule;
-                                    }
-                                });
-                            }
-                        }
-                    }
-                });
-            }
-            return nodeLinks.tsPlusImplicitScope;
-        }
 
         function isIdenticalForDerivation(self: Type, that: Type) {
             return isTypeIdenticalTo(self, that) && hashType(self) === hashType(that);
@@ -32951,7 +32898,6 @@ namespace ts {
             originalType: Type,
             type: Type,
             diagnostics: Diagnostic[],
-            implicitScope: ImplicitScope,
             derivationScope: FromRule[],
             prohibited: Type[],
             currentDerivation: Type[]
@@ -32962,11 +32908,12 @@ namespace ts {
                     type
                 };
             }
+            const selfExport = getSelfExportStatement(location);
             const typeHash = hashType(type);
-            const implicits = implicitScope.implicits.get(typeHash);
+            const implicits = tsPlusWorldScope.implicits.get(typeHash);
             if (implicits) {
-                for (const [implicitType, declaration, local] of implicits) {
-                    if (isIdenticalForDerivation(type, implicitType) && (!local || isBlockScopedNameDeclaredBeforeUse(declaration, location))) {
+                for (const [implicitType, declaration] of implicits) {
+                    if (isIdenticalForDerivation(type, implicitType) && isBlockScopedNameDeclaredBeforeUse(declaration, location) && getSelfExportStatement(declaration) !== selfExport) {
                         return {
                             _tag: "FromImplicitScope",
                             type,
@@ -33020,7 +32967,7 @@ namespace ts {
             if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
                 const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
                 tagCheck: for (const tag of arrayFrom(tags.values())) {
-                    const foundRules = implicitScope.rules.get(tag);
+                    const foundRules = tsPlusWorldScope.rules.get(tag);
                     if (!foundRules) {
                         continue tagCheck;
                     }
@@ -33103,7 +33050,6 @@ namespace ts {
                                                 originalType,
                                                 childType,
                                                 diagnostics,
-                                                implicitScope,
                                                 newDerivationScope,
                                                 newProhibited,
                                                 newCurrentDerivation
@@ -33130,7 +33076,6 @@ namespace ts {
                     originalType,
                     prop,
                     diagnostics,
-                    implicitScope,
                     derivationScope,
                     prohibited,
                     newCurrentDerivation
@@ -33157,7 +33102,6 @@ namespace ts {
                         originalType,
                         prop,
                         diagnostics,
-                        implicitScope,
                         derivationScope,
                         prohibited,
                         newCurrentDerivation
@@ -33186,7 +33130,6 @@ namespace ts {
                                     originalType,
                                     getTypeOfSymbol(prop),
                                     diagnostics,
-                                    implicitScope,
                                     derivationScope,
                                     prohibited,
                                     newCurrentDerivation
@@ -46077,66 +46020,51 @@ namespace ts {
                 }
             }
         }
-        function fillScopeWithExports(exports: SymbolTable, collectTsPlusImplicitTags: (statement: Declaration) => readonly TsPlusJSDocImplicitTag[], getTypeOfNode: (node: Node) => Type, hashType: (type: Type) => number, indexedImplicits: ESMap<number, [Type, Declaration, boolean][]>, collectTsPlusDeriveTags: (statement: Declaration) => readonly TsPlusJSDocDeriveTag[], derivationRules: ESMap<string, { lazyRule: Declaration | undefined; rules: [Rule, number, Type, Declaration][]; }>) {
-            exports.forEach((exportSymbol) => {
-                forEach(exportSymbol.declarations, (declaration) => {
-                    const implicitTags = collectTsPlusImplicitTags(declaration);
-                    if (implicitTags.length > 0) {
-                        const typeOfNode = getTypeOfNode(declaration);
-                        const hash = hashType(typeOfNode);
-                        if (!indexedImplicits.has(hash)) {
-                            indexedImplicits.set(hash, []);
-                        }
-                        indexedImplicits.get(hash)!.push([typeOfNode, declaration, true]);
-                    }
-                    const deriveTags = collectTsPlusDeriveTags(declaration);
-                    for (const tag of deriveTags) {
-                        const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
-                        if (match) {
-                            const [, typeTag, paramActions, priority] = match;
-                            if (!derivationRules.has(typeTag)) {
-                                derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
-                            }
-                            const typeOfNode = getTypeOfNode(declaration);
-                            derivationRules.get(typeTag)?.rules.push([
-                                { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) },
-                                Number.parseFloat(priority),
-                                typeOfNode,
-                                declaration
-                            ]);
-                        } else {
-                            const match = tag.comment.match(/^derive ([^<]*) lazy$/);
-                            if (match) {
-                                const [, typeTag] = match;
-                                if (!derivationRules.has(typeTag)) {
-                                    derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
-                                }
-                                derivationRules.get(typeTag)!.lazyRule = declaration;
-                            }
-                        }
-                    }
-                });
-            });
-        }
-        function fillTsPlusExportedScope(file: SourceFile) {
-            const links = getNodeLinks(file)
-            const indexedImplicits = links.tsPlusExportedScope!.implicits;
-            const derivationRules = links.tsPlusExportedScope!.rules;
-            if (file.symbol) {
-                const exports = getExportsOfModule(file.symbol);
-                if (exports) {
-                    fillScopeWithExports(exports, collectTsPlusImplicitTags, getTypeOfNode, hashType, indexedImplicits, collectTsPlusDeriveTags, derivationRules);
-                }
-            }
-        }
         function fillTsPlusLocalScope(file: SourceFile) {
-            const links = getNodeLinks(file)
-            const indexedImplicits = links.tsPlusLocalScope!.implicits;
-            const derivationRules = links.tsPlusLocalScope!.rules;
+            const indexedImplicits = tsPlusWorldScope.implicits;
+            const derivationRules = tsPlusWorldScope.rules;
             if (file.symbol) {
                 const exports = file.symbol.exports;
                 if (exports) {
-                    fillScopeWithExports(exports, collectTsPlusImplicitTags, getTypeOfNode, hashType, indexedImplicits, collectTsPlusDeriveTags, derivationRules);
+                    exports.forEach((exportSymbol) => {
+                        forEach(exportSymbol.declarations, (declaration) => {
+                            const implicitTags = collectTsPlusImplicitTags(declaration);
+                            if (implicitTags.length > 0) {
+                                const typeOfNode = getTypeOfNode(declaration);
+                                const hash = hashType(typeOfNode);
+                                if (!indexedImplicits.has(hash)) {
+                                    indexedImplicits.set(hash, []);
+                                }
+                                indexedImplicits.get(hash)!.push([typeOfNode, declaration]);
+                            }
+                            const deriveTags = collectTsPlusDeriveTags(declaration);
+                            for (const tag of deriveTags) {
+                                const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
+                                if (match) {
+                                    const [, typeTag, paramActions, priority] = match;
+                                    if (!derivationRules.has(typeTag)) {
+                                        derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
+                                    }
+                                    const typeOfNode = getTypeOfNode(declaration);
+                                    derivationRules.get(typeTag)?.rules.push([
+                                        { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) },
+                                        Number.parseFloat(priority),
+                                        typeOfNode,
+                                        declaration
+                                    ]);
+                                } else {
+                                    const match = tag.comment.match(/^derive ([^<]*) lazy$/);
+                                    if (match) {
+                                        const [, typeTag] = match;
+                                        if (!derivationRules.has(typeTag)) {
+                                            derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
+                                        }
+                                        derivationRules.get(typeTag)!.lazyRule = declaration;
+                                    }
+                                }
+                            }
+                        });
+                    });
                 }
             }
         }
@@ -46148,21 +46076,7 @@ namespace ts {
                         tryCacheTsPlusGlobalSymbol(statement);
                     }
                 }
-                const links = getNodeLinks(file)
-                if (!links.tsPlusLocalScope) {
-                    links.tsPlusLocalScope = {
-                        implicits: new Map(),
-                        rules: new Map()
-                    }
-                }
-                if (!links.tsPlusExportedScope) {
-                    links.tsPlusExportedScope = {
-                        implicits: new Map(),
-                        rules: new Map()
-                    }
-                }
                 fillTsPlusLocalScope(file);
-                fillTsPlusExportedScope(file);
             }
         }
         function initTsPlusTypeChecker() {
@@ -46181,9 +46095,9 @@ namespace ts {
             indexAccessExpressionCache.clear();
             pipeableCache.clear();
             inheritanceSymbolCache.clear();
-            
+            tsPlusWorldScope.implicits.clear();
+            tsPlusWorldScope.rules.clear();
             initTsPlusTypeCheckerGlobal();
-
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);
             }
