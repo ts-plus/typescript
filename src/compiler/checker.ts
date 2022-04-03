@@ -365,7 +365,7 @@ namespace ts {
         const fluentCache = new Map<string, ESMap<string, () => TsPlusFluentExtension | undefined>>();
         const tsPlusWorldScope: {
             implicits: ESMap<number, [Type, Declaration][]>;
-            rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration][] }>;
+            rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration, Set<string>][] }>;
         } = {
             implicits: new Map(),
             rules: new Map()
@@ -33001,13 +33001,11 @@ namespace ts {
                         continue tagCheck;
                     }
                     const rules = foundRules.rules.sort((a, b) => a[1] - b[1]);
-                    const supportsLazy = !!foundRules.lazyRule;
-                    const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
                     const targetTypes = (type as TypeReference).resolvedTypeArguments!;
                     if (rules.length > 0) {
                         hasRules =  true;
                     }
-                    ruleCheck: for (const [rule, _, ruleType, ruleDeclaration] of rules) {
+                    ruleCheck: for (const [rule, _, ruleType, ruleDeclaration, options] of rules) {
                         const toCheck: Type[] = [];
                         if (rule.paramActions.length !== targetTypes.length) {
                             continue ruleCheck;
@@ -33073,6 +33071,8 @@ namespace ts {
                                                 usedBy: [],
                                                 lazyRule: foundRules.lazyRule
                                             };
+                                            const supportsLazy = !!foundRules.lazyRule && !options.has("no-recursion");
+                                            const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
                                             const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
                                             const derivations = map(types, (childType) => deriveTypeWorker(
                                                 location,
@@ -46070,7 +46070,8 @@ namespace ts {
                             for (const tag of deriveTags) {
                                 const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
                                 if (match) {
-                                    const [, typeTag, paramActions, priority] = match;
+                                    const [, typeTag, paramActions, rest] = match;
+                                    const [priority, ...options] = rest.split(" ");
                                     if (!derivationRules.has(typeTag)) {
                                         derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
                                     }
@@ -46079,7 +46080,8 @@ namespace ts {
                                         { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) },
                                         Number.parseFloat(priority),
                                         typeOfNode,
-                                        declaration
+                                        declaration,
+                                        new Set(options)
                                     ]);
                                 } else {
                                     const match = tag.comment.match(/^derive ([^<]*) lazy$/);

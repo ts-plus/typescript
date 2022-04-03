@@ -128,7 +128,7 @@ export function deriveRefinementStruct<A, B extends Record<string, any> & A>(
 //
 
 /**
- * @tsplus derive Refinement<_, _> 30
+ * @tsplus derive Refinement<_, _> 30 no-recursion
  */
 export function deriveRefinementFromUnknown<A, B extends A>(
     ...[guard]: [Guard<B>]
