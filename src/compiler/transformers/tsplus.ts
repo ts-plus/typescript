@@ -37,13 +37,17 @@ namespace ts {
             return this.cache.get(d)!
         }
     }
+    interface LocalUniqueName {
+        readonly name: Identifier
+        readonly isExported: boolean
+    }
     export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
         const fileMap: [string, RegExp][] = getFileMap(options, host);
         const traceMap: [string, RegExp][] = getTraceMap(options, host);
         return function (context: TransformationContext) {
             const importer = new TsPlusImporter(context.factory);
             const uniqueNameOfDerivation = new UniqueNameOfDerivation(context.factory);
-            const localUniqueExtensionNames = new Map<string, Identifier>();
+            const localUniqueExtensionNames = new Map<string, LocalUniqueName>();
             const fileVar = factory.createUniqueName("fileName");
             let fileVarUsed = false;
             return chainBundle(context, transformSourceFile);
@@ -134,10 +138,62 @@ namespace ts {
                             return visitVariableStatement(source, node as VariableStatement, visitor(source, traceInScope), context)
                         case SyntaxKind.Identifier:
                             return visitIdentifier(source, traceInScope, node as Identifier, context);
+                        case SyntaxKind.Block:
+                            return visitBlock(node as Block, visitor(source, traceInScope), context);
                         default:
                             return visitEachChild(node, visitor(source, traceInScope), context);
                     }
                 }
+            }
+            function visitBlock(node: Block, visitor: Visitor, context: TransformationContext) {
+                const uniqueNames = checker.getNodeLinks(getEnclosingBlockScopeContainer(node)).uniqueNames;
+                if (uniqueNames) {
+                    const remainingNames = new Set(uniqueNames);
+                    const updatedStatements = flatMapToMutable(node.statements, (statement) => {
+                        if (isVariableStatement(statement) && statement.declarationList.declarations[0]) {
+                            const declaration = statement.declarationList.declarations[0];
+                            const declarationLinks = checker.getNodeLinks(declaration);
+                            if (declarationLinks.needsUniqueName) {
+                                Debug.assert(isNamedDeclaration(declaration) && isIdentifier(declaration.name));
+                                const uniqueIdentifier = context.factory.createUniqueName(declaration.name.escapedText as string);
+                                declarationLinks.resolvedUniqueName = uniqueIdentifier;
+                                remainingNames.delete(declaration as NamedDeclaration & { name: Identifier });
+                                return [
+                                    statement,
+                                    context.factory.createVariableStatement(
+                                        [context.factory.createModifier(SyntaxKind.ConstKeyword)],
+                                        context.factory.createVariableDeclarationList([
+                                            context.factory.createVariableDeclaration(uniqueIdentifier, undefined, undefined, declaration.name)
+                                        ], NodeFlags.Const)
+                                    ),
+                                ];
+                            }
+                        }
+                        return statement;
+                    })
+                    remainingNames.forEach((declaration) => {
+                        const declarationLinks = checker.getNodeLinks(declaration);
+                        if (declarationLinks.needsUniqueName) {
+                            Debug.assert(isNamedDeclaration(declaration) && isIdentifier(declaration.name));
+                            const uniqueIdentifier = context.factory.createUniqueName(declaration.name.escapedText as string);
+                            declarationLinks.resolvedUniqueName = uniqueIdentifier;
+                            updatedStatements.unshift(
+                                context.factory.createVariableStatement(
+                                    [context.factory.createModifier(SyntaxKind.ConstKeyword)],
+                                    context.factory.createVariableDeclarationList([
+                                        context.factory.createVariableDeclaration(uniqueIdentifier, undefined, undefined, declaration.name)
+                                    ], NodeFlags.Const)
+                                ),
+                            );
+                        }
+                    })
+                    remainingNames.clear();
+                    return context.factory.updateBlock(
+                        node,
+                        visitNodes(context.factory.createNodeArray(updatedStatements), visitor)
+                    )
+                }
+                return visitEachChild(node, visitor, context);
             }
             function isExtension(node: Node): boolean {
                 const extensionRegex = /^(static|fluent|getter|operator|index|pipeable).*/;
@@ -162,11 +218,11 @@ namespace ts {
                         if (symbol.valueDeclaration && isExtension(symbol.valueDeclaration) && getSourceFileOfNode(symbol.valueDeclaration) === source) {
                             const name = node.escapedText.toString();
                             if (localUniqueExtensionNames.has(name)) {
-                                return localUniqueExtensionNames.get(name)!;
+                                return localUniqueExtensionNames.get(name)!.name;
                             }
                             else {
                                 const uniqueName = context.factory.createTsPlusUniqueName(node.escapedText.toString());
-                                localUniqueExtensionNames.set(name, uniqueName);
+                                localUniqueExtensionNames.set(name, { name: uniqueName, isExported: true });
                                 return uniqueName;
                             }
                         }
@@ -347,11 +403,17 @@ namespace ts {
                 }
                 return node
             }
-            function produceDerivation(derivation: Derivation | undefined, context: TransformationContext, importer: TsPlusImporter, source: SourceFile, localUniqueExtensionNames: ESMap<string, Identifier>): Expression {
+            function produceDerivation(derivation: Derivation | undefined, context: TransformationContext, importer: TsPlusImporter, source: SourceFile, localUniqueExtensionNames: ESMap<string, LocalUniqueName>): Expression {
                 if (derivation) {
                     switch (derivation._tag) {
                         case "FromBlockScope": {
-                            return factory.createIdentifier(derivation.implicit.symbol.escapedName as string);
+                            const nodeLinks = checker.getNodeLinks(derivation.implicit);
+                            if (nodeLinks.resolvedUniqueName) {
+                                return nodeLinks.resolvedUniqueName;
+                            }
+                            else {
+                                return getPathOfImplicitOrRule(context, importer, derivation.implicit, source, localUniqueExtensionNames);
+                            }
                         }
                         case "FromImplicitScope": {
                             return getPathOfImplicitOrRule(context, importer, derivation.implicit, source, localUniqueExtensionNames);
@@ -640,7 +702,7 @@ namespace ts {
                 return visitEachChild(node, visitor, context);
             }
         }
-        function addUniqueLocalExtensionsVisitor(hoistedStatements: Array<Statement>, localUniqueExtensionNames: ESMap<string, Identifier>, context: TransformationContext) {
+        function addUniqueLocalExtensionsVisitor(hoistedStatements: Array<Statement>, localUniqueExtensionNames: ESMap<string, LocalUniqueName>, context: TransformationContext) {
             return function (node: Node): VisitResult<Node> {
                 switch (node.kind) {
                     case SyntaxKind.FunctionDeclaration: {
@@ -648,12 +710,12 @@ namespace ts {
                         if (declaration.name && declaration.body) {
                             const name = declaration.name.escapedText.toString()
                             if (localUniqueExtensionNames.has(name)) {
-                                const uniqueIdentifier = localUniqueExtensionNames.get(name)!
+                                const uniqueName = localUniqueExtensionNames.get(name)!
                                 hoistedStatements.push(
                                     context.factory.createVariableStatement(
-                                        [context.factory.createModifier(SyntaxKind.ExportKeyword), context.factory.createModifier(SyntaxKind.ConstKeyword)],
+                                        [...(uniqueName.isExported ? [context.factory.createModifier(SyntaxKind.ExportKeyword)] : []), context.factory.createModifier(SyntaxKind.ConstKeyword)],
                                         context.factory.createVariableDeclarationList([
-                                            context.factory.createVariableDeclaration(declaration.name, declaration.exclamationToken, undefined, uniqueIdentifier)
+                                            context.factory.createVariableDeclaration(declaration.name, declaration.exclamationToken, undefined, uniqueName.name)
                                         ], NodeFlags.Const)
                                     )
                                 );
@@ -662,7 +724,7 @@ namespace ts {
                                     declaration.decorators,
                                     filter(declaration.modifiers, (mod) => mod.kind !== SyntaxKind.ExportKeyword),
                                     declaration.asteriskToken,
-                                    uniqueIdentifier,
+                                    uniqueName.name,
                                     declaration.typeParameters,
                                     declaration.parameters,
                                     declaration.type,
@@ -678,7 +740,7 @@ namespace ts {
                         if (declaration && declaration.name && isIdentifier(declaration.name)) {
                             const name = declaration.name.escapedText.toString();
                             if (localUniqueExtensionNames.has(name)) {
-                                const uniqueIdentifier = localUniqueExtensionNames.get(name)!;
+                                const uniqueName = localUniqueExtensionNames.get(name)!;
                                 return [
                                     context.factory.updateVariableStatement(
                                         variableStatement,
@@ -686,7 +748,7 @@ namespace ts {
                                         context.factory.createVariableDeclarationList([
                                             context.factory.updateVariableDeclaration(
                                                 declaration,
-                                                uniqueIdentifier,
+                                                uniqueName.name,
                                                 declaration.exclamationToken,
                                                 declaration.type,
                                                 declaration.initializer
@@ -695,9 +757,9 @@ namespace ts {
                                         ], NodeFlags.Const)
                                     ),
                                     context.factory.createVariableStatement(
-                                        [context.factory.createModifier(SyntaxKind.ExportKeyword), context.factory.createModifier(SyntaxKind.ConstKeyword)],
+                                        [...(uniqueName.isExported ? [context.factory.createModifier(SyntaxKind.ExportKeyword)] : []), context.factory.createModifier(SyntaxKind.ConstKeyword)],
                                         context.factory.createVariableDeclarationList([
-                                            context.factory.createVariableDeclaration(declaration.name, declaration.exclamationToken, undefined, uniqueIdentifier)
+                                            context.factory.createVariableDeclaration(declaration.name, declaration.exclamationToken, undefined, uniqueName.name)
                                         ], NodeFlags.Const)
                                     )
                                 ];
@@ -721,17 +783,24 @@ namespace ts {
             return node;
         }
 
-        function getPathOfImplicitOrRule(context: TransformationContext, importer: TsPlusImporter, implicitOrRule: Declaration, source: SourceFile, localUniqueExtensionNames: ESMap<string, Identifier>) {
+        function isExported(declaration: Declaration): boolean {
+            if(!declaration.modifiers) {
+                return false;
+            }
+            return declaration.modifiers.findIndex((mod) => mod.kind === SyntaxKind.ExportKeyword) !== -1
+        }
+
+        function getPathOfImplicitOrRule(context: TransformationContext, importer: TsPlusImporter, implicitOrRule: Declaration, source: SourceFile, localUniqueExtensionNames: ESMap<string, LocalUniqueName>) {
             const factory = context.factory;
             const sourceExtension = getSourceFileOfNode(implicitOrRule);
             // TODO(Mike): carry over proper export name don't rely on the symbol of the declaration being exported
             const exportName = implicitOrRule.symbol.escapedName as string;
             if (source.fileName === sourceExtension.fileName) {
                 if (localUniqueExtensionNames.has(exportName)) {
-                    return localUniqueExtensionNames.get(exportName)!;
+                    return localUniqueExtensionNames.get(exportName)!.name;
                 }
                 const uniqueIdentifier = factory.createTsPlusUniqueName(exportName);
-                localUniqueExtensionNames.set(exportName, uniqueIdentifier);
+                localUniqueExtensionNames.set(exportName, { name: uniqueIdentifier, isExported: isExported(implicitOrRule) });
                 return uniqueIdentifier;
             }
             let path: string | undefined;
@@ -754,14 +823,14 @@ namespace ts {
             return node;
         }
 
-        function getPathOfExtension(context: TransformationContext, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile, localUniqueExtensionNames: ESMap<string, Identifier>) {
+        function getPathOfExtension(context: TransformationContext, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile, localUniqueExtensionNames: ESMap<string, LocalUniqueName>) {
             const factory = context.factory;
             if (source.fileName === extension.definition.fileName) {
                 if (localUniqueExtensionNames.has(extension.exportName)) {
-                    return localUniqueExtensionNames.get(extension.exportName)!;
+                    return localUniqueExtensionNames.get(extension.exportName)!.name;
                 }
                 const uniqueIdentifier = factory.createTsPlusUniqueName(extension.exportName);
-                localUniqueExtensionNames.set(extension.exportName, uniqueIdentifier);
+                localUniqueExtensionNames.set(extension.exportName, { name: uniqueIdentifier, isExported: true });
                 return uniqueIdentifier;
             }
 

@@ -5442,6 +5442,9 @@ namespace ts {
         tsPlusDerivation?: Derivation;
         isFluent?: true;
         isFluentCall?: true;
+        uniqueNames?: Set<NamedDeclaration & { name: Identifier }>;
+        needsUniqueName?: boolean;
+        resolvedUniqueName?: Identifier
         // TSPLUS EXTENSION END
     }
 
@@ -5451,7 +5454,7 @@ namespace ts {
     export interface FromBlockScope {
         readonly _tag: "FromBlockScope"
         readonly type: Type
-        readonly implicit: Declaration
+        readonly implicit: NamedDeclaration & { name: Identifier }
     }
     export interface FromImplicitScope {
         readonly _tag: "FromImplicitScope"
