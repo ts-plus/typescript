@@ -132,27 +132,38 @@ namespace ts {
                 const extensionRegex = /^(static|fluent|getter|operator|index|pipeable).*/;
                 return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && extensionRegex.test(tag.comment)).length > 0;
             }
-            function visitIdentifier(source: SourceFile, traceInScope: Identifier | undefined, node: Identifier, context: TransformationContext) {
-                if ((isDeclarationName(node) && !isExportDeclaration(node.parent)) || (node.parent && isTypeReferenceNode(node.parent))) {
-                    return visitEachChild(node, visitor(source, traceInScope), context);
+            function shouldTransformIdentifier(node: Identifier) {
+                if (node.parent && isDeclarationName(node) && !isExportDeclaration(node.parent)) {
+                    return false;
                 }
-                const symbol = checker.getSymbolAtLocation(node);
-                if (symbol) {
-                    if (symbol.valueDeclaration && isExtension(symbol.valueDeclaration) && getSourceFileOfNode(symbol.valueDeclaration) === source) {
-                        const name = node.escapedText.toString();
-                        if (localUniqueExtensionNames.has(name)) {
-                            return localUniqueExtensionNames.get(name)!;
+                if (node.parent && isPartOfTypeNode(node.parent)) {
+                    return false;
+                }
+                if (node.parent && isPartOfTypeQuery(node.parent)) {
+                    return false;
+                }
+                return true
+            }
+            function visitIdentifier(source: SourceFile, traceInScope: Identifier | undefined, node: Identifier, context: TransformationContext) {
+                if (shouldTransformIdentifier(node)) {
+                    const symbol = checker.getSymbolAtLocation(node);
+                    if (symbol) {
+                        if (symbol.valueDeclaration && isExtension(symbol.valueDeclaration) && getSourceFileOfNode(symbol.valueDeclaration) === source) {
+                            const name = node.escapedText.toString();
+                            if (localUniqueExtensionNames.has(name)) {
+                                return localUniqueExtensionNames.get(name)!;
+                            }
+                            else {
+                                const uniqueName = context.factory.createTsPlusUniqueName(node.escapedText.toString());
+                                localUniqueExtensionNames.set(name, uniqueName);
+                                return uniqueName;
+                            }
                         }
-                        else {
-                            const uniqueName = context.factory.createTsPlusUniqueName(node.escapedText.toString());
-                            localUniqueExtensionNames.set(name, uniqueName);
-                            return uniqueName;
+                        const { tsPlusGlobalIdentifier } = checker.getNodeLinks(node);
+                        const globalImport = checker.getTsPlusGlobal(node.escapedText.toString());
+                        if (tsPlusGlobalIdentifier && globalImport) {
+                            return getPathOfGlobalImport(context, importer, node, globalImport.location)
                         }
-                    }
-                    const { tsPlusGlobalIdentifier } = checker.getNodeLinks(node);
-                    const globalImport = checker.getTsPlusGlobal(node.escapedText.toString());
-                    if (tsPlusGlobalIdentifier && globalImport) {
-                        return getPathOfGlobalImport(context, importer, node, globalImport.location)
                     }
                 }
                 return visitEachChild(node, visitor(source, traceInScope), context);
