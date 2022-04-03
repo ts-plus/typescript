@@ -1,6 +1,6 @@
 import { Check } from "./check";
 import { Guard } from "./guard";
-import { IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection, UnionToTuple } from "./types";
+import { OptionalKeys, RequiredKeys, UnionToIntersection, UnionToTuple } from "./types";
 
 /**
  * @tsplus type Show
@@ -80,15 +80,15 @@ export function deriveShowIntersection<A extends unknown[]>(
 /**
  * @tsplus derive Show<_> 20
  */
-export function deriveShowStruct<A extends Record<string, any>>(
-    ...args: keyof A extends string ? IsUnion<A> extends false ? [
-        requiredFields: {
-            [k in RequiredKeys<A>]: Show<A[k]>
-        },
-        optionalFields: {
-            [k in OptionalKeys<A>]: Show<NonNullable<A[k]>>
-        }
-    ] : never : never
+export function deriveShowStruct<A>(
+    ...args: Check<Check.IsStruct<A>> extends Check.True ? [
+            requiredFields: {
+                [k in RequiredKeys<A>]: Show<A[k]>
+            },
+            optionalFields: {
+                [k in OptionalKeys<A>]: Show<NonNullable<A[k]>>
+            }
+        ] : never
 ): Show<A> {
     args
     throw new Error("Not Implemented")

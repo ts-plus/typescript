@@ -50,6 +50,8 @@ export declare namespace Check {
         Not<Extends<string | number, A>> &
         Not<Extends<string, A>> &
         Not<Extends<number, A>>
+
+    type IsStruct<A> = Check.Extends<keyof A, string> & Check.Not<Check.IsUnion<A>>
 }
 
 export type Check<Condition> = [Condition] extends [never] ? Check.False : Check.True
