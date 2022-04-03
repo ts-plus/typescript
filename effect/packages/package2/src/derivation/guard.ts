@@ -5,6 +5,7 @@ import { IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection } from "./type
  * @tsplus type Guard
  */
 export class Guard<A> {
+    readonly _tag = "Guard"
     constructor(readonly is: (u: unknown) => u is A) { }
 }
 

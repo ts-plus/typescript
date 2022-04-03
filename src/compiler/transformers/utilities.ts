@@ -34,10 +34,10 @@ namespace ts {
         return source
     }
 
-    export function getFileMap(options: CompilerOptions, host: CompilerHost) {
+    export function getFileMap(options: CompilerOptions, host: CompilerHost | TypeCheckerHost) {
         const fileMap: [string, RegExp][] = []
         if (options.configFilePath && options.tsPlusConfig) {
-            const content = host.readFile(getNormalizedAbsolutePath(combinePaths(options.configFilePath, "..", options.tsPlusConfig), void 0))
+            const content = host.readFile?.(getNormalizedAbsolutePath(combinePaths(options.configFilePath, "..", options.tsPlusConfig), void 0))
             if (content) {
                 try {
                     const parsed = JSON.parse(content)

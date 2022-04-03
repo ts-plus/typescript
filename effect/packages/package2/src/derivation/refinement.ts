@@ -5,6 +5,7 @@ import { IsUnion, OptionalKeys, RequiredKeys, TypeEquals, UnionToIntersection } 
  * @tsplus type Refinement
  */
 export class Refinement<A, B extends A> {
+    readonly _tag = "Refinement"
     constructor(readonly is: (a: A) => a is B) { }
 }
 

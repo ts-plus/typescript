@@ -363,6 +363,9 @@ namespace ts {
         const companionSymbolCache = new Map<Symbol, string[]>();
         const resolvedFluentCache = new Map<string, ESMap<string, TsPlusFluentExtension>>();
         const fluentCache = new Map<string, ESMap<string, () => TsPlusFluentExtension | undefined>>();
+        const fileMap = {
+            map: getFileMap(host.getCompilerOptions(), host)
+        };
         const tsPlusWorldScope: {
             implicits: ESMap<number, [Type, Declaration][]>;
             rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration, Set<string>][] }>;
@@ -32778,7 +32781,11 @@ namespace ts {
                         location.arguments[0],
                         Diagnostics.Deriving_type_0_1,
                         typeToString(derivation.type),
-                        `using implicit ${derivation.implicit.symbol.escapedName} (${getRelativePathFromFile(getSourceFileOfNode(location).fileName, getSourceFileOfNode(derivation.implicit).fileName, normalizePath)})`
+                        `using implicit ${
+                            getSourceFileOfNode(location).fileName !== getSourceFileOfNode(derivation.implicit).fileName ? 
+                                `${getImportPath(derivation.implicit)}#${derivation.implicit.symbol.escapedName}` : 
+                                derivation.implicit.symbol.escapedName
+                            }`
                     )
                 }
                 case "FromIntersectionStructure": {
@@ -32837,9 +32844,11 @@ namespace ts {
                             derivation.arguments.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
                             Diagnostics.Deriving_type_0_1,
                             typeToString(derivation.type),
-                            `using rule ${derivation.rule.symbol.escapedName}` +
-                            (derivation.usedBy.length > 0 ? " (recursive)" : "") +
-                            ` (${getRelativePathFromFile(getSourceFileOfNode(location).fileName, getSourceFileOfNode(derivation.rule).fileName, normalizePath)})`
+                            `using${(derivation.usedBy.length > 0 ? " (recursive)" : "")} rule ${
+                                getSourceFileOfNode(location).fileName !== getSourceFileOfNode(derivation.rule).fileName ? 
+                                    `${getImportPath(derivation.rule)}#${derivation.rule.symbol.escapedName}` : 
+                                    derivation.rule.symbol.escapedName
+                                }`
                         )
                     )
                 }
@@ -32850,7 +32859,20 @@ namespace ts {
                 throw new Error("Bug, unreachable")
             }
         }
-
+        function getImportPath(declaration: Declaration) {
+            let path: string | undefined;
+            const locationTag = getAllJSDocTags(declaration, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && tag.comment?.toString().startsWith("location") === true)[0];
+            if (locationTag) {
+                const match = locationTag.comment!.toString().match(/^location "(.*)"/);
+                if (match) {
+                    path = match[1]
+                }
+            }
+            if (!path) {
+                path = getImportLocation(fileMap.map, getSourceFileOfNode(declaration).fileName);
+            }
+            return path;
+        }
         function deriveType(deriveCallNode: CallExpression, type: Type): Type {
             const nodeLinks = getNodeLinks(deriveCallNode);
             if (!nodeLinks.tsPlusDerivation) {
@@ -46117,6 +46139,7 @@ namespace ts {
             }
         }
         function initTsPlusTypeChecker() {
+            fileMap.map = getFileMap(host.getCompilerOptions(), host);
             fluentCache.clear();
             unresolvedFluentCache.clear();
             operatorCache.clear();
