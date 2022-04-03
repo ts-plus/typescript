@@ -1,6 +1,6 @@
 import { Check } from "./check";
 import { Guard } from "./guard";
-import { OptionalKeys, RequiredKeys, UnionToIntersection, UnionToTuple } from "./types";
+import { OptionalKeys, RequiredKeys, UnionToIntersection } from "./types";
 
 /**
  * @tsplus type Show
@@ -82,13 +82,13 @@ export function deriveShowIntersection<A extends unknown[]>(
  */
 export function deriveShowStruct<A>(
     ...args: Check<Check.IsStruct<A>> extends Check.True ? [
-            requiredFields: {
-                [k in RequiredKeys<A>]: Show<A[k]>
-            },
-            optionalFields: {
-                [k in OptionalKeys<A>]: Show<NonNullable<A[k]>>
-            }
-        ] : never
+        requiredFields: {
+            [k in RequiredKeys<A>]: Show<A[k]>
+        },
+        optionalFields: {
+            [k in OptionalKeys<A>]: Show<NonNullable<A[k]>>
+        }
+    ] : never
 ): Show<A> {
     args
     throw new Error("Not Implemented")
@@ -107,15 +107,15 @@ export function deriveShowTuple<A extends unknown[]>(
 }
 
 /**
- * @tsplus derive Show<|> 20
+ * @tsplus derive Show<_> 20
  */
-export function deriveShowUnionTagged<A extends { _tag: string }[]>(
-    ...args: UnionToTuple<A[number]["_tag"]>["length"] extends A["length"] ? [
+export function deriveShowUnionTagged<A extends { _tag: string }>(
+    ...args: Check<Check.IsTagged<"_tag", A>> extends Check.True ? [
         members: {
-            [k in A[number]["_tag"]]: Show<Extract<A[number], { _tag: k }>>
+            [k in A["_tag"]]: Show<Extract<A, { _tag: k }>>
         }
     ] : never
-): Show<A[number]> {
+): Show<A> {
     args
     throw new Error("Not Implemented")
 }
