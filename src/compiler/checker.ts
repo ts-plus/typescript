@@ -32781,11 +32781,7 @@ namespace ts {
                         location.arguments[0],
                         Diagnostics.Deriving_type_0_1,
                         typeToString(derivation.type),
-                        `using block-scoped implicit ${
-                            getSourceFileOfNode(location).fileName !== getSourceFileOfNode(derivation.implicit).fileName ? 
-                                `${getImportPath(derivation.implicit)}#${derivation.implicit.symbol.escapedName}` : 
-                                derivation.implicit.symbol.escapedName
-                            }`
+                        `using block-scoped implicit ${derivation.implicit.symbol.escapedName}`
                     );
                 }
                 case "FromImplicitScope": {
