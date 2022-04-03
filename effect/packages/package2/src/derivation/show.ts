@@ -144,7 +144,7 @@ export function deriveShowUnion<A extends unknown[]>(
 /**
  * @tsplus implicit
  */
-export const number = new Show((a: number) => `${a}`)
+export const number = new Show((a: number) => `${a}`).via((x) => x)
 
 /**
  * @tsplus implicit

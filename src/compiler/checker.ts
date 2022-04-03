@@ -32874,6 +32874,9 @@ namespace ts {
             return path;
         }
         function deriveType(deriveCallNode: CallExpression, type: Type): Type {
+            if (getSourceFileOfNode(deriveCallNode).fileName.endsWith("hello.ts")) {
+                console.log("HERE");
+            }
             const nodeLinks = getNodeLinks(deriveCallNode);
             if (!nodeLinks.tsPlusDerivation) {
                 const derivationDiagnostics: Diagnostic[] = [];
@@ -46130,11 +46133,15 @@ namespace ts {
         function initTsPlusTypeCheckerGlobal() {
             globalSymbolsCache.clear();
             for (const file of host.getSourceFiles()) {
-                for (const statement of file.statements) {
-                    if (isImportDeclaration(statement)) {
-                        tryCacheTsPlusGlobalSymbol(statement);
+                for (const statement of file.imports) {
+                    if (isImportDeclaration(statement.parent)) {
+                        tryCacheTsPlusGlobalSymbol(statement.parent);
                     }
                 }
+            }
+        }
+        function initTsPlusTypeCheckerImplicits() {
+            for (const file of host.getSourceFiles()) {
                 fillTsPlusLocalScope(file);
             }
         }
@@ -46227,7 +46234,6 @@ namespace ts {
                     })
                 })
             })
-
             unresolvedFluentCache.forEach((map, typeName) => {
                 if (!fluentCache.has(typeName)) {
                     fluentCache.set(typeName, new Map());
@@ -46300,15 +46306,12 @@ namespace ts {
                     });
                 });
             });
-
             unresolvedFluentCache.clear();
-
             operatorCache.forEach((map) => {
                 map.forEach((extensions) => {
                     extensions.sort(({ priority: x }, { priority: y }) => x > y ? 1 : x < y ? -1 : 0)
                 })
             })
-
             pipeableCache.forEach((map, typeName) => {
                 if (!fluentCache.has(typeName)) {
                     fluentCache.set(typeName, new Map());
@@ -46342,6 +46345,7 @@ namespace ts {
                     });
                 });
             })
+            initTsPlusTypeCheckerImplicits();
         }
         // TSPLUS EXTENSION END
 
