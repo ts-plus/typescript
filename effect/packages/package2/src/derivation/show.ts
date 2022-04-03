@@ -1,3 +1,4 @@
+import { Check } from "./check";
 import { Guard } from "./guard";
 import { IsTypeEqualToAnyOf, IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection, UnionToTuple } from "./types";
 
@@ -32,9 +33,12 @@ export function deriveShowLazy<A>(
  * @tsplus derive Show<_> 10
  */
 export function deriveShowLiteralNumber<A extends number>(
-    ...args: IsUnion<A> extends false ? number extends A ? never : [
-        value: A
-    ] : never
+    ...args: Check<
+        Check.Not<Check.IsUnion<A>> &
+        Check.Not<Check.Extends<number, A>>
+    > extends Check.True ? [
+            value: A
+        ] : never
 ): Show<A> {
     return new Show(() => `${args[0]}`)
 }
@@ -43,9 +47,12 @@ export function deriveShowLiteralNumber<A extends number>(
  * @tsplus derive Show<_> 10
  */
 export function deriveShowLiteralString<A extends string>(
-    ...args: IsUnion<A> extends false ? string extends A ? never : [
-        value: A
-    ] : never
+    ...args: Check<
+        Check.Not<Check.IsUnion<A>> &
+        Check.Not<Check.Extends<string, A>>
+    > extends Check.True ? [
+            value: A
+        ] : never
 ): Show<A> {
     return new Show(() => args[0])
 }

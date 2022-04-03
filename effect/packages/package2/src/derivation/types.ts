@@ -38,3 +38,5 @@ export type UnionToTuple<Union> =
     > extends ((merged: infer Intersection) => void)
     ? readonly [...UnionToTuple<Exclude<Union, Intersection>>, Intersection]
     : [];
+
+export type IsNever<T> = [T] extends [never] ? true : false;
