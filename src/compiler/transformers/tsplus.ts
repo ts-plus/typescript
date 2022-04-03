@@ -350,6 +350,9 @@ namespace ts {
             function produceDerivation(derivation: Derivation | undefined, context: TransformationContext, importer: TsPlusImporter, source: SourceFile, localUniqueExtensionNames: ESMap<string, Identifier>): Expression {
                 if (derivation) {
                     switch (derivation._tag) {
+                        case "FromBlockScope": {
+                            return factory.createIdentifier(derivation.implicit.symbol.escapedName as string);
+                        }
                         case "FromImplicitScope": {
                             return getPathOfImplicitOrRule(context, importer, derivation.implicit, source, localUniqueExtensionNames);
                         }

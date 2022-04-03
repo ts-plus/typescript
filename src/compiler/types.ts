@@ -5446,7 +5446,13 @@ namespace ts {
     }
 
     // TSPLUS EXTENSION START
-    export type Derivation = FromImplicitScope | FromRule | FromObjectStructure | FromTupleStructure | FromIntersectionStructure | InvalidDerivation | EmptyObjectDerivation | FromPriorDerivation | FromLiteral
+    export type Derivation = FromBlockScope | FromImplicitScope | FromRule | FromObjectStructure | FromTupleStructure | FromIntersectionStructure | InvalidDerivation | EmptyObjectDerivation | FromPriorDerivation | FromLiteral
+
+    export interface FromBlockScope {
+        readonly _tag: "FromBlockScope"
+        readonly type: Type
+        readonly implicit: Declaration
+    }
     export interface FromImplicitScope {
         readonly _tag: "FromImplicitScope"
         readonly type: Type

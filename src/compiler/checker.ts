@@ -32776,6 +32776,18 @@ namespace ts {
                 case "InvalidDerivation": {
                     throw new Error("Bug, derivation debug called with InvalidDerivation")
                 }
+                case "FromBlockScope": {
+                    return createError(
+                        location.arguments[0],
+                        Diagnostics.Deriving_type_0_1,
+                        typeToString(derivation.type),
+                        `using block-scoped implicit ${
+                            getSourceFileOfNode(location).fileName !== getSourceFileOfNode(derivation.implicit).fileName ? 
+                                `${getImportPath(derivation.implicit)}#${derivation.implicit.symbol.escapedName}` : 
+                                derivation.implicit.symbol.escapedName
+                            }`
+                    );
+                }
                 case "FromImplicitScope": {
                     return createError(
                         location.arguments[0],
@@ -32953,6 +32965,20 @@ namespace ts {
             return hashType(self) === hashType(that) && isTypeIdenticalTo(self, that)
         }
 
+        function getAllBlockScopedDeclarations(location: Node): [Type, Declaration][] {
+            let scope: Node = getEnclosingBlockScopeContainer(location);
+            const blockScopedImplicits: [Type, Declaration][] = [];
+            while (!isSourceFile(scope)) {
+                forEachChild(scope, (node) => {
+                    if (isDeclaration(node)) {
+                        blockScopedImplicits.push([getTypeOfNode(node), node])
+                    }
+                });
+                scope = getEnclosingBlockScopeContainer(scope);
+            }
+            return blockScopedImplicits;
+        }
+
         function deriveTypeWorker(
             location: Node,
             originalType: Type,
@@ -32967,6 +32993,18 @@ namespace ts {
                     _tag: "EmptyObjectDerivation",
                     type
                 };
+            }
+            const blockScopedImplicits = getAllBlockScopedDeclarations(location);
+            if (blockScopedImplicits.length > 0) {
+                for (const [implicitType, declaration] of blockScopedImplicits) {
+                    if (isIdenticalInDerivation(type, implicitType) && isBlockScopedNameDeclaredBeforeUse(declaration, location)) {
+                        return {
+                            _tag: "FromBlockScope",
+                            type,
+                            implicit: declaration
+                        };
+                    }
+                }
             }
             const selfExport = getSelfExportStatement(location);
             const typeHash = hashType(type);
