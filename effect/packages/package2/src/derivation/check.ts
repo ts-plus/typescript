@@ -53,11 +53,13 @@ export declare namespace Check {
 
     type IsStruct<A> = Check.Extends<keyof A, string> & Check.Not<Check.IsUnion<A>>
 
+    type HaveSameLength<A extends { length: number }, B extends { length: number }> = IsEqual<A["length"], B["length"]>
+
     type IsTagged<Tag extends string, A extends { [k in Tag]: string }> =
         IsLiteral<A[Tag]> &
         IsUnion<A[Tag]> &
         IsUnion<A> &
-        IsEqual<TypeLevel.UnionToTuple<A[Tag]>["length"], TypeLevel.UnionToTuple<A>["length"]>
+        HaveSameLength<TypeLevel.UnionToTuple<A[Tag]>, TypeLevel.UnionToTuple<A>>
 }
 
 export type Check<Condition> = [Condition] extends [never] ? Check.False : Check.True
