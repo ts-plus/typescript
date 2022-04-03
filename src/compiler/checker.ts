@@ -32918,6 +32918,10 @@ namespace ts {
             return hashing.hashArray(map(getPropertiesOfType(type), (x) => x.escapedName).sort());
         }
 
+        function isIdenticalInDerivation(self: Type, that: Type) {
+            return hashType(self) === hashType(that) && isTypeIdenticalTo(self, that)
+        }
+
         function deriveTypeWorker(
             location: Node,
             originalType: Type,
@@ -32938,7 +32942,7 @@ namespace ts {
             const implicits = tsPlusWorldScope.implicits.get(typeHash);
             if (implicits) {
                 for (const [implicitType, declaration] of implicits) {
-                    if (isTypeIdenticalTo(type, implicitType) && isBlockScopedNameDeclaredBeforeUse(declaration, location) && getSelfExportStatement(declaration) !== selfExport) {
+                    if (isIdenticalInDerivation(type, implicitType) && isBlockScopedNameDeclaredBeforeUse(declaration, location) && getSelfExportStatement(declaration) !== selfExport) {
                         return {
                             _tag: "FromImplicitScope",
                             type,
@@ -32948,7 +32952,7 @@ namespace ts {
                 }
             }
             for (const derivedType of derivationScope) {
-                if (isTypeIdenticalTo(type, derivedType.type)) {
+                if (isIdenticalInDerivation(type, derivedType.type)) {
                     const rule: FromPriorDerivation = {
                         _tag: "FromPriorDerivation",
                         derivation: derivedType,
@@ -32960,7 +32964,7 @@ namespace ts {
             }
             const newCurrentDerivation = [...currentDerivation, type];
             for (const prohibitedType of prohibited) {
-                if (isTypeIdenticalTo(type, prohibitedType)) {
+                if (isIdenticalInDerivation(type, prohibitedType)) {
                     if (diagnostics.length === 0) {
                         const digs: Diagnostic[] = [];
                         for (let i = 1; i < newCurrentDerivation.length - 1; i++) {
@@ -33179,7 +33183,7 @@ namespace ts {
                 };
             }
             if (diagnostics.length === 0) {
-                if (isTypeIdenticalTo(originalType, type)) {
+                if (isIdenticalInDerivation(originalType, type)) {
                     diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_and_no_derivation_rules_are_found, typeToString(originalType)));
                 } else {
                     const digs: Diagnostic[] = [];
