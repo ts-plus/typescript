@@ -40,8 +40,8 @@ export declare namespace Check {
         >() => T extends EqualsWrapped<B> ? 1 : 2
         ? unknown
         : never
-    type Extends<A, B> = A extends B ? unknown : never
-    type Not<A> = Check<A> extends Check.True ? Check.False : Check.True
+    type Extends<A, B> = [A] extends [B] ? unknown : never
+    type Not<A> = [A] extends [never] ? unknown : never
 }
 
 export type Check<Condition> = [Condition] extends [never] ? Check.False : Check.True

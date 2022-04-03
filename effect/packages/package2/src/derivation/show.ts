@@ -1,6 +1,6 @@
 import { Check } from "./check";
 import { Guard } from "./guard";
-import { IsTypeEqualToAnyOf, IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection, UnionToTuple } from "./types";
+import { IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection, UnionToTuple } from "./types";
 
 /**
  * @tsplus type Show
@@ -83,9 +83,14 @@ export function deriveShowArray<A extends Array<any>>(
  * @tsplus derive Show<|> 10
  */
 export function deriveShowLiteralUnion<A extends unknown[]>(
-    ...args: A[number] extends string | number ? IsTypeEqualToAnyOf<A[number], [string, number, number | string]> extends true ? never : {
-        [k in keyof A]: Show<A[k]>
-    } : never
+    ...args: Check<
+        Check.Extends<A[number], string | number> &
+        Check.Not<Check.IsEqual<A[number], string | number>> &
+        Check.Not<Check.IsEqual<A[number], string>> &
+        Check.Not<Check.IsEqual<A[number], number>>
+    > extends Check.True ? {
+            [k in keyof A]: Show<A[k]>
+        } : never
 ): Show<A[number]> {
     args
     throw new Error("Not Implemented")
