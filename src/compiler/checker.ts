@@ -32882,17 +32882,40 @@ namespace ts {
 
         function hashType(type: Type) {
             if (!typeHashCache.has(type)) {
-                typeHashCache.set(type, hashing.hashString(typeToString(
-                    type,
-                    undefined,
-                    TypeFormatFlags.None
-                )))!;
+                typeHashCache.set(type, hashTypeWorker(type));
             }
             return typeHashCache.get(type)!;
         }
 
-        function isIdenticalForDerivation(self: Type, that: Type) {
-            return isTypeIdenticalTo(self, that) && hashType(self) === hashType(that);
+        function hashTypeWorker(type: Type) {
+            if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
+                const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
+                let hasRules = false;
+                for (const tag of arrayFrom(tags.values())) {
+                    const foundRules = tsPlusWorldScope.rules.get(tag);
+                    if (foundRules) {
+                        hasRules = true;
+                        break
+                    }
+                }
+                if (hasRules) {
+                    const tagsHsah = hashing.hashArray(arrayFrom(tags.values()).sort())
+                    const argumentsHash = hashing.hashArray(map((type as TypeReference).resolvedTypeArguments!, hashType))
+                    const hash = hashing.hashPlainObject({
+                        type: type.symbol.escapedName,
+                        tags: tagsHsah,
+                        arguments: argumentsHash
+                    })
+                    return hash;
+                }
+            }
+            if ("intrinsicName" in type) {
+                return hashing.hashString((type as IntrinsicType).intrinsicName);
+            }
+            if (type.flags & TypeFlags.Union) {
+                return hashing.hashArray(map((type as UnionType).types, hashType));
+            }
+            return hashing.hashArray(map(getPropertiesOfType(type), (x) => x.escapedName).sort());
         }
 
         function deriveTypeWorker(
@@ -32915,7 +32938,7 @@ namespace ts {
             const implicits = tsPlusWorldScope.implicits.get(typeHash);
             if (implicits) {
                 for (const [implicitType, declaration] of implicits) {
-                    if (isIdenticalForDerivation(type, implicitType) && isBlockScopedNameDeclaredBeforeUse(declaration, location) && getSelfExportStatement(declaration) !== selfExport) {
+                    if (isTypeIdenticalTo(type, implicitType) && isBlockScopedNameDeclaredBeforeUse(declaration, location) && getSelfExportStatement(declaration) !== selfExport) {
                         return {
                             _tag: "FromImplicitScope",
                             type,
@@ -32925,7 +32948,7 @@ namespace ts {
                 }
             }
             for (const derivedType of derivationScope) {
-                if (isIdenticalForDerivation(type, derivedType.type)) {
+                if (isTypeIdenticalTo(type, derivedType.type)) {
                     const rule: FromPriorDerivation = {
                         _tag: "FromPriorDerivation",
                         derivation: derivedType,
@@ -32937,7 +32960,7 @@ namespace ts {
             }
             const newCurrentDerivation = [...currentDerivation, type];
             for (const prohibitedType of prohibited) {
-                if (isIdenticalForDerivation(type, prohibitedType)) {
+                if (isTypeIdenticalTo(type, prohibitedType)) {
                     if (diagnostics.length === 0) {
                         const digs: Diagnostic[] = [];
                         for (let i = 1; i < newCurrentDerivation.length - 1; i++) {
@@ -33156,7 +33179,7 @@ namespace ts {
                 };
             }
             if (diagnostics.length === 0) {
-                if (isIdenticalForDerivation(originalType, type)) {
+                if (isTypeIdenticalTo(originalType, type)) {
                     diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_and_no_derivation_rules_are_found, typeToString(originalType)));
                 } else {
                     const digs: Diagnostic[] = [];
