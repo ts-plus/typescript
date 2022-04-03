@@ -32912,6 +32912,12 @@ namespace ts {
             if ("intrinsicName" in type) {
                 return hashing.hashString((type as IntrinsicType).intrinsicName);
             }
+            if (type.flags & TypeFlags.StringLiteral) {
+                return hashing.hashString((type as StringLiteralType).value);
+            }
+            if (type.flags & TypeFlags.NumberLiteral) {
+                return hashing.hashNumber((type as NumberLiteralType).value);
+            }
             if (type.flags & TypeFlags.Union) {
                 return hashing.hashArray(map((type as UnionType).types, hashType));
             }
