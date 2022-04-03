@@ -29,32 +29,14 @@ export function deriveShowLazy<A>(
 // High Priority
 //
 
-/**
- * @tsplus derive Show<_> 10
- */
-export function deriveShowLiteralNumber<A extends number>(
-    ...args: Check<
-        Check.Not<Check.IsUnion<A>> &
-        Check.Not<Check.Extends<number, A>>
-    > extends Check.True ? [
-            value: A
-        ] : never
-): Show<A> {
-    return new Show(() => `${args[0]}`)
-}
 
 /**
  * @tsplus derive Show<_> 10
  */
-export function deriveShowLiteralString<A extends string>(
-    ...args: Check<
-        Check.Not<Check.IsUnion<A>> &
-        Check.Not<Check.Extends<string, A>>
-    > extends Check.True ? [
-            value: A
-        ] : never
+export function deriveShowLiteralUnion<A extends string | number>(
+    ...[]: Check<Check.IsLiteral<A>> extends Check.True ? [] : never
 ): Show<A> {
-    return new Show(() => args[0])
+    return new Show((a) => `${a}`)
 }
 
 /**
@@ -77,23 +59,6 @@ export function deriveShowArray<A extends Array<any>>(
     ] : never : never
 ): Show<A> {
     return new Show((a) => `Array<{${a.map(args[0].show)}}>`)
-}
-
-/**
- * @tsplus derive Show<|> 10
- */
-export function deriveShowLiteralUnion<A extends unknown[]>(
-    ...args: Check<
-        Check.Extends<A[number], string | number> &
-        Check.Not<Check.IsEqual<A[number], string | number>> &
-        Check.Not<Check.IsEqual<A[number], string>> &
-        Check.Not<Check.IsEqual<A[number], number>>
-    > extends Check.True ? {
-            [k in keyof A]: Show<A[k]>
-        } : never
-): Show<A[number]> {
-    args
-    throw new Error("Not Implemented")
 }
 
 //

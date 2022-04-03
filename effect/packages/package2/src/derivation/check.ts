@@ -34,14 +34,22 @@ export declare namespace Check {
     type True = typeof Ok
     type False = typeof No
 
+    type Not<A> = [A] extends [never] ? unknown : never
+
+    type Extends<A, B> = [A] extends [B] ? unknown : never
+
     type IsUnion<T> = [T] extends [TypeLevel.UnionToIntersection<T>] ? never : unknown
+
     type IsEqual<A, B> = (<T>() => T extends EqualsWrapped<A> ? 1 : 2) extends <
         T
         >() => T extends EqualsWrapped<B> ? 1 : 2
         ? unknown
         : never
-    type Extends<A, B> = [A] extends [B] ? unknown : never
-    type Not<A> = [A] extends [never] ? unknown : never
+
+    type IsLiteral<A extends string | number> =
+        Not<Extends<string | number, A>> &
+        Not<Extends<string, A>> &
+        Not<Extends<number, A>>
 }
 
 export type Check<Condition> = [Condition] extends [never] ? Check.False : Check.True
