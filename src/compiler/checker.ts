@@ -32961,17 +32961,28 @@ namespace ts {
             return hashType(self) === hashType(that) && isTypeIdenticalTo(self, that)
         }
 
-        function getAllBlockScopedDeclarations(location: Node): [Type, Declaration][] {
-            let scope: Node = getEnclosingBlockScopeContainer(location);
-            const blockScopedImplicits: [Type, Declaration][] = [];
-            while (!isSourceFile(scope)) {
-                forEachChild(scope, (node) => {
-                    if (isDeclaration(node)) {
-                        blockScopedImplicits.push([getTypeOfNode(node), node])
-                    }
-                });
-                scope = getEnclosingBlockScopeContainer(scope);
-            }
+        function isImplicitTagged(node: Node): boolean {
+            return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "implicit").length > 0;
+        }
+
+        function getAllBlockScopedDeclarations(location: Node): { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] {
+            const blockScopedImplicits: { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] = [];
+            forEachEnclosingBlockScopeContainer(location, (container) => {
+                if (container.locals) {
+                    container.locals.forEach((local) => {
+                        if (local.valueDeclaration &&
+                            isImplicitTagged(local.valueDeclaration) &&
+                            isNamedDeclaration(local.valueDeclaration) &&
+                            isIdentifier(local.valueDeclaration.name)) {
+                            blockScopedImplicits.push({
+                                type: getTypeOfSymbol(local),
+                                valueDeclaration: local.valueDeclaration as NamedDeclaration & { name: Identifier },
+                                enclosingBlockScope: container
+                            })
+                        }
+                    })
+                }
+            })
             return blockScopedImplicits;
         }
 
@@ -32992,12 +33003,19 @@ namespace ts {
             }
             const blockScopedImplicits = getAllBlockScopedDeclarations(location);
             if (blockScopedImplicits.length > 0) {
-                for (const [implicitType, declaration] of blockScopedImplicits) {
-                    if (isIdenticalInDerivation(type, implicitType) && isBlockScopedNameDeclaredBeforeUse(declaration, location)) {
+                for (const implicit of blockScopedImplicits) {
+                    if (isIdenticalInDerivation(type, implicit.type) && isBlockScopedNameDeclaredBeforeUse(implicit.valueDeclaration, location)) {
+                        const blockLinks = getNodeLinks(implicit.enclosingBlockScope);
+                        if (!blockLinks.uniqueNames) {
+                            blockLinks.uniqueNames = new Set()
+                        }
+                        blockLinks.uniqueNames.add(implicit.valueDeclaration);
+                        const implicitLinks = getNodeLinks(implicit.valueDeclaration);
+                        implicitLinks.needsUniqueName = true;
                         return {
                             _tag: "FromBlockScope",
                             type,
-                            implicit: declaration
+                            implicit: implicit.valueDeclaration,
                         };
                     }
                 }
