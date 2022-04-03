@@ -55,8 +55,7 @@ export declare namespace Check {
 
     type HaveSameLength<A extends { length: number }, B extends { length: number }> = IsEqual<A["length"], B["length"]>
 
-    type IsTagged<Tag extends string, A extends { [k in Tag]: string }> =
-        IsLiteral<A[Tag]> &
+    type IsTagged<Tag extends PropertyKey, A extends { [k in Tag]: string }> =
         IsUnion<A[Tag]> &
         IsUnion<A> &
         HaveSameLength<TypeLevel.UnionToTuple<A[Tag]>, TypeLevel.UnionToTuple<A>>
