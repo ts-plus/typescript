@@ -37,6 +37,22 @@ namespace ts {
             return this.cache.get(d)!
         }
     }
+    class SourceFileUniqueNames {
+        readonly cache = new Map<string, SourceFileUniqueName>()
+        constructor(readonly factory: NodeFactory) {}
+        get(text: string, isExported = true) {
+            if (!this.cache.has(text)) {
+                this.cache.set(text, { name: this.factory.createTsPlusUniqueName(text), isExported });
+            }
+            return this.cache.get(text)!;
+        }
+        has(text: string) {
+            return this.cache.has(text);
+        }
+        clear() {
+            this.cache.clear();
+        }
+    }
     interface SourceFileUniqueName {
         readonly name: Identifier
         readonly isExported: boolean
@@ -47,7 +63,7 @@ namespace ts {
         return function (context: TransformationContext) {
             const importer = new TsPlusImporter(context.factory);
             const uniqueNameOfDerivation = new UniqueNameOfDerivation(context.factory);
-            const sourceFileUniqueNames = new Map<string, SourceFileUniqueName>();
+            const sourceFileUniqueNames = new SourceFileUniqueNames(context.factory);
             const fileVar = factory.createUniqueName("fileName");
             let fileVarUsed = false;
             return chainBundle(context, transformSourceFile);
@@ -217,14 +233,7 @@ namespace ts {
                     if (symbol) {
                         if (symbol.valueDeclaration && isExtension(symbol.valueDeclaration) && getSourceFileOfNode(symbol.valueDeclaration) === source) {
                             const name = node.escapedText.toString();
-                            if (sourceFileUniqueNames.has(name)) {
-                                return sourceFileUniqueNames.get(name)!.name;
-                            }
-                            else {
-                                const uniqueName = context.factory.createTsPlusUniqueName(node.escapedText.toString());
-                                sourceFileUniqueNames.set(name, { name: uniqueName, isExported: true });
-                                return uniqueName;
-                            }
+                            return sourceFileUniqueNames.get(name).name;
                         }
                         const { tsPlusGlobalIdentifier } = checker.getNodeLinks(node);
                         const globalImport = checker.getTsPlusGlobal(node.escapedText.toString());
@@ -403,7 +412,7 @@ namespace ts {
                 }
                 return node
             }
-            function produceDerivation(derivation: Derivation | undefined, context: TransformationContext, importer: TsPlusImporter, source: SourceFile, sourceFileUniqueNames: ESMap<string, SourceFileUniqueName>): Expression {
+            function produceDerivation(derivation: Derivation | undefined, context: TransformationContext, importer: TsPlusImporter, source: SourceFile, sourceFileUniqueNames: SourceFileUniqueNames): Expression {
                 if (derivation) {
                     switch (derivation._tag) {
                         case "FromBlockScope": {
@@ -704,7 +713,7 @@ namespace ts {
                 return visitEachChild(node, visitor, context);
             }
         }
-        function addSourceFileUniqueNamesVisitor(hoistedStatements: Array<Statement>, sourceFileUniqueNames: ESMap<string, SourceFileUniqueName>, context: TransformationContext) {
+        function addSourceFileUniqueNamesVisitor(hoistedStatements: Array<Statement>, sourceFileUniqueNames: SourceFileUniqueNames, context: TransformationContext) {
             return function (node: Node): VisitResult<Node> {
                 switch (node.kind) {
                     case SyntaxKind.FunctionDeclaration: {
@@ -799,18 +808,13 @@ namespace ts {
             return declaration.modifiers.findIndex((mod) => mod.kind === SyntaxKind.ExportKeyword) !== -1
         }
 
-        function getPathOfImplicitOrRule(context: TransformationContext, importer: TsPlusImporter, implicitOrRule: Declaration, source: SourceFile, sourceFileUniqueNames: ESMap<string, SourceFileUniqueName>) {
+        function getPathOfImplicitOrRule(context: TransformationContext, importer: TsPlusImporter, implicitOrRule: Declaration, source: SourceFile, sourceFileUniqueNames: SourceFileUniqueNames) {
             const factory = context.factory;
             const sourceExtension = getSourceFileOfNode(implicitOrRule);
             // TODO(Mike): carry over proper export name don't rely on the symbol of the declaration being exported
             const exportName = implicitOrRule.symbol.escapedName as string;
             if (source.fileName === sourceExtension.fileName) {
-                if (sourceFileUniqueNames.has(exportName)) {
-                    return sourceFileUniqueNames.get(exportName)!.name;
-                }
-                const uniqueIdentifier = factory.createTsPlusUniqueName(exportName);
-                sourceFileUniqueNames.set(exportName, { name: uniqueIdentifier, isExported: isExported(implicitOrRule) });
-                return uniqueIdentifier;
+                return sourceFileUniqueNames.get(exportName, isExported(implicitOrRule)).name;
             }
             let path: string | undefined;
             const locationTag = getAllJSDocTags(implicitOrRule, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && tag.comment?.toString().startsWith("location") === true)[0];
@@ -832,15 +836,10 @@ namespace ts {
             return node;
         }
 
-        function getPathOfExtension(context: TransformationContext, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile, sourceFileUniqueNames: ESMap<string, SourceFileUniqueName>) {
+        function getPathOfExtension(context: TransformationContext, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile, sourceFileUniqueNames: SourceFileUniqueNames) {
             const factory = context.factory;
             if (source.fileName === extension.definition.fileName) {
-                if (sourceFileUniqueNames.has(extension.exportName)) {
-                    return sourceFileUniqueNames.get(extension.exportName)!.name;
-                }
-                const uniqueIdentifier = factory.createTsPlusUniqueName(extension.exportName);
-                sourceFileUniqueNames.set(extension.exportName, { name: uniqueIdentifier, isExported: true });
-                return uniqueIdentifier;
+                return sourceFileUniqueNames.get(extension.exportName).name;
             }
 
             const def = extension.definition.locals!.get(extension.exportName as __String)!
