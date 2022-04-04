@@ -32961,8 +32961,8 @@ namespace ts {
             return hashType(self) === hashType(that) && isTypeIdenticalTo(self, that)
         }
 
-        function isImplicitTagged(node: Node): boolean {
-            return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "implicit").length > 0;
+        function isLocalImplicit(node: Node): boolean {
+            return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === 'string' && tag.comment === 'implicit local').length > 0;
         }
 
         function getAllBlockScopedDeclarations(location: Node): { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] {
@@ -32971,7 +32971,7 @@ namespace ts {
                 if (container.locals) {
                     container.locals.forEach((local) => {
                         if (local.valueDeclaration &&
-                            isImplicitTagged(local.valueDeclaration) &&
+                            isLocalImplicit(local.valueDeclaration) &&
                             isNamedDeclaration(local.valueDeclaration) &&
                             isIdentifier(local.valueDeclaration.name)) {
                             blockScopedImplicits.push({
@@ -33005,6 +33005,7 @@ namespace ts {
             if (blockScopedImplicits.length > 0) {
                 for (const implicit of blockScopedImplicits) {
                     if (isIdenticalInDerivation(type, implicit.type) && isBlockScopedNameDeclaredBeforeUse(implicit.valueDeclaration, location)) {
+                        implicit.valueDeclaration.symbol.isReferenced = SymbolFlags.Value;
                         const blockLinks = getNodeLinks(implicit.enclosingBlockScope);
                         if (!blockLinks.uniqueNames) {
                             blockLinks.uniqueNames = new Set()
@@ -44986,7 +44987,7 @@ namespace ts {
         function collectTsPlusImplicitTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
-                (tag): tag is TsPlusJSDocImplicitTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("implicit")
+                (tag): tag is TsPlusJSDocImplicitTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("implicit") && !tag.comment.includes("local")
             );
         }
         function collectTsPlusDeriveTags(statement: Declaration) {

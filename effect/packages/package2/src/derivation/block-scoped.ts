@@ -1,11 +1,11 @@
 import { Show } from "./show";
 
-export function f<A>(/** @implicit */_show: Show<A>): Show<Maybe<A>> {
+export function f<A>(/** @tsplus implicit local */_show: Show<A>): Show<Maybe<A>> {
     const ok: Show<Maybe<A>> = Derive()
     return ok;
 }
 
-export function g<A>(/** @implicit */_show: Show<A>): Show<Maybe<A>> {
+export function g<A>(/** @tsplus implicit local */_show: Show<A>): Show<Maybe<A>> {
     const go = () => {
         const _show = 0;
         _show;
@@ -16,11 +16,9 @@ export function g<A>(/** @implicit */_show: Show<A>): Show<Maybe<A>> {
 }
 
 /**
- * @implicit
+ * @tsplus implicit local
  */
 const _showSourceScoped: Show<{ x: number }> = Derive()
-
-_showSourceScoped;
 
 export function h() {
   // uses _showSourceScoped
@@ -30,10 +28,9 @@ export function h() {
 
 export function i() {
   /**
-   * @implicit
+   * @tsplus implicit local
    */
   const _showBlockScoped: Show<{ x: number }> = Derive();
-  _showBlockScoped;
   const ok: Show<{ x: number }> = Derive();
   return ok;
 }
