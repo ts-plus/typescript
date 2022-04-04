@@ -711,14 +711,16 @@ namespace ts {
                             const name = declaration.name.escapedText.toString()
                             if (localUniqueExtensionNames.has(name)) {
                                 const uniqueName = localUniqueExtensionNames.get(name)!
-                                hoistedStatements.push(
-                                    context.factory.createVariableStatement(
-                                        [...(uniqueName.isExported ? [context.factory.createModifier(SyntaxKind.ExportKeyword)] : []), context.factory.createModifier(SyntaxKind.ConstKeyword)],
-                                        context.factory.createVariableDeclarationList([
-                                            context.factory.createVariableDeclaration(declaration.name, declaration.exclamationToken, undefined, uniqueName.name)
-                                        ], NodeFlags.Const)
-                                    )
-                                );
+                                if (uniqueName.isExported) {
+                                    hoistedStatements.push(
+                                        context.factory.createVariableStatement(
+                                            [context.factory.createModifier(SyntaxKind.ExportKeyword), context.factory.createModifier(SyntaxKind.ConstKeyword)],
+                                            context.factory.createVariableDeclarationList([
+                                                context.factory.createVariableDeclaration(declaration.name, declaration.exclamationToken, undefined, uniqueName.name)
+                                            ], NodeFlags.Const)
+                                        )
+                                    );
+                                }
                                 return context.factory.updateFunctionDeclaration(
                                     declaration,
                                     declaration.decorators,
@@ -741,7 +743,7 @@ namespace ts {
                             const name = declaration.name.escapedText.toString();
                             if (localUniqueExtensionNames.has(name)) {
                                 const uniqueName = localUniqueExtensionNames.get(name)!;
-                                return [
+                                const updated = [
                                     context.factory.updateVariableStatement(
                                         variableStatement,
                                         filter(node.modifiers, (mod) => mod.kind !== SyntaxKind.ExportKeyword),
@@ -756,13 +758,18 @@ namespace ts {
                                             ...variableStatement.declarationList.declarations.slice(1)
                                         ], NodeFlags.Const)
                                     ),
-                                    context.factory.createVariableStatement(
-                                        [...(uniqueName.isExported ? [context.factory.createModifier(SyntaxKind.ExportKeyword)] : []), context.factory.createModifier(SyntaxKind.ConstKeyword)],
-                                        context.factory.createVariableDeclarationList([
-                                            context.factory.createVariableDeclaration(declaration.name, declaration.exclamationToken, undefined, uniqueName.name)
-                                        ], NodeFlags.Const)
-                                    )
-                                ];
+                                ]
+                                if (uniqueName.isExported) {
+                                    updated.push(
+                                        context.factory.createVariableStatement(
+                                            [context.factory.createModifier(SyntaxKind.ExportKeyword), context.factory.createModifier(SyntaxKind.ConstKeyword)],
+                                            context.factory.createVariableDeclarationList([
+                                                context.factory.createVariableDeclaration(declaration.name, declaration.exclamationToken, undefined, uniqueName.name)
+                                            ], NodeFlags.Const)
+                                        )
+                                    );
+                                }
+                                return updated;
                             }
                         }
                         return node;
