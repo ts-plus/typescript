@@ -5443,8 +5443,8 @@ namespace ts {
         isFluent?: true;
         isFluentCall?: true;
         uniqueNames?: Set<NamedDeclaration & { name: Identifier }>;
-        needsUniqueName?: boolean;
-        resolvedUniqueName?: Identifier
+        needsUniqueNameInSope?: boolean;
+        uniqueNameInScope?: Identifier
         // TSPLUS EXTENSION END
     }
 

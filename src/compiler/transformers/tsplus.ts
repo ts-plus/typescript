@@ -62,7 +62,7 @@ namespace ts {
 
                 const transformedWithUniqueDeclarations = visitEachChild(
                     transformed,
-                    addUniqueLocalExtensionsVisitor(uniqueDeclarations, sourceFileUniqueNames, context),
+                    addSourceFileUniqueNamesVisitor(uniqueDeclarations, sourceFileUniqueNames, context),
                     context
                 )
 
@@ -153,10 +153,10 @@ namespace ts {
                         if (isVariableStatement(statement) && statement.declarationList.declarations[0]) {
                             const declaration = statement.declarationList.declarations[0];
                             const declarationLinks = checker.getNodeLinks(declaration);
-                            if (declarationLinks.needsUniqueName) {
+                            if (declarationLinks.needsUniqueNameInSope) {
                                 Debug.assert(isNamedDeclaration(declaration) && isIdentifier(declaration.name));
                                 const uniqueIdentifier = context.factory.createUniqueName(declaration.name.escapedText as string);
-                                declarationLinks.resolvedUniqueName = uniqueIdentifier;
+                                declarationLinks.uniqueNameInScope = uniqueIdentifier;
                                 remainingNames.delete(declaration as NamedDeclaration & { name: Identifier });
                                 return [
                                     statement,
@@ -173,10 +173,10 @@ namespace ts {
                     })
                     remainingNames.forEach((declaration) => {
                         const declarationLinks = checker.getNodeLinks(declaration);
-                        if (declarationLinks.needsUniqueName) {
+                        if (declarationLinks.needsUniqueNameInSope) {
                             Debug.assert(isNamedDeclaration(declaration) && isIdentifier(declaration.name));
                             const uniqueIdentifier = context.factory.createUniqueName(declaration.name.escapedText as string);
-                            declarationLinks.resolvedUniqueName = uniqueIdentifier;
+                            declarationLinks.uniqueNameInScope = uniqueIdentifier;
                             updatedStatements.unshift(
                                 context.factory.createVariableStatement(
                                     [context.factory.createModifier(SyntaxKind.ConstKeyword)],
@@ -403,20 +403,22 @@ namespace ts {
                 }
                 return node
             }
-            function produceDerivation(derivation: Derivation | undefined, context: TransformationContext, importer: TsPlusImporter, source: SourceFile, localUniqueExtensionNames: ESMap<string, SourceFileUniqueName>): Expression {
+            function produceDerivation(derivation: Derivation | undefined, context: TransformationContext, importer: TsPlusImporter, source: SourceFile, sourceFileUniqueNames: ESMap<string, SourceFileUniqueName>): Expression {
                 if (derivation) {
                     switch (derivation._tag) {
                         case "FromBlockScope": {
                             const nodeLinks = checker.getNodeLinks(derivation.implicit);
-                            if (nodeLinks.resolvedUniqueName) {
-                                return nodeLinks.resolvedUniqueName;
+                            if (nodeLinks.uniqueNameInScope) {
+                                // Block-scoped (other than SourceFile) implicit
+                                return nodeLinks.uniqueNameInScope;
                             }
                             else {
-                                return getPathOfImplicitOrRule(context, importer, derivation.implicit, source, localUniqueExtensionNames);
+                                // SourceFile-scoped implicit
+                                return getPathOfImplicitOrRule(context, importer, derivation.implicit, source, sourceFileUniqueNames);
                             }
                         }
                         case "FromImplicitScope": {
-                            return getPathOfImplicitOrRule(context, importer, derivation.implicit, source, localUniqueExtensionNames);
+                            return getPathOfImplicitOrRule(context, importer, derivation.implicit, source, sourceFileUniqueNames);
                         }
                         case "EmptyObjectDerivation": {
                             return factory.createObjectLiteralExpression(
@@ -429,7 +431,7 @@ namespace ts {
                         }
                         case "FromIntersectionStructure": {
                             return factory.createObjectLiteralExpression(
-                                derivation.fields.map((child) => factory.createSpreadAssignment(produceDerivation(child, context, importer, source, localUniqueExtensionNames))),
+                                derivation.fields.map((child) => factory.createSpreadAssignment(produceDerivation(child, context, importer, source, sourceFileUniqueNames))),
                                 false
                             );
                         }
@@ -437,14 +439,14 @@ namespace ts {
                             return factory.createObjectLiteralExpression(
                                 derivation.fields.map((child) => factory.createPropertyAssignment(
                                     child.prop.escapedName as string,
-                                    produceDerivation(child.value, context, importer, source, localUniqueExtensionNames)
+                                    produceDerivation(child.value, context, importer, source, sourceFileUniqueNames)
                                 )),
                                 false
                             );
                         }
                         case "FromTupleStructure": {
                             return factory.createArrayLiteralExpression(
-                                derivation.fields.map((child) => produceDerivation(child, context, importer, source, localUniqueExtensionNames)),
+                                derivation.fields.map((child) => produceDerivation(child, context, importer, source, sourceFileUniqueNames)),
                                 false
                             );
                         }
@@ -458,13 +460,13 @@ namespace ts {
                         case "FromRule": {
                             if (derivation.usedBy.length === 0) {
                                 return factory.createCallExpression(
-                                    getPathOfImplicitOrRule(context, importer, derivation.rule, source, localUniqueExtensionNames),
+                                    getPathOfImplicitOrRule(context, importer, derivation.rule, source, sourceFileUniqueNames),
                                     undefined,
-                                    derivation.arguments.map((child) => produceDerivation(child, context, importer, source, localUniqueExtensionNames))
+                                    derivation.arguments.map((child) => produceDerivation(child, context, importer, source, sourceFileUniqueNames))
                                 );
                             } else if (derivation.lazyRule) {
                                 const name = uniqueNameOfDerivation.get(derivation);
-                                const lazy = getPathOfImplicitOrRule(context, importer, derivation.lazyRule, source, localUniqueExtensionNames);
+                                const lazy = getPathOfImplicitOrRule(context, importer, derivation.lazyRule, source, sourceFileUniqueNames);
                                 return factory.createCallExpression(
                                     lazy,
                                     undefined,
@@ -483,9 +485,9 @@ namespace ts {
                                         undefined,
                                         factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
                                         factory.createCallExpression(
-                                            getPathOfImplicitOrRule(context, importer, derivation.rule, source, localUniqueExtensionNames),
+                                            getPathOfImplicitOrRule(context, importer, derivation.rule, source, sourceFileUniqueNames),
                                             undefined,
-                                            derivation.arguments.map((child) => produceDerivation(child, context, importer, source, localUniqueExtensionNames))
+                                            derivation.arguments.map((child) => produceDerivation(child, context, importer, source, sourceFileUniqueNames))
                                         )
                                     )]
                                 );
@@ -702,15 +704,15 @@ namespace ts {
                 return visitEachChild(node, visitor, context);
             }
         }
-        function addUniqueLocalExtensionsVisitor(hoistedStatements: Array<Statement>, localUniqueExtensionNames: ESMap<string, SourceFileUniqueName>, context: TransformationContext) {
+        function addSourceFileUniqueNamesVisitor(hoistedStatements: Array<Statement>, sourceFileUniqueNames: ESMap<string, SourceFileUniqueName>, context: TransformationContext) {
             return function (node: Node): VisitResult<Node> {
                 switch (node.kind) {
                     case SyntaxKind.FunctionDeclaration: {
                         const declaration = node as FunctionDeclaration
                         if (declaration.name && declaration.body) {
                             const name = declaration.name.escapedText.toString()
-                            if (localUniqueExtensionNames.has(name)) {
-                                const uniqueName = localUniqueExtensionNames.get(name)!
+                            if (sourceFileUniqueNames.has(name)) {
+                                const uniqueName = sourceFileUniqueNames.get(name)!
                                 if (uniqueName.isExported) {
                                     hoistedStatements.push(
                                         context.factory.createVariableStatement(
@@ -741,8 +743,8 @@ namespace ts {
                         const declaration = variableStatement.declarationList.declarations[0];
                         if (declaration && declaration.name && isIdentifier(declaration.name)) {
                             const name = declaration.name.escapedText.toString();
-                            if (localUniqueExtensionNames.has(name)) {
-                                const uniqueName = localUniqueExtensionNames.get(name)!;
+                            if (sourceFileUniqueNames.has(name)) {
+                                const uniqueName = sourceFileUniqueNames.get(name)!;
                                 const updated = [
                                     context.factory.updateVariableStatement(
                                         variableStatement,
@@ -797,17 +799,17 @@ namespace ts {
             return declaration.modifiers.findIndex((mod) => mod.kind === SyntaxKind.ExportKeyword) !== -1
         }
 
-        function getPathOfImplicitOrRule(context: TransformationContext, importer: TsPlusImporter, implicitOrRule: Declaration, source: SourceFile, localUniqueExtensionNames: ESMap<string, SourceFileUniqueName>) {
+        function getPathOfImplicitOrRule(context: TransformationContext, importer: TsPlusImporter, implicitOrRule: Declaration, source: SourceFile, sourceFileUniqueNames: ESMap<string, SourceFileUniqueName>) {
             const factory = context.factory;
             const sourceExtension = getSourceFileOfNode(implicitOrRule);
             // TODO(Mike): carry over proper export name don't rely on the symbol of the declaration being exported
             const exportName = implicitOrRule.symbol.escapedName as string;
             if (source.fileName === sourceExtension.fileName) {
-                if (localUniqueExtensionNames.has(exportName)) {
-                    return localUniqueExtensionNames.get(exportName)!.name;
+                if (sourceFileUniqueNames.has(exportName)) {
+                    return sourceFileUniqueNames.get(exportName)!.name;
                 }
                 const uniqueIdentifier = factory.createTsPlusUniqueName(exportName);
-                localUniqueExtensionNames.set(exportName, { name: uniqueIdentifier, isExported: isExported(implicitOrRule) });
+                sourceFileUniqueNames.set(exportName, { name: uniqueIdentifier, isExported: isExported(implicitOrRule) });
                 return uniqueIdentifier;
             }
             let path: string | undefined;
@@ -830,14 +832,14 @@ namespace ts {
             return node;
         }
 
-        function getPathOfExtension(context: TransformationContext, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile, localUniqueExtensionNames: ESMap<string, SourceFileUniqueName>) {
+        function getPathOfExtension(context: TransformationContext, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile, sourceFileUniqueNames: ESMap<string, SourceFileUniqueName>) {
             const factory = context.factory;
             if (source.fileName === extension.definition.fileName) {
-                if (localUniqueExtensionNames.has(extension.exportName)) {
-                    return localUniqueExtensionNames.get(extension.exportName)!.name;
+                if (sourceFileUniqueNames.has(extension.exportName)) {
+                    return sourceFileUniqueNames.get(extension.exportName)!.name;
                 }
                 const uniqueIdentifier = factory.createTsPlusUniqueName(extension.exportName);
-                localUniqueExtensionNames.set(extension.exportName, { name: uniqueIdentifier, isExported: true });
+                sourceFileUniqueNames.set(extension.exportName, { name: uniqueIdentifier, isExported: true });
                 return uniqueIdentifier;
             }
 

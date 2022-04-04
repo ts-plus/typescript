@@ -33012,7 +33012,7 @@ namespace ts {
                         }
                         blockLinks.uniqueNames.add(implicit.valueDeclaration);
                         const implicitLinks = getNodeLinks(implicit.valueDeclaration);
-                        implicitLinks.needsUniqueName = true;
+                        implicitLinks.needsUniqueNameInSope = true;
                         return {
                             _tag: "FromBlockScope",
                             type,
