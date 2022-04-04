@@ -30927,11 +30927,27 @@ namespace ts {
                 const arg = args[i];
                 if (arg.kind !== SyntaxKind.OmittedExpression && !(checkMode & CheckMode.IsForStringLiteralArgumentCompletions && hasSkipDirectInferenceFlag(arg))) {
                     // TSPLUS EXTENTION BEGIN
-                    const _paramType = getTypeAtPosition(signature, i);
-                    const paramType = isLazyParameterByType(_paramType) ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
+                    const paramType = getTypeAtPosition(signature, i);
+                    if (isLazyParameterByType(paramType)) {
+                        const genericLazy = cloneTypeReference((paramType as TypeReference));
+                        genericLazy.resolvedTypeArguments = [anyType];
+                        const typeOfNode = getTypeOfNode(arg);
+                        if (!isTypeAssignableTo(typeOfNode, genericLazy) && !isTypeIdenticalTo(typeOfNode, anyType)) {
+                            const argType = checkExpressionWithContextualType(arg, (paramType as TypeReference).resolvedTypeArguments![0], context, checkMode);
+                            const instantiated = cloneTypeReference((paramType as TypeReference));
+                            instantiated.resolvedTypeArguments = [argType];
+                            inferTypes(context.inferences, instantiated, paramType);
+                        }
+                        else {
+                            const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
+                            inferTypes(context.inferences, argType, paramType);
+                        }
+                    }
+                    else {
+                        const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
+                        inferTypes(context.inferences, argType, paramType);
+                    }
                     // TSPLUS EXTENTION END
-                    const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
-                    inferTypes(context.inferences, argType, paramType);
                 }
             }
 
@@ -30944,7 +30960,7 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION BEGIN
-        function isLazyParameterByType(type: Type) {
+        function isLazyParameterByType(type: Type): type is TypeReference {
             if (type.symbol && type.symbol.declarations && type.symbol.declarations.length > 0) {
                 const tag = collectTsPlusTypeTags(type.symbol.declarations[0])[0];
                 if (tag && tag.comment === "type tsplus/LazyArgument") {
