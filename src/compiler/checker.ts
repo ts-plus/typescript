@@ -32882,9 +32882,6 @@ namespace ts {
             return path;
         }
         function deriveType(deriveCallNode: CallExpression, type: Type): Type {
-            if (getSourceFileOfNode(deriveCallNode).fileName.endsWith("hello.ts")) {
-                console.log("HERE");
-            }
             const nodeLinks = getNodeLinks(deriveCallNode);
             if (!nodeLinks.tsPlusDerivation) {
                 const derivationDiagnostics: Diagnostic[] = [];

@@ -39,7 +39,7 @@ namespace ts {
     }
     class SourceFileUniqueNames {
         readonly cache = new Map<string, SourceFileUniqueName>()
-        constructor(readonly factory: NodeFactory) {}
+        constructor(readonly factory: NodeFactory) { }
         get(text: string, isExported = true) {
             if (!this.cache.has(text)) {
                 this.cache.set(text, { name: this.factory.createTsPlusUniqueName(text), isExported });
@@ -758,7 +758,7 @@ namespace ts {
                                     context.factory.updateVariableStatement(
                                         variableStatement,
                                         filter(node.modifiers, (mod) => mod.kind !== SyntaxKind.ExportKeyword),
-                                        context.factory.createVariableDeclarationList([
+                                        context.factory.updateVariableDeclarationList(variableStatement.declarationList, [
                                             context.factory.updateVariableDeclaration(
                                                 declaration,
                                                 uniqueName.name,
@@ -767,7 +767,7 @@ namespace ts {
                                                 declaration.initializer
                                             ),
                                             ...variableStatement.declarationList.declarations.slice(1)
-                                        ], NodeFlags.Const)
+                                        ])
                                     ),
                                 ]
                                 if (uniqueName.isExported) {
@@ -801,11 +801,18 @@ namespace ts {
             return node;
         }
 
-        function isExported(declaration: Declaration): boolean {
-            if(!declaration.modifiers) {
+        function isExportedWorker(declaration: Node): boolean {
+            if (!declaration.modifiers) {
                 return false;
             }
             return declaration.modifiers.findIndex((mod) => mod.kind === SyntaxKind.ExportKeyword) !== -1
+        }
+
+        function isExported(declaration: Declaration): boolean {
+            if (isVariableDeclaration(declaration) && declaration.parent && declaration.parent.parent) {
+                return isExportedWorker(declaration.parent.parent);
+            }
+            return isExportedWorker(declaration);
         }
 
         function getPathOfImplicitOrRule(context: TransformationContext, importer: TsPlusImporter, implicitOrRule: Declaration, source: SourceFile, sourceFileUniqueNames: SourceFileUniqueNames) {

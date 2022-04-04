@@ -149,3 +149,7 @@ export const date: Guard<Date> = 0 as any
  * @tsplus implicit
  */
 export const boolean: Guard<boolean> = 0 as any
+
+export const A: Guard<{
+    a: string
+}> = Derive()
