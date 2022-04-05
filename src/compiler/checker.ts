@@ -358,21 +358,10 @@ namespace ts {
             deferredDiagnosticsCallbacks.push(arg);
         };
         // TSPLUS EXTENSION START
-        const typeHashCache = new Map<Type, number>();
         const typeSymbolCache = new Map<Symbol, string[]>();
         const companionSymbolCache = new Map<Symbol, string[]>();
         const resolvedFluentCache = new Map<string, ESMap<string, TsPlusFluentExtension>>();
         const fluentCache = new Map<string, ESMap<string, () => TsPlusFluentExtension | undefined>>();
-        const fileMap = {
-            map: getFileMap(host.getCompilerOptions(), host)
-        };
-        const tsPlusWorldScope: {
-            implicits: ESMap<number, [Type, Declaration][]>;
-            rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration, Set<string>][] }>;
-        } = {
-            implicits: new Map(),
-            rules: new Map()
-        };
         const unresolvedFluentCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
         const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
         const operatorCache = new Map<string, ESMap<string, TsPlusOperatorExtension[]>>();
@@ -388,9 +377,6 @@ namespace ts {
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
         const globalSymbolsCache = new Map<string, TsPlusGlobalImport>()
         const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/
-        const unificationInProgress = {
-            isRunning: false
-        };
         // TSPLUS EXTENSION END
 
         // Cancellation that controls whether or not we can cancel in the middle of type checking.
@@ -829,9 +815,7 @@ namespace ts {
                 ...collectTsPlusGetterTags(statement),
                 ...collectTsPlusOperatorTags(statement),
                 ...collectTsPlusPipeableTags(statement),
-                ...collectTsPlusStaticTags(statement),
-                ...collectTsPlusImplicitTags(statement),
-                ...collectTsPlusDeriveTags(statement)
+                ...collectTsPlusStaticTags(statement)
             ],
             getFluentExtensionForPipeableSymbol,
             getPrimitiveTypeName,
@@ -1030,23 +1014,11 @@ namespace ts {
                 }
             }
         }
-        function collectRelevantSymbols(target: Type) {
-            const symbols = new Set<Symbol>();
-            for (const symbol of collectRelevantSymbolsWorker(getBaseConstraintOrType(target))) {
-                symbols.add(symbol)
-            }
-            if (symbols.size === 0) {
-                for (const symbol of collectRelevantSymbolsWorker(target)) {
-                    symbols.add(symbol)
-                }
-            }
-            return arrayFrom(symbols.values());
-        }
         /**
          * Recursively collects the symbols associated with the given type. Index 0 is the given type's symbol,
          * followed by subtypes, subtypes of subtypes, etc.
          */
-        function collectRelevantSymbolsWorker(target: Type) {
+        function collectRelevantSymbols(target: Type) {
             const returnArray = arrayFrom(collectRelevantSymbolsLoop(target).values())
 
             // collect primitive symbols last, in case they have overridden extensions
@@ -1079,7 +1051,7 @@ namespace ts {
             return returnArray
         }
         function getExtensions(selfNode: Expression) {
-            const targetType: Type = getTypeOfNode(selfNode);
+            const targetType: Type = getBaseConstraintOrType(getTypeOfNode(selfNode));
             const symbols = collectRelevantSymbols(targetType);
             const copy: ESMap<string, Symbol> = new Map();
             const copyFluent: ESMap<string, Set<TsPlusFluentExtension>> = new Map();
@@ -1193,7 +1165,7 @@ namespace ts {
             }) !== undefined;
         }
         function getFluentExtension(targetType: Type, name: string): Type | undefined {
-            const symbols = collectRelevantSymbols(targetType);
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType));
             const candidates: Set<TsPlusSignature> = new Set();
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
@@ -1234,7 +1206,7 @@ namespace ts {
             }
         }
         function getGetterExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType)
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
@@ -1283,7 +1255,7 @@ namespace ts {
             }
         }
         function getStaticExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(targetType)
+            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
@@ -1354,7 +1326,7 @@ namespace ts {
         function getOperatorExtensionsForTypes(name: string, types: Type[]): Signature[] {
             const symbols = new Set<Symbol>();
             for (const type of types) {
-                collectRelevantSymbols(type).forEach((symbol) => {
+                collectRelevantSymbols(getBaseConstraintOrType(type)).forEach((symbol) => {
                     symbols.add(symbol)
                 })
             }
@@ -1484,13 +1456,12 @@ namespace ts {
             if (!isCallExpression(node)) {
                 return false;
             }
-            const type = getTypeOfNode(node.expression);
-            if (type && type.symbol && type.symbol.declarations) {
-                for (const declaration of type.symbol.declarations) {
-                    if (getAllJSDocTags(declaration, (_): _ is JSDocTag => _.tagName.escapedText === "tsplus" && _.comment === `macro ${macro}`).length > 0) {
-                        return true;
-                    }
-                }
+            const symbol = getSymbolAtLocation(node.expression);
+            if (symbol && symbol.valueDeclaration) {
+                return getAllJSDocTags(
+                    symbol.valueDeclaration,
+                    (_): _ is JSDocTag => _.tagName.escapedText === "tsplus" && _.comment === `macro ${macro}`
+                ).length > 0;
             }
             return false;
         }
@@ -15521,39 +15492,25 @@ namespace ts {
             }
             return candidate;
         }
-
         function getUnionType(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type): Type {
             const unionType = getUnionTypeOriginal(types, unionReduction, aliasSymbol, aliasTypeArguments, origin);
-            if (types.length <= 1 || aliasSymbol || unificationInProgress.isRunning) {
+            if (types.length <= 1) {
                 return unionType;
             }
-            const seen = new Set<string | Symbol>()
             for (let type of types) {
                 let tags = 0
                 const targetSymbol = type.symbol || type.aliasSymbol;
-                if (!seen.has(targetSymbol)) {
-                    seen.add(targetSymbol);
-                } else {
-                    break
-                }
                 for (let declaration of (targetSymbol?.declarations || [])) {
                     for (let typeTag of collectTsPlusTypeTags(declaration)) {
-                        if (!seen.has(typeTag.comment)) {
-                            seen.add(typeTag.comment);
-                        } else {
-                            break
-                        }
                         tags++;
                         const target = typeTag.comment.split(" ")[1]!;
                         const id = identityCache.get(target);
                         if (id) {
-                            unificationInProgress.isRunning = true;
                             const result = checkTsPlusCustomCall(
                                 id,
                                 [factory.createSyntheticExpression(unionType)],
                                 CheckMode.Normal
-                                );
-                            unificationInProgress.isRunning = false;
+                            );
                             if (!isErrorType(result)) {
                                 return result
                             }
@@ -30957,8 +30914,7 @@ namespace ts {
                 if (arg.kind !== SyntaxKind.OmittedExpression && !(checkMode & CheckMode.IsForStringLiteralArgumentCompletions && hasSkipDirectInferenceFlag(arg))) {
                     // TSPLUS EXTENTION BEGIN
                     const _paramType = getTypeAtPosition(signature, i);
-                    const isLazy = isLazyParameterByType(_paramType);
-                    const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
+                    const paramType = isLazyParameterByType(_paramType) ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
                     // TSPLUS EXTENTION END
                     const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
                     inferTypes(context.inferences, argType, paramType);
@@ -30974,7 +30930,7 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION BEGIN
-        function isLazyParameterByType(type: Type): type is TypeReference {
+        function isLazyParameterByType(type: Type) {
             if (type.symbol && type.symbol.declarations && type.symbol.declarations.length > 0) {
                 const tag = collectTsPlusTypeTags(type.symbol.declarations[0])[0];
                 if (tag && tag.comment === "type tsplus/LazyArgument") {
@@ -31224,7 +31180,7 @@ namespace ts {
                     const _paramType = getTypeAtPosition(signature, i);
                     const isLazy = isLazyParameterByType(_paramType);
                     const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
-                     // TSPLUS EXTENTION END
+                    // TSPLUS EXTENTION END
                     const argType = checkExpressionWithContextualType(arg, paramType, /*inferenceContext*/ undefined, checkMode);
                     // TSPLUS EXTENTION BEGIN
                     if (isLazy && isTypeIdenticalTo(argType, anyType)) {
@@ -32791,545 +32747,11 @@ namespace ts {
                     }
                 }
             }
-        }
-
-        function getDerivationDebugDiagnostic(location: CallExpression, derivation: Derivation): Diagnostic {
-            switch(derivation._tag) {
-                case "EmptyObjectDerivation": {
-                    return createError(
-                        location.arguments[0],
-                        Diagnostics.Deriving_type_0_1,
-                        typeToString(derivation.type),
-                        "intrinsically as it is an empty object"
-                    )
-                }
-                case "InvalidDerivation": {
-                    throw new Error("Bug, derivation debug called with InvalidDerivation")
-                }
-                case "FromBlockScope": {
-                    return createError(
-                        location.arguments[0],
-                        Diagnostics.Deriving_type_0_1,
-                        typeToString(derivation.type),
-                        `using block-scoped implicit ${derivation.implicit.symbol.escapedName}`
-                    );
-                }
-                case "FromImplicitScope": {
-                    return createError(
-                        location.arguments[0],
-                        Diagnostics.Deriving_type_0_1,
-                        typeToString(derivation.type),
-                        `using implicit ${
-                            getSourceFileOfNode(location).fileName !== getSourceFileOfNode(derivation.implicit).fileName ? 
-                                `${getImportPath(derivation.implicit)}#${derivation.implicit.symbol.escapedName}` : 
-                                derivation.implicit.symbol.escapedName
-                            }`
-                    )
-                }
-                case "FromIntersectionStructure": {
-                    return createDiagnosticForNodeFromMessageChain(
-                        location.arguments[0],
-                        chainDiagnosticMessages(
-                            derivation.fields.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
-                            Diagnostics.Deriving_type_0_1,
-                            typeToString(derivation.type),
-                            "intrinsically as an intersection"
-                        )
-                    )
-                }
-                case "FromObjectStructure": {
-                    return createDiagnosticForNodeFromMessageChain(
-                        location.arguments[0],
-                        chainDiagnosticMessages(
-                            derivation.fields.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d.value))),
-                            Diagnostics.Deriving_type_0_1,
-                            typeToString(derivation.type),
-                            "intrinsically as an object structure"
-                        )
-                    )
-                }
-                case "FromTupleStructure": {
-                    return createDiagnosticForNodeFromMessageChain(
-                        location.arguments[0],
-                        chainDiagnosticMessages(
-                            derivation.fields.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
-                            Diagnostics.Deriving_type_0_1,
-                            typeToString(derivation.type),
-                            "intrinsically as a tuple structure"
-                        )
-                    )
-                }
-                case "FromLiteral": {
-                    return createError(
-                        location.arguments[0],
-                        Diagnostics.Deriving_type_0_1,
-                        typeToString(derivation.type),
-                        `intrinsically as a literal ${typeof derivation.value}`
-                    )
-                }
-                case "FromPriorDerivation": {
-                    return createError(
-                        location.arguments[0],
-                        Diagnostics.Deriving_type_0_1,
-                        typeToString(derivation.type),
-                        `from derivation scope`
-                    )
-                }
-                case "FromRule": {
-                    return createDiagnosticForNodeFromMessageChain(
-                        location.arguments[0],
-                        chainDiagnosticMessages(
-                            derivation.arguments.map((d) => createDiagnosticMessageChainFromDiagnostic(getDerivationDebugDiagnostic(location, d))),
-                            Diagnostics.Deriving_type_0_1,
-                            typeToString(derivation.type),
-                            `using${(derivation.usedBy.length > 0 ? " (recursive)" : "")} rule ${
-                                getSourceFileOfNode(location).fileName !== getSourceFileOfNode(derivation.rule).fileName ? 
-                                    `${getImportPath(derivation.rule)}#${derivation.rule.symbol.escapedName}` : 
-                                    derivation.rule.symbol.escapedName
-                                }`
-                        )
-                    )
-                }
-                default: {
-                    // @ts-expect-error
-                    derivation._tag
-                }
-                throw new Error("Bug, unreachable")
-            }
-        }
-        function getImportPath(declaration: Declaration) {
-            let path: string | undefined;
-            const locationTag = getAllJSDocTags(declaration, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && tag.comment?.toString().startsWith("location") === true)[0];
-            if (locationTag) {
-                const match = locationTag.comment!.toString().match(/^location "(.*)"/);
-                if (match) {
-                    path = match[1]
-                }
-            }
-            if (!path) {
-                path = getImportLocation(fileMap.map, getSourceFileOfNode(declaration).fileName);
-            }
-            return path;
-        }
-        function deriveType(deriveCallNode: CallExpression, type: Type): Type {
-            const nodeLinks = getNodeLinks(deriveCallNode);
-            if (!nodeLinks.tsPlusDerivation) {
-                const derivationDiagnostics: Diagnostic[] = [];
-                const derivation = deriveTypeWorker(deriveCallNode, type, type, derivationDiagnostics, [], [], []);
-                nodeLinks.tsPlusDerivation = derivation;
-                if (isErrorType(derivation.type)) {
-                    derivationDiagnostics.forEach((diagnostic) => {
-                        diagnostics.add(diagnostic);
-                    })
-                    return errorType;
-                } else if (deriveCallNode.arguments.length > 0) {
-                    diagnostics.add(getDerivationDebugDiagnostic(deriveCallNode, nodeLinks.tsPlusDerivation));
-                    return errorType;
-                }
-            }
-            return nodeLinks.tsPlusDerivation.type;
-        }
-
-        function getSelfExportStatement(location: Node) {
-            let current = location;
-            while (!isVariableStatement(current) && current.parent) {
-                current = current.parent;
-            }
-            if (current.parent) {
-                return current;
-            }
-        }
-
-        function hashType(type: Type) {
-            if (!typeHashCache.has(type)) {
-                typeHashCache.set(type, hashTypeWorker(type));
-            }
-            return typeHashCache.get(type)!;
-        }
-
-        function hashTypeWorker(type: Type) {
-            if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
-                const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
-                let hasRules = false;
-                for (const tag of arrayFrom(tags.values())) {
-                    const foundRules = tsPlusWorldScope.rules.get(tag);
-                    if (foundRules) {
-                        hasRules = true;
-                        break
-                    }
-                }
-                if (hasRules) {
-                    const tagsHsah = hashing.hashArray(arrayFrom(tags.values()).sort())
-                    const argumentsHash = hashing.hashArray(map((type as TypeReference).resolvedTypeArguments!, hashType))
-                    const hash = hashing.hashPlainObject({
-                        type: type.symbol.escapedName,
-                        tags: tagsHsah,
-                        arguments: argumentsHash
-                    })
-                    return hash;
-                }
-            }
-            if ("intrinsicName" in type) {
-                return hashing.hashString((type as IntrinsicType).intrinsicName);
-            }
-            if (type.flags & TypeFlags.StringLiteral) {
-                return hashing.hashString((type as StringLiteralType).value);
-            }
-            if (type.flags & TypeFlags.NumberLiteral) {
-                return hashing.hashNumber((type as NumberLiteralType).value);
-            }
-            if (type.flags & TypeFlags.Union) {
-                return hashing.hashArray(map((type as UnionType).types, hashType));
-            }
-            return hashing.hashArray(map(getPropertiesOfType(type), (x) => x.escapedName).sort());
-        }
-
-        function isIdenticalInDerivation(self: Type, that: Type) {
-            return hashType(self) === hashType(that) && isTypeIdenticalTo(self, that)
-        }
-
-        function isLocalImplicit(node: Node): boolean {
-            return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === 'string' && tag.comment === 'implicit local').length > 0;
-        }
-
-        function getAllBlockScopedDeclarations(location: Node): { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] {
-            const blockScopedImplicits: { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] = [];
-            forEachEnclosingBlockScopeContainer(location, (container) => {
-                if (container.locals) {
-                    container.locals.forEach((local) => {
-                        if (local.valueDeclaration &&
-                            isLocalImplicit(local.valueDeclaration) &&
-                            isNamedDeclaration(local.valueDeclaration) &&
-                            isIdentifier(local.valueDeclaration.name)) {
-                            blockScopedImplicits.push({
-                                type: getTypeOfSymbol(local),
-                                valueDeclaration: local.valueDeclaration as NamedDeclaration & { name: Identifier },
-                                enclosingBlockScope: container
-                            })
-                        }
-                    })
-                }
-            })
-            return blockScopedImplicits;
-        }
-
-        function deriveTypeWorker(
-            location: Node,
-            originalType: Type,
-            type: Type,
-            diagnostics: Diagnostic[],
-            derivationScope: FromRule[],
-            prohibited: Type[],
-            currentDerivation: Type[]
-        ): Derivation {
-            if (isTypeIdenticalTo(type, emptyObjectType)) {
-                return {
-                    _tag: "EmptyObjectDerivation",
-                    type
-                };
-            }
-            const blockScopedImplicits = getAllBlockScopedDeclarations(location);
-            if (blockScopedImplicits.length > 0) {
-                for (const implicit of blockScopedImplicits) {
-                    if (isIdenticalInDerivation(type, implicit.type) && isBlockScopedNameDeclaredBeforeUse(implicit.valueDeclaration, location)) {
-                        implicit.valueDeclaration.symbol.isReferenced = SymbolFlags.Value;
-                        const blockLinks = getNodeLinks(implicit.enclosingBlockScope);
-                        if (!blockLinks.uniqueNames) {
-                            blockLinks.uniqueNames = new Set()
-                        }
-                        blockLinks.uniqueNames.add(implicit.valueDeclaration);
-                        const implicitLinks = getNodeLinks(implicit.valueDeclaration);
-                        implicitLinks.needsUniqueNameInSope = true;
-                        return {
-                            _tag: "FromBlockScope",
-                            type,
-                            implicit: implicit.valueDeclaration,
-                        };
-                    }
-                }
-            }
-            const selfExport = getSelfExportStatement(location);
-            const typeHash = hashType(type);
-            const implicits = tsPlusWorldScope.implicits.get(typeHash);
-            if (implicits) {
-                for (const [implicitType, declaration] of implicits) {
-                    if (isIdenticalInDerivation(type, implicitType) && isBlockScopedNameDeclaredBeforeUse(declaration, location) && getSelfExportStatement(declaration) !== selfExport) {
-                        return {
-                            _tag: "FromImplicitScope",
-                            type,
-                            implicit: declaration
-                        };
-                    }
-                }
-            }
-            for (const derivedType of derivationScope) {
-                if (isIdenticalInDerivation(type, derivedType.type)) {
-                    const rule: FromPriorDerivation = {
-                        _tag: "FromPriorDerivation",
-                        derivation: derivedType,
-                        type
-                    };
-                    derivedType.usedBy.push(rule);
-                    return rule;
-                }
-            }
-            const newCurrentDerivation = [...currentDerivation, type];
-            for (const prohibitedType of prohibited) {
-                if (isIdenticalInDerivation(type, prohibitedType)) {
-                    if (diagnostics.length === 0) {
-                        const digs: Diagnostic[] = [];
-                        for (let i = 1; i < newCurrentDerivation.length - 1; i++) {
-                            const step = newCurrentDerivation[i];
-                            digs.push(createError(
-                                location,
-                                Diagnostics.Failed_derivation_of_type_0,
-                                typeToString(step)
-                            ));
-                        }
-                        const diagnostic = createDiagnosticForNodeFromMessageChain(
-                            location,
-                            chainDiagnosticMessages(
-                                map(digs, createDiagnosticMessageChainFromDiagnostic),
-                                Diagnostics.Cannot_derive_type_0_the_derivation_requires_a_lazy_rule_to_be_in_scope_as_it_is_cyclic_for_the_type_1,
-                                typeToString(newCurrentDerivation[0]),
-                                typeToString(newCurrentDerivation[newCurrentDerivation.length - 1])
-                            )
-                        )
-                        diagnostics.push(diagnostic)
-                    }
-                    return {
-                        _tag: "InvalidDerivation",
-                        type: errorType
-                    };
-                }
-            }
-            let hasRules = false;
-            if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
-                const tags = new Set(map(flatMap(type.symbol.declarations, collectTsPlusTypeTags), (tag) => tag.comment.replace(/^type /, "")));
-                tagCheck: for (const tag of arrayFrom(tags.values())) {
-                    const foundRules = tsPlusWorldScope.rules.get(tag);
-                    if (!foundRules) {
-                        continue tagCheck;
-                    }
-                    const rules = foundRules.rules.sort((a, b) => a[1] - b[1]);
-                    const targetTypes = (type as TypeReference).resolvedTypeArguments!;
-                    if (rules.length > 0) {
-                        hasRules =  true;
-                    }
-                    ruleCheck: for (const [rule, _, ruleType, ruleDeclaration, options] of rules) {
-                        const toCheck: Type[] = [];
-                        if (rule.paramActions.length !== targetTypes.length) {
-                            continue ruleCheck;
-                        }
-                        let index = 0;
-                        for (const paramAction of rule.paramActions) {
-                            if (paramAction === "_") {
-                                toCheck.push(targetTypes[index])
-                            } else if (paramAction === "[]") {
-                                if (isTupleType(targetTypes[index])) {
-                                    toCheck.push(targetTypes[index])
-                                } else {
-                                    continue ruleCheck;
-                                }
-                            } else if (paramAction === "|") {
-                                if (targetTypes[index].flags & TypeFlags.Union) {
-                                    const typesInUnion = (targetTypes[index] as UnionType).types;
-                                    const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
-                                    toCheck.push(typesInUnionTuple)
-                                } else {
-                                    continue ruleCheck;
-                                }
-                            } else if (paramAction === "&") {
-                                if (targetTypes[index].flags & TypeFlags.Intersection) {
-                                    const typesInUnion = (targetTypes[index] as IntersectionType).types;
-                                    const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
-                                    toCheck.push(typesInUnionTuple)
-                                } else {
-                                    continue ruleCheck;
-                                }
-                            } else {
-                                continue ruleCheck;
-                            }
-                            index++;
-                        }
-                        if (toCheck.length !== targetTypes.length) {
-                            continue ruleCheck;
-                        }
-                        const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
-                        for (const signature of signatures) {
-                            if (signature.typeParameters && signature.typeParameters.length === toCheck.length) {
-                                const mapper = createTypeMapper(signature.typeParameters, toCheck);
-                                if (every(signature.typeParameters, (param, i) => {
-                                    const constraint = instantiateType(getConstraintOfTypeParameter(param), mapper);
-                                    if (!constraint) {
-                                        return true;
-                                    }
-                                    return isTypeAssignableTo(toCheck[i], constraint);
-                                })) {
-                                    const instantiated = getSignatureInstantiation(signature, toCheck, false);
-                                    if (instantiated.parameters.length === 1 &&
-                                        instantiated.parameters[0].valueDeclaration &&
-                                        (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
-                                    ) {
-                                        const residualType = getTypeOfSymbol(instantiated.parameters[0]);
-                                        if (isTupleType(residualType)) {
-                                            const types = getTypeArguments(residualType);
-                                            const selfRule: FromRule = {
-                                                _tag: "FromRule",
-                                                type,
-                                                rule: ruleDeclaration,
-                                                arguments: [],
-                                                usedBy: [],
-                                                lazyRule: foundRules.lazyRule
-                                            };
-                                            const supportsLazy = !!foundRules.lazyRule && !options.has("no-recursion");
-                                            const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
-                                            const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
-                                            const derivations = map(types, (childType) => deriveTypeWorker(
-                                                location,
-                                                originalType,
-                                                childType,
-                                                diagnostics,
-                                                newDerivationScope,
-                                                newProhibited,
-                                                newCurrentDerivation
-                                            ));
-                                            if (!find(derivations, (d) => isErrorType(d.type))) {
-                                                selfRule.arguments.push(...derivations);
-                                                return selfRule;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if (diagnostics.length > 0) {
-                            break tagCheck;
-                        }
-                    }
-                }
-            }
-            if (diagnostics.length === 0 && !hasRules && isTupleType(type)) {
-                const props = getTypeArguments(type);
-                const derivations = map(props, (prop) => deriveTypeWorker(
-                    location,
-                    originalType,
-                    prop,
-                    diagnostics,
-                    derivationScope,
-                    prohibited,
-                    newCurrentDerivation
-                ));
-                if (!find(derivations, (d) => isErrorType(d.type))) {
-                    return {
-                        _tag: "FromTupleStructure",
-                        type,
-                        fields: derivations
-                    };
-                }
-            }
-            if (diagnostics.length === 0 && !hasRules && (type.flags & TypeFlags.Intersection)) {
-                const props = (type as IntersectionType).types;
-                const canIntersect = !find(props, (p) => {
-                    if ((p.flags & TypeFlags.Object) && getSignaturesOfType(p, SignatureKind.Call).length === 0 && getSignaturesOfType(p, SignatureKind.Construct).length === 0 && !isArrayOrTupleLikeType(p)) {
-                        return false
-                    }
-                    return true
-                })
-                if (canIntersect) {
-                    const derivations = map(props, (prop) => deriveTypeWorker(
-                        location,
-                        originalType,
-                        prop,
-                        diagnostics,
-                        derivationScope,
-                        prohibited,
-                        newCurrentDerivation
-                    ));
-                    if (!find(derivations, (d) => isErrorType(d.type))) {
-                        return {
-                            _tag: "FromIntersectionStructure",
-                            type,
-                            fields: derivations
-                        };
-                    }
-                }
-            }
-            if (diagnostics.length === 0 && !hasRules && (type.flags & TypeFlags.Object)) {
-                const call = getSignaturesOfType(type, SignatureKind.Call);
-                const construct = getSignaturesOfType(type, SignatureKind.Construct);
-                if (call.length === 0 && construct.length === 0) {
-                    const props = getPropertiesOfType(type);
-                    if (!find(props, (p) => p.escapedName.toString().startsWith("__@"))) {
-                        const fields: FromObjectStructure["fields"] = [];
-                        for (const prop of props) {
-                            fields.push({
-                                prop,
-                                value: deriveTypeWorker(
-                                    location,
-                                    originalType,
-                                    getTypeOfSymbol(prop),
-                                    diagnostics,
-                                    derivationScope,
-                                    prohibited,
-                                    newCurrentDerivation
-                                )
-                            })
-                        }
-                        if (!find(fields, (d) => isErrorType(d.value.type))) {
-                            return {
-                                _tag: "FromObjectStructure",
-                                type,
-                                fields
-                            };
-                        }
-                    }
-                }
-            }
-            if (diagnostics.length === 0 && !hasRules && (type.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral))) {
-                return {
-                    _tag: "FromLiteral",
-                    type,
-                    value: (type as StringLiteralType | NumberLiteralType).value
-                };
-            }
-            if (diagnostics.length === 0) {
-                if (isIdenticalInDerivation(originalType, type)) {
-                    diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_and_no_derivation_rules_are_found, typeToString(originalType)));
-                } else {
-                    const digs: Diagnostic[] = [];
-                    for (let i = 1; i < newCurrentDerivation.length - 1; i++) {
-                        const step = newCurrentDerivation[i];
-                        digs.push(createError(
-                            location,
-                            Diagnostics.Failed_derivation_of_type_0,
-                            typeToString(step)
-                        ));
-                    }
-                    const diagnostic = createDiagnosticForNodeFromMessageChain(
-                        location,
-                        chainDiagnosticMessages(
-                            map(digs, createDiagnosticMessageChainFromDiagnostic),
-                            Diagnostics.Cannot_derive_type_0_you_may_want_to_try_add_an_implicit_for_1_in_scope,
-                            typeToString(newCurrentDerivation[0]),
-                            typeToString(newCurrentDerivation[newCurrentDerivation.length - 1])
-                        )
-                    )
-                    diagnostics.push(diagnostic)
-                }
-            }
-            return {
-                _tag: "InvalidDerivation",
-                type: errorType
-            };;
-        }
+        } 
 
         // TSPLUS EXTENSION START
         function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
             const checked = checkCallExpressionOriginal(node, checkMode);
-            if (isTsPlusMacroCall(node, "Derive") && !isErrorType(checked)) {
-                return deriveType(node, checked);
-            }
             if (isTsPlusMacroCall(node, "pipeable") && !isErrorType(checked)) {
                 if (!isVariableDeclaration(node.parent)) {
                   error(node, Diagnostics.Pipeable_macro_is_only_allowed_in_variable_declarations);
@@ -36057,6 +35479,7 @@ namespace ts {
                 context.contextualType = contextualType;
                 context.inferenceContext = inferenceContext;
                 const type = checkExpression(node, checkMode | CheckMode.Contextual | (inferenceContext ? CheckMode.Inferential : 0));
+
                 // We strip literal freshness when an appropriate contextual type is present such that contextually typed
                 // literals always preserve their literal types (otherwise they might widen during type inference). An alternative
                 // here would be to not mark contextually typed literals as fresh in the first place.
@@ -45010,18 +44433,6 @@ namespace ts {
                 (tag): tag is TsPlusJSDocGlobalTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("global")
             );
         }
-        function collectTsPlusImplicitTags(statement: Declaration) {
-            return getAllJSDocTags(
-                statement,
-                (tag): tag is TsPlusJSDocImplicitTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("implicit") && !tag.comment.includes("local")
-            );
-        }
-        function collectTsPlusDeriveTags(statement: Declaration) {
-            return getAllJSDocTags(
-                statement,
-                (tag): tag is TsPlusJSDocDeriveTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("derive")
-            );
-        }
         function collectTsPlusFluentTags(statement: Declaration) {
             return getAllJSDocTags(
                 statement,
@@ -45891,7 +45302,7 @@ namespace ts {
                             signatures,
                             exportName: declaration.name.escapedText.toString(),
                             definition: file
-                        });
+                        })
                         augmentPipeableIdentifierSymbol(
                             declaration.name,
                             target,
@@ -46159,78 +45570,22 @@ namespace ts {
                 }
             }
         }
-        function fillTsPlusLocalScope(file: SourceFile) {
-            const indexedImplicits = tsPlusWorldScope.implicits;
-            const derivationRules = tsPlusWorldScope.rules;
-            if (file.symbol) {
-                const exports = file.symbol.exports;
-                if (exports) {
-                    exports.forEach((exportSymbol) => {
-                        forEach(exportSymbol.declarations, (declaration) => {
-                            const implicitTags = collectTsPlusImplicitTags(declaration);
-                            if (implicitTags.length > 0) {
-                                const typeOfNode = getTypeOfNode(declaration);
-                                const hash = hashType(typeOfNode);
-                                if (!indexedImplicits.has(hash)) {
-                                    indexedImplicits.set(hash, []);
-                                }
-                                indexedImplicits.get(hash)!.push([typeOfNode, declaration]);
-                            }
-                            const deriveTags = collectTsPlusDeriveTags(declaration);
-                            for (const tag of deriveTags) {
-                                const match = tag.comment.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
-                                if (match) {
-                                    const [, typeTag, paramActions, rest] = match;
-                                    const [priority, ...options] = rest.split(" ");
-                                    if (!derivationRules.has(typeTag)) {
-                                        derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
-                                    }
-                                    const typeOfNode = getTypeOfNode(declaration);
-                                    derivationRules.get(typeTag)?.rules.push([
-                                        { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) },
-                                        Number.parseFloat(priority),
-                                        typeOfNode,
-                                        declaration,
-                                        new Set(options)
-                                    ]);
-                                } else {
-                                    const match = tag.comment.match(/^derive ([^<]*) lazy$/);
-                                    if (match) {
-                                        const [, typeTag] = match;
-                                        if (!derivationRules.has(typeTag)) {
-                                            derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
-                                        }
-                                        derivationRules.get(typeTag)!.lazyRule = declaration;
-                                    }
-                                }
-                            }
-                        });
-                    });
-                }
-            }
-        }
+        
         function initTsPlusTypeCheckerGlobal() {
             globalSymbolsCache.clear();
             for (const file of host.getSourceFiles()) {
-                for (const statement of file.imports) {
-                    if (isImportDeclaration(statement.parent)) {
-                        tryCacheTsPlusGlobalSymbol(statement.parent);
+                for (const statement of file.statements) {
+                    if (isImportDeclaration(statement)) {
+                        tryCacheTsPlusGlobalSymbol(statement);
                     }
                 }
             }
         }
-        function initTsPlusTypeCheckerImplicits() {
-            for (const file of host.getSourceFiles()) {
-                fillTsPlusLocalScope(file);
-            }
-        }
         function initTsPlusTypeChecker() {
-            fileMap.map = getFileMap(host.getCompilerOptions(), host);
             fluentCache.clear();
             unresolvedFluentCache.clear();
             operatorCache.clear();
             typeSymbolCache.clear();
-            typeHashCache.clear();
             staticFunctionCache.clear();
             staticValueCache.clear();
             unresolvedStaticCache.clear();
@@ -46241,10 +45596,9 @@ namespace ts {
             indexAccessExpressionCache.clear();
             pipeableCache.clear();
             inheritanceSymbolCache.clear();
-            tsPlusWorldScope.implicits.clear();
-            tsPlusWorldScope.rules.clear();
-            unificationInProgress.isRunning = false;
+            
             initTsPlusTypeCheckerGlobal();
+
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);
             }
@@ -46314,6 +45668,7 @@ namespace ts {
                     })
                 })
             })
+
             unresolvedFluentCache.forEach((map, typeName) => {
                 if (!fluentCache.has(typeName)) {
                     fluentCache.set(typeName, new Map());
@@ -46386,12 +45741,15 @@ namespace ts {
                     });
                 });
             });
+
             unresolvedFluentCache.clear();
+
             operatorCache.forEach((map) => {
                 map.forEach((extensions) => {
                     extensions.sort(({ priority: x }, { priority: y }) => x > y ? 1 : x < y ? -1 : 0)
                 })
             })
+
             pipeableCache.forEach((map, typeName) => {
                 if (!fluentCache.has(typeName)) {
                     fluentCache.set(typeName, new Map());
@@ -46425,7 +45783,6 @@ namespace ts {
                     });
                 });
             })
-            initTsPlusTypeCheckerImplicits();
         }
         // TSPLUS EXTENSION END
 
