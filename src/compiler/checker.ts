@@ -1027,11 +1027,23 @@ namespace ts {
                 }
             }
         }
+        function collectRelevantSymbols(target: Type) {
+            const symbols = new Set<Symbol>();
+            for (const symbol of collectRelevantSymbolsWorker(getBaseConstraintOrType(target))) {
+                symbols.add(symbol)
+            }
+            if (symbols.size === 0) {
+                for (const symbol of collectRelevantSymbolsWorker(target)) {
+                    symbols.add(symbol)
+                }
+            }
+            return arrayFrom(symbols.values());
+        }
         /**
          * Recursively collects the symbols associated with the given type. Index 0 is the given type's symbol,
          * followed by subtypes, subtypes of subtypes, etc.
          */
-        function collectRelevantSymbols(target: Type) {
+        function collectRelevantSymbolsWorker(target: Type) {
             const returnArray = arrayFrom(collectRelevantSymbolsLoop(target).values())
 
             // collect primitive symbols last, in case they have overridden extensions
@@ -1064,7 +1076,7 @@ namespace ts {
             return returnArray
         }
         function getExtensions(selfNode: Expression) {
-            const targetType: Type = getBaseConstraintOrType(getTypeOfNode(selfNode));
+            const targetType: Type = getTypeOfNode(selfNode);
             const symbols = collectRelevantSymbols(targetType);
             const copy: ESMap<string, Symbol> = new Map();
             const copyFluent: ESMap<string, Set<TsPlusFluentExtension>> = new Map();
@@ -1178,7 +1190,7 @@ namespace ts {
             }) !== undefined;
         }
         function getFluentExtension(targetType: Type, name: string): Type | undefined {
-            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType));
+            const symbols = collectRelevantSymbols(targetType);
             const candidates: Set<TsPlusSignature> = new Set();
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
@@ -1219,7 +1231,7 @@ namespace ts {
             }
         }
         function getGetterExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
+            const symbols = collectRelevantSymbols(targetType)
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
@@ -1268,7 +1280,7 @@ namespace ts {
             }
         }
         function getStaticExtension(targetType: Type, name: string) {
-            const symbols = collectRelevantSymbols(getBaseConstraintOrType(targetType))
+            const symbols = collectRelevantSymbols(targetType)
             for (const target of symbols) {
                 if (typeSymbolCache.has(target)) {
                     const x = typeSymbolCache.get(target)!.flatMap(
@@ -1339,7 +1351,7 @@ namespace ts {
         function getOperatorExtensionsForTypes(name: string, types: Type[]): Signature[] {
             const symbols = new Set<Symbol>();
             for (const type of types) {
-                collectRelevantSymbols(getBaseConstraintOrType(type)).forEach((symbol) => {
+                collectRelevantSymbols(type).forEach((symbol) => {
                     symbols.add(symbol)
                 })
             }
@@ -30927,27 +30939,12 @@ namespace ts {
                 const arg = args[i];
                 if (arg.kind !== SyntaxKind.OmittedExpression && !(checkMode & CheckMode.IsForStringLiteralArgumentCompletions && hasSkipDirectInferenceFlag(arg))) {
                     // TSPLUS EXTENTION BEGIN
-                    const paramType = getTypeAtPosition(signature, i);
-                    if (isLazyParameterByType(paramType)) {
-                        const genericLazy = cloneTypeReference((paramType as TypeReference));
-                        genericLazy.resolvedTypeArguments = [anyType];
-                        const typeOfNode = getTypeOfNode(arg);
-                        if (!isTypeAssignableTo(typeOfNode, genericLazy) && !isTypeIdenticalTo(typeOfNode, anyType)) {
-                            const argType = checkExpressionWithContextualType(arg, (paramType as TypeReference).resolvedTypeArguments![0], context, checkMode);
-                            const instantiated = cloneTypeReference((paramType as TypeReference));
-                            instantiated.resolvedTypeArguments = [argType];
-                            inferTypes(context.inferences, instantiated, paramType);
-                        }
-                        else {
-                            const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
-                            inferTypes(context.inferences, argType, paramType);
-                        }
-                    }
-                    else {
-                        const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
-                        inferTypes(context.inferences, argType, paramType);
-                    }
-                    // TSPLUS EXTENTION END
+                    const _paramType = getTypeAtPosition(signature, i);
+                    const isLazy = isLazyParameterByType(_paramType);
+                    const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
+                     // TSPLUS EXTENTION END
+                    const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
+                    inferTypes(context.inferences, argType, paramType);
                 }
             }
 
@@ -31210,7 +31207,7 @@ namespace ts {
                     const _paramType = getTypeAtPosition(signature, i);
                     const isLazy = isLazyParameterByType(_paramType);
                     const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
-                    // TSPLUS EXTENTION END
+                     // TSPLUS EXTENTION END
                     const argType = checkExpressionWithContextualType(arg, paramType, /*inferenceContext*/ undefined, checkMode);
                     // TSPLUS EXTENTION BEGIN
                     if (isLazy && isTypeIdenticalTo(argType, anyType)) {
