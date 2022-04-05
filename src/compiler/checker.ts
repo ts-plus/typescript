@@ -388,6 +388,9 @@ namespace ts {
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
         const globalSymbolsCache = new Map<string, TsPlusGlobalImport>()
         const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/
+        const unificationInProgress = {
+            isRunning: false
+        };
         // TSPLUS EXTENSION END
 
         // Cancellation that controls whether or not we can cancel in the middle of type checking.
@@ -15518,25 +15521,39 @@ namespace ts {
             }
             return candidate;
         }
+
         function getUnionType(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type): Type {
             const unionType = getUnionTypeOriginal(types, unionReduction, aliasSymbol, aliasTypeArguments, origin);
-            if (types.length <= 1) {
+            if (types.length <= 1 || aliasSymbol || unificationInProgress.isRunning) {
                 return unionType;
             }
+            const seen = new Set<string | Symbol>()
             for (let type of types) {
                 let tags = 0
                 const targetSymbol = type.symbol || type.aliasSymbol;
+                if (!seen.has(targetSymbol)) {
+                    seen.add(targetSymbol);
+                } else {
+                    break
+                }
                 for (let declaration of (targetSymbol?.declarations || [])) {
                     for (let typeTag of collectTsPlusTypeTags(declaration)) {
+                        if (!seen.has(typeTag.comment)) {
+                            seen.add(typeTag.comment);
+                        } else {
+                            break
+                        }
                         tags++;
                         const target = typeTag.comment.split(" ")[1]!;
                         const id = identityCache.get(target);
                         if (id) {
+                            unificationInProgress.isRunning = true;
                             const result = checkTsPlusCustomCall(
                                 id,
                                 [factory.createSyntheticExpression(unionType)],
                                 CheckMode.Normal
-                            );
+                                );
+                            unificationInProgress.isRunning = false;
                             if (!isErrorType(result)) {
                                 return result
                             }
@@ -46227,6 +46244,7 @@ namespace ts {
             inheritanceSymbolCache.clear();
             tsPlusWorldScope.implicits.clear();
             tsPlusWorldScope.rules.clear();
+            unificationInProgress.isRunning = false;
             initTsPlusTypeCheckerGlobal();
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);

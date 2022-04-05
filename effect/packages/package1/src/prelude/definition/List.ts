@@ -1,11 +1,18 @@
 import { pipe } from "../../primitives";
+import { LazyArgument } from "../../utils/LazyArgument";
 
+/**
+ * @tsplus type tsplus-tests/List/Cons
+ */
 export class Cons<out A> implements Iterable<A> {
     constructor(readonly array: readonly A[]) { }
 
     [Symbol.iterator]!: () => Iterator<A>
 }
 
+/**
+ * @tsplus type tsplus-tests/List/Nil
+ */
 export class Nil<out A> implements Iterable<A> {
     readonly _A!: () => A;
     readonly array = [];
@@ -26,6 +33,8 @@ export const List: ListOps = {};
 
 /**
  * @tsplus unify tsplus-tests/List
+ * @tsplus unify tsplus-tests/List/Cons
+ * @tsplus unify tsplus-tests/List/Nil
  */
 export function unifyList<X extends List<any>>(self: X): List<
     [X] extends [List<infer A>] ? A : never
@@ -121,3 +130,9 @@ function appending() {
         x = x + 1
     }
 }
+
+function i<A>(l: LazyArgument<A>) {
+    return l()
+}
+
+const x = i(make(0))
