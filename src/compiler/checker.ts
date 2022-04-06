@@ -15569,7 +15569,21 @@ namespace ts {
                                 );
                             unificationInProgress.isRunning = false;
                             if (!isErrorType(result)) {
-                                return result
+                                if (result.aliasTypeArguments && result.aliasSymbol) {
+                                    return getTypeAliasInstantiation(
+                                        result.aliasSymbol,
+                                        map(result.aliasTypeArguments, (type) => type.flags & TypeFlags.Union ? getUnionType((type as UnionType).types) : type)
+                                    );
+                                }
+                                if (result.flags & TypeFlags.Object && (result as ObjectType).objectFlags & ObjectFlags.Reference) {
+                                    const ref = result as TypeReference;
+                                    if (ref.resolvedTypeArguments) {
+                                        const newRef = cloneTypeReference(ref);
+                                        newRef.resolvedTypeArguments = map(ref.resolvedTypeArguments, (type) => type.flags & TypeFlags.Union ? getUnionType((type as UnionType).types) : type);
+                                        return newRef;
+                                    }
+                                }
+                                return result;
                             }
                         }
                     }
