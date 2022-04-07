@@ -134,3 +134,48 @@ function aliasTest() {
   ac.methodAB()
   ac.methodAC()
 }
+
+// --------------------------------------------
+
+/**
+ * @tsplus type union/UA
+ */
+export interface UA {
+  readonly _tag: "UA"
+}
+
+/**
+ * @tsplus type union/UB
+ */
+export interface UB {
+  readonly _tag: "UB"
+}
+
+/**
+ * @tsplus type union/UC
+ */
+export interface UC {
+  readonly _tag: "UC"
+}
+
+/**
+ * @tsplus type union/U
+ */
+export type U = UA | UB | UC
+
+/**
+ * @tsplus fluent union/U u_op
+ */
+export declare function u_op(u: U): void
+
+declare const u: U
+
+declare const ub: UB
+
+function u_test() {
+  if (u._tag === "UA") {
+    u.u_op()
+  } else {
+    u.u_op()
+  }
+}
