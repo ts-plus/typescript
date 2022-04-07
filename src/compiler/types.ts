@@ -3329,6 +3329,9 @@ namespace ts {
     export interface TsPlusExtensionTag {
         readonly target: string;
         readonly name: string;
+    }
+
+    export interface TsPlusPrioritizedExtensionTag extends TsPlusExtensionTag {
         readonly priority: number;
     }
 
@@ -3361,7 +3364,6 @@ namespace ts {
         readonly tagName: Identifier;
         readonly comment: `macro ${string}`
     }
-
 
     export type TsPlusMacroCallExpression<K extends string> = CallExpression & { __tsplus_brand: K };
 
@@ -4714,13 +4716,13 @@ namespace ts {
         getIndexAccessExpressionCache(): ESMap<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isClassCompanionReference(node: Expression): boolean
-        collectTsPlusFluentTags(statement: Declaration): readonly TsPlusJSDocFluentTag[]
-        collectTsPlusAnyValueTags(statement: Declaration): readonly (TsPlusJSDocFluentTag | TsPlusJSDocGetterTag | TsPlusJSDocOperatorTag | TsPlusJSDocStaticTag | TsPlusJSDocImplicitTag | TsPlusJSDocDeriveTag)[]
+        collectTsPlusFluentTags(statement: Declaration): readonly TsPlusPrioritizedExtensionTag[]
+        hasExportedPlusTags(statement: Declaration): boolean;
         getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
         getPrimitiveTypeName(type: Type): string | undefined
         getResolvedOperator(node: BinaryExpression): Signature | undefined
         getNodeLinks(node: Node): NodeLinks
-        collectTsPlusMacroTags(statement: Declaration): readonly TsPlusJSDocMacroTag[]
+        collectTsPlusMacroTags(statement: Declaration): readonly string[]
         getTsPlusGlobals(): Symbol[];
         getTsPlusGlobal(name: string): TsPlusGlobalImport | undefined;
     }
@@ -5446,7 +5448,22 @@ namespace ts {
         isFluentCall?: true;
         uniqueNames?: Set<NamedDeclaration & { name: Identifier }>;
         needsUniqueNameInSope?: boolean;
-        uniqueNameInScope?: Identifier
+        uniqueNameInScope?: Identifier;
+
+        tsPlusTypeTags?: Array<string>;
+        tsPlusFluentTags?: Array<TsPlusPrioritizedExtensionTag>;
+        tsPlusOperatorTags?: Array<TsPlusPrioritizedExtensionTag>;
+        tsPlusStaticTags?: Array<TsPlusExtensionTag>;
+        tsPlusGetterTags?: Array<TsPlusExtensionTag>;
+        tsPlusPipeableTags?: Array<TsPlusExtensionTag>;
+        tsPlusIndexTags?: Array<string>;
+        tsPlusCompanionTags?: Array<string>;
+        tsPlusMacroTags?: Array<string>;
+        tsPlusUnifyTags?: Array<string>;
+        tsPlusDeriveTags?: Array<string>;
+        isTsPlusGlobal?: boolean;
+        isTsPlusImplicit?: boolean;
+        isTsPlusTailRec?: boolean;
         // TSPLUS EXTENSION END
     }
 

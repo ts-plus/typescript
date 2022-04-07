@@ -587,7 +587,7 @@ namespace ts {
                     if (fluentExtension.tsPlusDeclaration) {
                         const macroTags = checker.collectTsPlusMacroTags(fluentExtension.tsPlusDeclaration)
 
-                        if (macroTags.find((tag) => tag.comment === "macro pipe")) {
+                        if (macroTags.find((tag) => tag === "pipe")) {
                             return optimizePipe(
                                 visitNodes(factory.createNodeArray([simplyfy(node.expression), ...node.arguments], node.arguments.hasTrailingComma), visitor),
                                 context.factory,
@@ -634,7 +634,7 @@ namespace ts {
                     if (fluentExtension.tsPlusDeclaration) {
                         const macroTags = checker.collectTsPlusMacroTags(fluentExtension.tsPlusDeclaration)
 
-                        if (macroTags.find((tag) => tag.comment === "macro pipe")) {
+                        if (macroTags.find((tag) => tag === "pipe")) {
                             return optimizePipe(
                                 visitNodes(factory.createNodeArray([simplyfy(node.expression.expression), ...node.arguments], node.arguments.hasTrailingComma), visitor),
                                 context.factory,

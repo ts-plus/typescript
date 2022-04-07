@@ -93,8 +93,7 @@ namespace ts {
                 }
             }
             function visitFunctionDeclaration(_source: SourceFile, node: FunctionDeclaration, _visitor: Visitor, _context: TransformationContext): VisitResult<Node> {
-                const signatureFluentTags = checker.collectTsPlusAnyValueTags(node)
-                if (signatureFluentTags.length > 0) {
+                if (checker.hasExportedPlusTags(node)) {
                     const emitNode = getOrCreateEmitNode(node);
                     if (!emitNode.tsPlusLocationComment) {
                         const existingJsDoc = node.jsDoc?.[0] ?? factory.createJSDocComment()
@@ -135,7 +134,7 @@ namespace ts {
                             const signatureDeclaration = targetType.symbol.valueDeclaration
                             const signatureFluentTags = checker.collectTsPlusFluentTags(signatureDeclaration)
                             if (signatureFluentTags.length > 0) {
-                                const [_, target, name] = signatureFluentTags[0].comment.split(" ")
+                                const { target, name } = signatureFluentTags[0]
                                 const existingJsDoc = node.jsDoc?.[0] ?? factory.createJSDocComment()
                                 const existingTags = existingJsDoc.tags ?? factory.createNodeArray()
                                 const newJsDoc = factory.createJSDocComment(
@@ -170,8 +169,7 @@ namespace ts {
                         }
                     } else {
                         const declaration = node.declarationList.declarations[0];
-                        const signatureFluentTags = checker.collectTsPlusAnyValueTags(declaration);
-                        if (signatureFluentTags.length > 0) {
+                        if (checker.hasExportedPlusTags(declaration)) {
                             const emitNode = getOrCreateEmitNode(node);
                             if (!emitNode.tsPlusLocationComment) {
                                 const existingJsDoc = node.jsDoc?.[0] ?? factory.createJSDocComment()
