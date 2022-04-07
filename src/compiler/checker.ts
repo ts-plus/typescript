@@ -979,21 +979,7 @@ namespace ts {
                     }
                     // If the current type is a union type, add the inherited type symbols common to all members
                     if (target.flags & TypeFlags.Union) {
-                        const types = (target as UnionType).types;
-                        const inherited: Set<Symbol>[] = []
-                        for (const member of types) {
-                            if (!seen.has(member)) {
-                                inherited.push(collectRelevantSymbolsLoop(member, seen));
-                            }
-                        }
-                        // Add union members as "seen" only after the union has been collected
-                        for (const member of types) {
-                            seen.add(member);
-                        }
-
-                        intersectSets(inherited).forEach((s) => {
-                            relevant.add(s)
-                        })
+                        collectUnionType(target as UnionType);
                     }
                     // If the current type is an intersection type, simply enqueue all unseen members
                     if (target.flags & TypeFlags.Intersection) {
@@ -1003,6 +989,11 @@ namespace ts {
                                 queue.push(member);
                             }
                         }
+                    }
+                }
+                if (!target.symbol && !target.aliasSymbol) {
+                    if (target.flags & TypeFlags.Union) {
+                        collectUnionType(target as UnionType);
                     }
                 }
             }
@@ -1015,7 +1006,7 @@ namespace ts {
                         // Exclude all declarations but interface and class declarations.
                         // Symbol declarations can also include other declarations, such as variable declarations
                         // and module declarations, which we do not want to include for inheritance
-                        if (isInterfaceDeclaration(decl) || isClassDeclaration(decl)) {
+                        if (isInterfaceDeclaration(decl) || isClassDeclaration(decl) || isTypeAliasDeclaration(decl)) {
                             const type = getTypeOfNode(decl);
                             if (seen.has(type)) {
                                 continue;
@@ -1028,6 +1019,24 @@ namespace ts {
                         }
                     }
                 }
+            }
+
+            function collectUnionType(type: UnionType) {
+                const types = (type as UnionType).types;
+                const inherited: Set<Symbol>[] = []
+                for (const member of types) {
+                    if (!seen.has(member)) {
+                        inherited.push(collectRelevantSymbolsLoop(member, seen));
+                    }
+                }
+                // Add union members as "seen" only after the union has been collected
+                for (const member of types) {
+                    seen.add(member);
+                }
+
+                intersectSets(inherited).forEach((s) => {
+                    relevant.add(s)
+                })
             }
         }
         function collectRelevantSymbols(target: Type) {
@@ -45734,6 +45743,9 @@ namespace ts {
                 if (type.aliasSymbol) {
                     addToTypeSymbolCache(type.aliasSymbol, typeTag, "after");
                 }
+                if (type.flags & TypeFlags.Union) {
+                    tryCacheUnionInheritance((type as UnionType).types, type);
+                }
                 if (type.flags & TypeFlags.UnionOrIntersection) {
                     const types = (type as UnionOrIntersectionType).types;
                     for (const member of types) {
@@ -45760,6 +45772,20 @@ namespace ts {
                     }
                 })
             })
+        }
+        function tryCacheUnionInheritance(members: Type[], parent: Type): void {
+            const parentSymbol = parent.symbol ?? parent.aliasSymbol;
+            if (parentSymbol) {
+                for (const member of members) {
+                    const memberSymbol = member.symbol ?? member.aliasSymbol;
+                    if (memberSymbol) {
+                        if (!inheritanceSymbolCache.has(memberSymbol)) {
+                            inheritanceSymbolCache.set(memberSymbol, new Set());
+                        }
+                        inheritanceSymbolCache.get(memberSymbol)!.add(parentSymbol);
+                    }
+                }
+            }
         }
         function tryCacheTsPlusCompanion(declaration: ClassDeclaration): void {
             const tag = collectTsPlusCompanionTags(declaration)[0];
