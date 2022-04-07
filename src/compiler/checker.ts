@@ -45614,12 +45614,6 @@ namespace ts {
             const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
             return [final, createSymbolWithType(symbol, final)] as const;
         }
-        function getTsPlusStaticSymbolForCallSignatures(file: SourceFile, exportName: string, name: string, declaration: VariableDeclaration, signatures: readonly Signature[]) {
-            const methods = map(signatures, (s) => createTsPlusSignature(s, exportName, file));
-            const symbol = createTsPlusStaticFunctionSymbol(name, declaration, methods);
-            const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
-            return createSymbolWithType(symbol, final);
-        }
         function augmentPipeableIdentifierSymbol(identifier: Identifier, target: string, _exportName: string, name: string, dataFirstType: Type, declaration: FunctionDeclaration | VariableDeclarationWithFunction) {
             const identifierType = getTypeOfNode(identifier);
             if (identifierType.symbol) {
@@ -46198,7 +46192,7 @@ namespace ts {
         function tryCacheTsPlusPipeableFunction(file: SourceFile, declaration: FunctionDeclaration) {
             if (declaration.name && isIdentifier(declaration.name)) {
                 const pipeableTags = collectTsPlusPipeableTags(declaration);
-                for (const { target, name } of collectTsPlusPipeableTags(declaration)) {
+                for (const { target, name } of pipeableTags) {
                     const typeAndSignatures = getTsPlusFluentSignatureForPipeableFunction(file, declaration.name.escapedText.toString(), name, declaration);
                     if (typeAndSignatures) {
                         const [type, signatures] = typeAndSignatures;
@@ -46537,28 +46531,24 @@ namespace ts {
                     staticCache.set(typeName, new Map());
                 }
                 const staticMap = staticCache.get(typeName)!;
-                map.forEach(({ symbol, target, declaration, name, definition, exportName }) => {
+                map.forEach(({ target, declaration, name, definition, exportName }) => {
                     staticMap.set(name, () => {
-                        const callSignatures = getSignaturesOfType(getTypeOfSymbol(symbol), SignatureKind.Call);
-                        if (callSignatures.length > 0) {
-                            if (staticFunctionCache.has(target)) {
-                                const resolvedMap = staticFunctionCache.get(target)!;
-                                if (resolvedMap.has(name)) {
-                                    return resolvedMap.get(name)!;
-                                }
+                        if (staticValueCache.has(target)) {
+                            const resolvedMap = staticValueCache.get(target)!;
+                            if (resolvedMap.has(name)) {
+                                return resolvedMap.get(name)!;
                             }
-                            else {
-                                staticFunctionCache.set(target, new Map());
-                            }
-                            const resolvedMap = staticFunctionCache.get(typeName)!;
-                            const patched = getTsPlusStaticSymbolForCallSignatures(
-                                definition,
-                                exportName,
-                                name,
-                                declaration,
-                                callSignatures
-                            )
+                        }
+                        else {
+                            staticValueCache.set(target, new Map());
+                        }
+                        const resolvedMap = staticValueCache.get(typeName)!;
+                        const nameSymbol = getSymbolAtLocation(declaration.name);
+                        if (nameSymbol) {
+                            const patched = createTsPlusStaticValueSymbol(name, declaration, nameSymbol);
                             const type = getTypeOfSymbol(patched);
+                            // @ts-expect-error
+                            type.tsPlusSymbol = patched;
                             const extension = {
                                 patched,
                                 definition,
@@ -46567,33 +46557,6 @@ namespace ts {
                             }
                             resolvedMap.set(name, extension);
                             return extension;
-                        }
-                        else {
-                            if (staticValueCache.has(target)) {
-                                const resolvedMap = staticValueCache.get(target)!;
-                                if (resolvedMap.has(name)) {
-                                    return resolvedMap.get(name)!;
-                                }
-                            }
-                            else {
-                                staticValueCache.set(target, new Map());
-                            }
-                            const resolvedMap = staticValueCache.get(typeName)!;
-                            const nameSymbol = getSymbolAtLocation(declaration.name);
-                            if (nameSymbol) {
-                                const patched = createTsPlusStaticValueSymbol(name, declaration, nameSymbol);
-                                const type = getTypeOfSymbol(patched);
-                                // @ts-expect-error
-                                type.tsPlusSymbol = patched;
-                                const extension = {
-                                    patched,
-                                    definition,
-                                    exportName,
-                                    type
-                                }
-                                resolvedMap.set(name, extension);
-                                return extension;
-                            }
                         }
                     })
                 })
