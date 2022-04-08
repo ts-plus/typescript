@@ -5268,8 +5268,9 @@ namespace ts {
         tupleLabelDeclaration?: NamedTupleMember | ParameterDeclaration; // Declaration associated with the tuple's label
         accessibleChainCache?: ESMap<string, Symbol[] | undefined>;
         // TSPLUS EXTENSION START
-        isTsPlusGlobal?: boolean
-        isTsPlusTypeOnlyGlobal?: boolean
+        isTsPlusGlobal?: boolean;
+        isTsPlusTypeOnlyGlobal?: boolean;
+        tsPlusDerivationRules?: { lazyRule: Declaration | undefined; rules: [Rule, number, Type, Declaration, Set<string>][]; };
         // TSPLUS EXTENSION END
     }
 

@@ -15,10 +15,14 @@ export function g<A>(/** @tsplus implicit local */_show: Show<A>): Show<Maybe<A>
     return go();
 }
 
+interface Aliased {
+  x: number;
+}
+
 /**
  * @tsplus implicit local
  */
-const _showSourceScoped: Show<{ x: number }> = Derive()
+const _showSourceScoped: Show<Aliased> = Derive()
 
 export function h() {
   // uses _showSourceScoped

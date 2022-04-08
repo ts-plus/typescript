@@ -33087,28 +33087,18 @@ namespace ts {
 
         function hashTypeWorker(type: Type) {
             if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
-                const tags = new Set(flatMap(type.symbol.declarations, collectTsPlusTypeTags));
-                let hasRules = false;
-                for (const tag of arrayFrom(tags.values())) {
-                    const foundRules = tsPlusWorldScope.rules.get(tag);
-                    if (foundRules) {
-                        hasRules = true;
-                        break
-                    }
-                }
-                if (hasRules) {
-                    const tagsHsah = hashing.hashArray(arrayFrom(tags.values()).sort())
+                const hasTags = !!find(type.symbol.declarations, (e) => collectTsPlusTypeTags(e).length > 0);
+                if (hasTags) {
                     const argumentsHash = hashing.hashArray(map((type as TypeReference).resolvedTypeArguments!, hashType))
                     const hash = hashing.hashPlainObject({
                         type: type.symbol.escapedName,
-                        tags: tagsHsah,
                         arguments: argumentsHash
                     })
                     return hash;
                 }
             }
-            if ("intrinsicName" in type) {
-                return hashing.hashString((type as IntrinsicType).intrinsicName);
+            if (type.flags & TypeFlags.Intrinsic) {
+                return hashing.hashString(typeToString(type));
             }
             if (type.flags & TypeFlags.StringLiteral) {
                 return hashing.hashString((type as StringLiteralType).value);
@@ -33150,7 +33140,34 @@ namespace ts {
             })
             return blockScopedImplicits;
         }
-
+        function getTsPlusDerivationRules(symbol: Symbol) {
+            const links = getSymbolLinks(symbol);
+            if (!links.tsPlusDerivationRules) {
+                const mergedRules: { lazyRule: Declaration | undefined; rules: [Rule, number, Type, Declaration, Set<string>][]; } = {
+                    lazyRule: void 0,
+                    rules: []
+                }
+                const dedupe = new Set<Declaration>();
+                forEach(map(symbol.declarations, collectTsPlusTypeTags), (tags) => {
+                    forEach(tags, (tag) => {
+                        const foundRules = tsPlusWorldScope.rules.get(tag);
+                        if (foundRules) {
+                            if (foundRules.lazyRule) {
+                                mergedRules.lazyRule = foundRules.lazyRule;
+                            }
+                            foundRules.rules.forEach((rule) => {
+                                if (!dedupe.has(rule[3])) {
+                                    dedupe.add(rule[3]);
+                                    mergedRules.rules.push(rule);
+                                }
+                            });
+                        }
+                    });
+                });
+                links.tsPlusDerivationRules = mergedRules;
+            }
+            return links.tsPlusDerivationRules;
+        }
         function deriveTypeWorker(
             location: Node,
             originalType: Type,
@@ -33243,107 +33260,97 @@ namespace ts {
             }
             let hasRules = false;
             if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
-                const tags = new Set(flatMap(type.symbol.declarations, collectTsPlusTypeTags));
-                tagCheck: for (const tag of arrayFrom(tags.values())) {
-                    const foundRules = tsPlusWorldScope.rules.get(tag);
-                    if (!foundRules) {
-                        continue tagCheck;
+                const mergedRules = getTsPlusDerivationRules(type.symbol);
+                const targetTypes = (type as TypeReference).resolvedTypeArguments!;
+                ruleCheck: for (const [rule, _, ruleType, ruleDeclaration, options] of mergedRules.rules) {
+                    const toCheck: Type[] = [];
+                    if (rule.paramActions.length !== targetTypes.length) {
+                        continue ruleCheck;
                     }
-                    const rules = foundRules.rules.sort((a, b) => a[1] - b[1]);
-                    const targetTypes = (type as TypeReference).resolvedTypeArguments!;
-                    if (rules.length > 0) {
-                        hasRules =  true;
-                    }
-                    ruleCheck: for (const [rule, _, ruleType, ruleDeclaration, options] of rules) {
-                        const toCheck: Type[] = [];
-                        if (rule.paramActions.length !== targetTypes.length) {
-                            continue ruleCheck;
-                        }
-                        let index = 0;
-                        for (const paramAction of rule.paramActions) {
-                            if (paramAction === "_") {
+                    let index = 0;
+                    for (const paramAction of rule.paramActions) {
+                        if (paramAction === "_") {
+                            toCheck.push(targetTypes[index])
+                        } else if (paramAction === "[]") {
+                            if (isTupleType(targetTypes[index])) {
                                 toCheck.push(targetTypes[index])
-                            } else if (paramAction === "[]") {
-                                if (isTupleType(targetTypes[index])) {
-                                    toCheck.push(targetTypes[index])
-                                } else {
-                                    continue ruleCheck;
-                                }
-                            } else if (paramAction === "|") {
-                                if (targetTypes[index].flags & TypeFlags.Union) {
-                                    const typesInUnion = (targetTypes[index] as UnionType).types;
-                                    const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
-                                    toCheck.push(typesInUnionTuple)
-                                } else {
-                                    continue ruleCheck;
-                                }
-                            } else if (paramAction === "&") {
-                                if (targetTypes[index].flags & TypeFlags.Intersection) {
-                                    const typesInUnion = (targetTypes[index] as IntersectionType).types;
-                                    const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
-                                    toCheck.push(typesInUnionTuple)
-                                } else {
-                                    continue ruleCheck;
-                                }
                             } else {
                                 continue ruleCheck;
                             }
-                            index++;
-                        }
-                        if (toCheck.length !== targetTypes.length) {
+                        } else if (paramAction === "|") {
+                            if (targetTypes[index].flags & TypeFlags.Union) {
+                                const typesInUnion = (targetTypes[index] as UnionType).types;
+                                const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
+                                toCheck.push(typesInUnionTuple)
+                            } else {
+                                continue ruleCheck;
+                            }
+                        } else if (paramAction === "&") {
+                            if (targetTypes[index].flags & TypeFlags.Intersection) {
+                                const typesInUnion = (targetTypes[index] as IntersectionType).types;
+                                const typesInUnionTuple = createTupleType(typesInUnion, void 0, false, void 0);
+                                toCheck.push(typesInUnionTuple)
+                            } else {
+                                continue ruleCheck;
+                            }
+                        } else {
                             continue ruleCheck;
                         }
-                        const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
-                        for (const signature of signatures) {
-                            if (signature.typeParameters && signature.typeParameters.length === toCheck.length) {
-                                const mapper = createTypeMapper(signature.typeParameters, toCheck);
-                                if (every(signature.typeParameters, (param, i) => {
-                                    const constraint = instantiateType(getConstraintOfTypeParameter(param), mapper);
-                                    if (!constraint) {
-                                        return true;
-                                    }
-                                    return isTypeAssignableTo(toCheck[i], constraint);
-                                })) {
-                                    const instantiated = getSignatureInstantiation(signature, toCheck, false);
-                                    if (instantiated.parameters.length === 1 &&
-                                        instantiated.parameters[0].valueDeclaration &&
-                                        (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
-                                    ) {
-                                        const residualType = getTypeOfSymbol(instantiated.parameters[0]);
-                                        if (isTupleType(residualType)) {
-                                            const types = getTypeArguments(residualType);
-                                            const selfRule: FromRule = {
-                                                _tag: "FromRule",
-                                                type,
-                                                rule: ruleDeclaration,
-                                                arguments: [],
-                                                usedBy: [],
-                                                lazyRule: foundRules.lazyRule
-                                            };
-                                            const supportsLazy = !!foundRules.lazyRule && !options.has("no-recursion");
-                                            const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
-                                            const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
-                                            const derivations = map(types, (childType) => deriveTypeWorker(
-                                                location,
-                                                originalType,
-                                                childType,
-                                                diagnostics,
-                                                newDerivationScope,
-                                                newProhibited,
-                                                newCurrentDerivation
-                                            ));
-                                            if (!find(derivations, (d) => isErrorType(d.type))) {
-                                                selfRule.arguments.push(...derivations);
-                                                return selfRule;
-                                            }
+                        index++;
+                    }
+                    if (toCheck.length !== targetTypes.length) {
+                        continue ruleCheck;
+                    }
+                    const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
+                    for (const signature of signatures) {
+                        if (signature.typeParameters && signature.typeParameters.length === toCheck.length) {
+                            const mapper = createTypeMapper(signature.typeParameters, toCheck);
+                            if (every(signature.typeParameters, (param, i) => {
+                                const constraint = instantiateType(getConstraintOfTypeParameter(param), mapper);
+                                if (!constraint) {
+                                    return true;
+                                }
+                                return isTypeAssignableTo(toCheck[i], constraint);
+                            })) {
+                                const instantiated = getSignatureInstantiation(signature, toCheck, false);
+                                if (instantiated.parameters.length === 1 &&
+                                    instantiated.parameters[0].valueDeclaration &&
+                                    (instantiated.parameters[0].valueDeclaration as ParameterDeclaration).dotDotDotToken
+                                ) {
+                                    const residualType = getTypeOfSymbol(instantiated.parameters[0]);
+                                    if (isTupleType(residualType)) {
+                                        const types = getTypeArguments(residualType);
+                                        const selfRule: FromRule = {
+                                            _tag: "FromRule",
+                                            type,
+                                            rule: ruleDeclaration,
+                                            arguments: [],
+                                            usedBy: [],
+                                            lazyRule: mergedRules.lazyRule
+                                        };
+                                        const supportsLazy = !!mergedRules.lazyRule && !options.has("no-recursion");
+                                        const newProhibited = !supportsLazy ? [...prohibited, type] : prohibited;
+                                        const newDerivationScope: FromRule[] = supportsLazy ? [...derivationScope, selfRule] : derivationScope;
+                                        const derivations = map(types, (childType) => deriveTypeWorker(
+                                            location,
+                                            originalType,
+                                            childType,
+                                            diagnostics,
+                                            newDerivationScope,
+                                            newProhibited,
+                                            newCurrentDerivation
+                                        ));
+                                        if (!find(derivations, (d) => isErrorType(d.type))) {
+                                            selfRule.arguments.push(...derivations);
+                                            return selfRule;
                                         }
                                     }
                                 }
                             }
                         }
-                        if (diagnostics.length > 0) {
-                            break tagCheck;
-                        }
+                    }
+                    if (diagnostics.length > 0) {
+                        break ruleCheck;
                     }
                 }
             }
