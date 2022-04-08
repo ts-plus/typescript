@@ -46000,6 +46000,13 @@ namespace ts {
                             inheritanceSymbolCache.set(memberSymbol, new Set());
                         }
                         inheritanceSymbolCache.get(memberSymbol)!.add(parentSymbol);
+                        if (memberSymbol.declarations) {
+                            for (const declaration of memberSymbol.declarations) {
+                                if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.heritageClauses) {
+                                    tryCacheTsPlusInheritance(memberSymbol, declaration.heritageClauses);
+                                }
+                            }
+                        }
                     }
                 }
             }
