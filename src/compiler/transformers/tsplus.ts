@@ -173,6 +173,7 @@ namespace ts {
                                 Debug.assert(isNamedDeclaration(declaration) && isIdentifier(declaration.name));
                                 const uniqueIdentifier = context.factory.createUniqueName(declaration.name.escapedText as string);
                                 declarationLinks.uniqueNameInScope = uniqueIdentifier;
+                                declarationLinks.needsUniqueNameInSope = false;
                                 remainingNames.delete(declaration as NamedDeclaration & { name: Identifier });
                                 return [
                                     statement,
@@ -193,6 +194,7 @@ namespace ts {
                             Debug.assert(isNamedDeclaration(declaration) && isIdentifier(declaration.name));
                             const uniqueIdentifier = context.factory.createUniqueName(declaration.name.escapedText as string);
                             declarationLinks.uniqueNameInScope = uniqueIdentifier;
+                            declarationLinks.needsUniqueNameInSope = false;
                             updatedStatements.unshift(
                                 context.factory.createVariableStatement(
                                     [context.factory.createModifier(SyntaxKind.ConstKeyword)],
