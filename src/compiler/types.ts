@@ -5269,7 +5269,6 @@ namespace ts {
         // TSPLUS EXTENSION START
         isTsPlusGlobal?: boolean;
         isTsPlusTypeOnlyGlobal?: boolean;
-        tsPlusDerivationRules?: { lazyRule: Declaration | undefined; rules: [Rule, number, Type, Declaration, Set<string>][]; };
         // TSPLUS EXTENSION END
     }
 

@@ -29,7 +29,6 @@ export function deriveShowLazy<A>(
 // High Priority
 //
 
-
 /**
  * @tsplus derive Show<_> 10
  */
@@ -40,7 +39,7 @@ export function deriveShowLiteralUnion<A extends string | number>(
 }
 
 /**
- * @tsplus derive Show<_> 10
+ * @tsplus derive Show[Maybe]<_> 10
  */
 export function deriveShowMaybe<A extends Maybe<any>>(
     ...args: [A] extends [Maybe<infer _A>]
@@ -50,8 +49,15 @@ export function deriveShowMaybe<A extends Maybe<any>>(
     return new Show((a) => a.isJust() ? `Maybe.Just(${args[0].show(a)})` : `Maybe.None`)
 }
 
+declare global {
+    /**
+     * @tsplus type MutableArray
+     */
+    export interface Array<T> {}
+}
+
 /**
- * @tsplus derive Show<_> 10
+ * @tsplus derive Show[MutableArray]<_> 10
  */
 export function deriveShowArray<A extends Array<any>>(
     ...args: [A] extends [Array<infer _A>] ? [Array<_A>] extends [A] ? [

@@ -33148,33 +33148,45 @@ namespace ts {
             })
             return blockScopedImplicits;
         }
-        function getTsPlusDerivationRules(symbol: Symbol) {
-            const links = getSymbolLinks(symbol);
-            if (!links.tsPlusDerivationRules) {
-                const mergedRules: { lazyRule: Declaration | undefined; rules: [Rule, number, Type, Declaration, Set<string>][]; } = {
-                    lazyRule: void 0,
-                    rules: []
-                }
-                const dedupe = new Set<Declaration>();
-                forEach(map(symbol.declarations, collectTsPlusTypeTags), (tags) => {
-                    forEach(tags, (tag) => {
-                        const foundRules = tsPlusWorldScope.rules.get(tag);
-                        if (foundRules) {
-                            if (foundRules.lazyRule) {
-                                mergedRules.lazyRule = foundRules.lazyRule;
-                            }
-                            foundRules.rules.forEach((rule) => {
-                                if (!dedupe.has(rule[3])) {
-                                    dedupe.add(rule[3]);
-                                    mergedRules.rules.push(rule);
-                                }
-                            });
+        function flatTags(toFlat: string[][]): readonly string[] {
+            let strings: readonly string[] = toFlat[0];
+            for (let i = 1; i < toFlat.length; i++) {
+                strings = flatMap(strings, (prefix) => toFlat[i].map((post) => prefix + "," + post))
+            }
+            return strings.map((s) => `[${s}]`);
+        }
+        function collectTypeTagsOfType(type: Type) {
+            return flatMap(collectRelevantSymbols(type), (s) => typeSymbolCache.get(s));
+        }
+        function getTsPlusDerivationRules(symbol: Symbol, targetTypes: readonly Type[]) {
+            const mergedRules: { lazyRule: Declaration | undefined; rules: [Rule, number, Type, Declaration, Set<string>][]; } = {
+                lazyRule: void 0,
+                rules: []
+            }
+            const paramExtensions = flatTags(map(targetTypes, (t) => ["_", ...collectTypeTagsOfType(t)]));
+            const dedupe = new Set<Declaration>();
+            forEach(map(symbol.declarations, collectTsPlusTypeTags), (tags) => {
+                forEach(tags, (tag) => {
+                    collectForTag(tag);
+                    paramExtensions.forEach((extended) => collectForTag(tag + extended));
+                });
+            });
+            mergedRules.rules = mergedRules.rules.sort((a, b) => a[1] - b[1]);
+            return mergedRules;
+            function collectForTag(tag: string) {
+                const foundRules = tsPlusWorldScope.rules.get(tag);
+                if (foundRules) {
+                    if (foundRules.lazyRule) {
+                        mergedRules.lazyRule = foundRules.lazyRule;
+                    }
+                    foundRules.rules.forEach((rule) => {
+                        if (!dedupe.has(rule[3])) {
+                            dedupe.add(rule[3]);
+                            mergedRules.rules.push(rule);
                         }
                     });
-                });
-                links.tsPlusDerivationRules = mergedRules;
+                }
             }
-            return links.tsPlusDerivationRules;
         }
         function deriveTypeWorker(
             location: Node,
@@ -33267,9 +33279,9 @@ namespace ts {
                 }
             }
             let hasRules = false;
-            if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
-                const mergedRules = getTsPlusDerivationRules(type.symbol);
-                const targetTypes = (type as TypeReference).resolvedTypeArguments!;
+            if ((type.flags & TypeFlags.Object) && ((type as ObjectType).objectFlags & ObjectFlags.Reference) && !isTupleType(type) && type.symbol && type.symbol.declarations) {
+                const targetTypes = getTypeArguments(type as TypeReference);
+                const mergedRules = getTsPlusDerivationRules(type.symbol, targetTypes);
                 ruleCheck: for (const [rule, _, ruleType, ruleDeclaration, options] of mergedRules.rules) {
                     const toCheck: Type[] = [];
                     if (rule.paramActions.length !== targetTypes.length) {
