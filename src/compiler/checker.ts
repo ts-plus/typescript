@@ -45562,6 +45562,7 @@ namespace ts {
             const originalSymbolLinks = getSymbolLinks(originalSymbol);
             const symbolLinks = getSymbolLinks(symbol);
             symbolLinks.uniqueESSymbolType = originalSymbolLinks.uniqueESSymbolType;
+            symbolLinks.declaredType = originalSymbolLinks.declaredType;
 
             return symbol;
         }
