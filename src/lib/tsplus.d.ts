@@ -12,3 +12,11 @@ declare function Pipeable<F extends (self: any, ...rest: any) => any>(f: F): (..
  * @tsplus macro Derive
  */
 declare function Derive<A>(explain?: "explain"): A
+
+/**
+ * @tsplus macro Do
+ */
+declare function Do<A>(f: (_: {
+    /** @tsplus macro Bind */
+    <X>(a: X): X
+}) => A): A

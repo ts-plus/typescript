@@ -7419,6 +7419,26 @@
         "category": "Error",
         "code": 50022
     },
+    "A call to bind is only allowed in the context of a Do.": {
+        "category": "Error",
+        "code": 51000
+    },
+    "Cannot find a valid flatMap extension for type '{0}'.": {
+        "category": "Error",
+        "code": 51001
+    },
+    "Cannot find a valid map extension for type '{0}'.": {
+        "category": "Error",
+        "code": 51002
+    },
+    "A Do block must contain at least 1 bound value": {
+        "category": "Error",
+        "code": 51003
+    },
+    "Cannot find a valid flatMap that can handle all the types of '{0}'": {
+        "category": "Error",
+        "code": 51004
+    },
     "Cannot derive type '{0}' and no derivation rules are found.": {
         "category": "Error",
         "code": 60000

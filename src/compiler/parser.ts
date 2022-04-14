@@ -3544,7 +3544,21 @@ namespace ts {
             const node = kind === SyntaxKind.CallSignature
                 ? factory.createCallSignature(typeParameters, parameters, type)
                 : factory.createConstructSignature(typeParameters, parameters, type);
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (kind === SyntaxKind.CallSignature && finished.jsDoc) {
+                (finished as CallSignatureDeclaration).tsPlusMacroTags = undefinedIfZeroLength(flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
+                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("macro")) {
+                        const [_, target] = tag.comment.split(" ");
+                        if (!target) {
+                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
+                            return [];
+                        }
+                        return [target];
+                    }
+                    return [];
+                })))
+            }
+            return finished;
         }
 
         function isIndexSignature(): boolean {

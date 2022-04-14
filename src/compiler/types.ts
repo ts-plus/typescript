@@ -1290,6 +1290,7 @@ namespace ts {
 
     export interface CallSignatureDeclaration extends SignatureDeclarationBase, TypeElement {
         readonly kind: SyntaxKind.CallSignature;
+        tsPlusMacroTags?: string[];
     }
 
     export interface ConstructSignatureDeclaration extends SignatureDeclarationBase, TypeElement {
@@ -5491,7 +5492,9 @@ namespace ts {
         uniqueNameInScope?: Identifier;
 
         tsPlusPipeableExtension?: TsPlusPipeableExtension;
+        tsPlusDoTypes?: ESMap<CallExpression, Type>;
         isTsPlusTailRec?: boolean;
+        isTsPlusDoCall?: boolean;
         // TSPLUS EXTENSION END
     }
 

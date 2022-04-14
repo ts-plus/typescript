@@ -1,11 +1,24 @@
-import { Effect } from "@effect/core/io/Effect";
+export interface Foo {
+    readonly foo: string;
+}
 
-export const y = (Effect(0) as Effect<unknown, unknown, number>).map((n) => n + 1);
-export const z = (Effect(0) as Effect.UIO<number>).map((n) => n + 1);
+export const Foo = Service.Tag<Foo>();
 
-Effect.succeed(0).map((n) => n + 1);
-Effect.succeed(0).map((n) => n + 1).cause().uncause();
+export interface Bar {
+    readonly bar: string;
+}
 
-const scoped = Effect.scoped(
-    Effect.acquireRelease(Effect.succeed(0), () => Effect.unit)
-);
+export const Bar = Service.Tag<Bar>();
+
+export const res = Do(($) => {
+    $(Effect.succeed(0))
+    $(Effect.serviceWith(Foo)((_) => _.foo))
+    $(Effect.serviceWith(Bar)((_) => _.bar))
+    $(Effect.fail("a" as const))
+    $(Effect.fail("b" as const))
+})
+
+
+Do(($) => {
+    const a = $(Either.right(0))
+})
