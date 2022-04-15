@@ -3460,6 +3460,14 @@ namespace ts {
         signatures: readonly TsPlusSignature[];
     }
 
+    export interface TsPlusPipeableExtension {
+        declaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType;
+        type: Type;
+        signatures: readonly TsPlusSignature[];
+        definition: SourceFile;
+        exportName: string;
+    }
+
     export interface TsPlusUnresolvedStaticExtension {
         symbol: Symbol;
         declaration: VariableDeclaration;
@@ -3494,12 +3502,6 @@ namespace ts {
         definition: SourceFile;
         exportName: string;
         type: Type;
-    }
-
-    export interface TsPlusPipeableExtension {
-        patched: Symbol;
-        definition: SourceFile;
-        exportName: string;
     }
 
     export interface TsPlusOperatorExtension {

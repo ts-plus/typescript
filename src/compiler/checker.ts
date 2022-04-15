@@ -380,7 +380,7 @@ namespace ts {
         const staticValueCache = new Map<string, ESMap<string, TsPlusStaticValueExtension>>();
         const staticCache = new Map<string, ESMap<string, () => TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined>>();
         const unresolvedStaticCache = new Map<string, ESMap<string, TsPlusUnresolvedStaticExtension>>();
-        const pipeableCache = new Map<string, ESMap<string, { declaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType, type: Type, signatures: readonly TsPlusSignature[], definition: SourceFile, exportName: string }>>();
+        const pipeableCache = new Map<string, ESMap<string, TsPlusPipeableExtension>>();
         const identityCache = new Map<string, FunctionDeclaration>();
         const callCache = new Map<Node, TsPlusStaticFunctionExtension>();
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
@@ -30023,23 +30023,18 @@ namespace ts {
                 }
             }
         }
-        function checkFluentPipeableAgreement(typeName: string, funcName: string) {
+        function checkFluentPipeableAgreement(pipeableExtension: TsPlusPipeableExtension, typeName: string, funcName: string) {
             if (!fluentCache.has(typeName)) {
                 return;
             }
-            if (!pipeableCache.has(typeName)) {
-                return;
-            }
             const fluentMap = fluentCache.get(typeName)!;
-            const pipeableMap = pipeableCache.get(typeName)!;
             if (!fluentMap.has(funcName)) {
                 return;
             }
-            if (!pipeableMap.has(funcName)) {
+            if (pipeableExtension.definition.isDeclarationFile) {
                 return;
             }
             const fluentExtension = fluentMap.get(funcName)!();
-            const pipeableExtension = pipeableMap.get(funcName)!;
             if (!fluentExtension || some(fluentExtension.types, ({ type: fluentType }) => isTypeAssignableTo(pipeableExtension.type, fluentType))) {
                 return;
             }
@@ -46684,7 +46679,7 @@ namespace ts {
                 const cache = fluentCache.get(typeName)!;
                 map.forEach((member, funcName) => {
                     if (cache.has(funcName)) {
-                        checkFluentPipeableAgreement(typeName, funcName);
+                        checkFluentPipeableAgreement(member, typeName, funcName);
                         return;
                     }
                     cache.set(funcName, () => {
