@@ -45205,7 +45205,7 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION START
-        function isTsPlusImplicit(declaration: Declaration): boolean {
+        function isTsPlusImplicit(declaration: Declaration): declaration is VariableDeclaration {
             if (isVariableDeclaration(declaration)) {
                 return declaration.isTsPlusImplicit;
             }
@@ -46416,7 +46416,7 @@ namespace ts {
                     exports.forEach((exportSymbol) => {
                         forEach(exportSymbol.declarations, (declaration) => {
                             if (isTsPlusImplicit(declaration)) {
-                                const typeOfNode = getTypeOfNode(declaration);
+                                const typeOfNode = declaration.type ? getTypeFromTypeNode(declaration.type) : getTypeOfNode(declaration);
                                 const hash = hashType(typeOfNode);
                                 if (!indexedImplicits.has(hash)) {
                                     indexedImplicits.set(hash, []);
