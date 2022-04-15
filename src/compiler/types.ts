@@ -3387,9 +3387,9 @@ namespace ts {
     export interface TsPlusPipeableIdentifierSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.PipeableIdentifier;
         tsPlusDeclaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType;
-        tsPlusDataFirstType: Type;
         tsPlusTypeName: string;
         tsPlusName: string;
+        getTsPlusDataFirstType(): Type;
     }
 
     export interface TsPlusPipeableMacroSymbol extends TransientSymbol {
@@ -3459,15 +3459,14 @@ namespace ts {
         types: { type: Type, signatures: readonly TsPlusSignature[] }[];
         signatures: readonly TsPlusSignature[];
     }
-
+    
     export interface TsPlusPipeableExtension {
         declaration: FunctionDeclaration | VariableDeclarationWithFunction | VariableDeclarationWithFunctionType;
-        type: Type;
-        signatures: readonly TsPlusSignature[];
         definition: SourceFile;
         exportName: string;
         typeName: string;
         funcName: string;
+        getTypeAndSignatures(): [Type, TsPlusSignature[]];
     }
 
     export interface TsPlusUnresolvedStaticExtension {
@@ -5448,6 +5447,7 @@ namespace ts {
         tsPlusResolvedType?: Type;
         tsPlusGlobalIdentifier?: Symbol;
         tsPlusDerivation?: Derivation;
+        tsPlusTags?: string[];
         isFluent?: true;
         isFluentCall?: true;
         uniqueNames?: Set<NamedDeclaration & { name: Identifier }>;

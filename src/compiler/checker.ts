@@ -30032,7 +30032,7 @@ namespace ts {
                 return;
             }
             const fluentExtension = fluentMap.get(pipeableExtension.funcName)!();
-            if (!fluentExtension || some(fluentExtension.types, ({ type: fluentType }) => isTypeAssignableTo(fluentType, pipeableExtension.type))) {
+            if (!fluentExtension || some(fluentExtension.types, ({ type: fluentType }) => isTypeAssignableTo(fluentType, pipeableExtension.getTypeAndSignatures()[0]))) {
                 return;
             }
             else {
@@ -32865,7 +32865,7 @@ namespace ts {
                     if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
                         const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
                         if (fluentExtension) {
-                            const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
+                            const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.getTsPlusDataFirstType(), type))?.signatures[0];
                             if (signature) {
                                 getNodeLinks(node).tsPlusOptimizedDataFirst = {
                                     definition: signature.tsPlusFile,
@@ -32889,7 +32889,7 @@ namespace ts {
                     if (identifierSymbol.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
                         const fluentExtension = checker.getFluentExtensionForPipeableSymbol(identifierSymbol);
                         if (fluentExtension) {
-                            const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.tsPlusDataFirstType, type))?.signatures[0];
+                            const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(identifierSymbol.getTsPlusDataFirstType(), type))?.signatures[0];
                             if (signature) {
                                 getNodeLinks(node).tsPlusOptimizedDataFirst = {
                                     definition: signature.tsPlusFile,
@@ -32911,7 +32911,7 @@ namespace ts {
                             if (declSym.tsPlusTag === TsPlusSymbolTag.PipeableIdentifier) {
                                 const fluentExtension = checker.getFluentExtensionForPipeableSymbol(declSym);
                                 if (fluentExtension) {
-                                    const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(declSym.tsPlusDataFirstType, type))?.signatures[0];
+                                    const signature = find(fluentExtension.types, ({ type }) => checker.isTypeAssignableTo(declSym.getTsPlusDataFirstType(), type))?.signatures[0];
                                     if (signature) {
                                         getNodeLinks(node).tsPlusOptimizedDataFirst = {
                                             definition: signature.tsPlusFile,
@@ -45204,8 +45204,8 @@ namespace ts {
         function isTsPlusGlobalImport(statement: ImportDeclaration): boolean {
             const links = getNodeLinks(statement);
             if (links.isTsPlusGlobal === undefined) {
-                for (const tag of getJSDocTags(statement)) {
-                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("global")) {
+                for (const tag of getTsPlusTagsOfNode(statement)) {
+                    if (tag.startsWith("global")) {
                         links.isTsPlusGlobal = true;
                         return links.isTsPlusGlobal;
                     }
@@ -45217,8 +45217,8 @@ namespace ts {
         function isTsPlusImplicit(statement: Declaration): boolean {
             const links = getNodeLinks(statement);
             if (links.isTsPlusImplicit === undefined) {
-                for (const tag of getJSDocTags(statement)) {
-                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("implicit") && !tag.comment.includes("local")) {
+                for (const tag of getTsPlusTagsOfNode(statement)) {
+                    if (tag.startsWith("implicit") && !tag.includes("local")) {
                         links.isTsPlusImplicit = true;
                         return links.isTsPlusImplicit;
                     }
@@ -45230,13 +45230,7 @@ namespace ts {
         function collectTsPlusDeriveTags(statement: Declaration) {
             const links = getNodeLinks(statement);
             if (!links.tsPlusDeriveTags) {
-                links.tsPlusDeriveTags = getAllJSDocTags(
-                    statement,
-                    (tag): tag is TsPlusJSDocDeriveTag =>
-                        tag.tagName.escapedText === "tsplus" &&
-                        typeof tag.comment === "string" &&
-                        tag.comment.startsWith("derive")
-                ).map((tag) => tag.comment);
+                links.tsPlusDeriveTags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("derive"));
             }
             return links.tsPlusDeriveTags;
         }
@@ -45244,13 +45238,7 @@ namespace ts {
             const links = getNodeLinks(statement);
             if (!links.tsPlusFluentTags) {
                 links.tsPlusFluentTags = [];
-                const tags = getAllJSDocTags(
-                    statement,
-                    (tag): tag is TsPlusJSDocFluentTag =>
-                        tag.tagName.escapedText === "tsplus" &&
-                        typeof tag.comment === "string" &&
-                        tag.comment.startsWith("fluent")
-                );
+                const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("fluent"));
                 for (const tag of tags) {
                     const parsedTag = parseTsPlusExtensionTag(tag)
                     if (!parsedTag) {
@@ -45266,15 +45254,9 @@ namespace ts {
             const links = getNodeLinks(statement);
             if (!links.tsPlusPipeableTags) {
                 links.tsPlusPipeableTags = [];
-                const tags = getAllJSDocTags(
-                    statement,
-                    (tag): tag is TsPlusJSDocFluentTag =>
-                        tag.tagName.escapedText === "tsplus" &&
-                        typeof tag.comment === "string" &&
-                        tag.comment.startsWith("pipeable")
-                )
+                const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("pipeable"));
                 for (const tag of tags) {
-                    const [_, target, name] = tag.comment.split(" ");
+                    const [_, target, name] = tag.split(" ");
                     if (!target || !name) {
                         error(statement, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
                         continue;
@@ -45288,15 +45270,9 @@ namespace ts {
             const links = getNodeLinks(statement);
             if (!links.tsPlusIndexTags) {
               links.tsPlusIndexTags = [];
-              const tags = getAllJSDocTags(
-                  statement,
-                  (tag): tag is TsPlusJSDocTypeTag =>
-                    tag.tagName.escapedText === "tsplus" &&
-                    typeof tag.comment === "string" &&
-                    tag.comment.startsWith("index")
-              );
+              const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("index"))
               for (const tag of tags) {
-                const [_, typeTag] = tag.comment.split(" ");
+                const [_, typeTag] = tag.split(" ");
                 if (!typeTag) {
                   error(statement, Diagnostics.Annotation_of_an_index_extension_must_have_the_form_tsplus_index_typename);
                   continue;
@@ -45310,15 +45286,9 @@ namespace ts {
             const links = getNodeLinks(statement);
             if (!links.tsPlusTypeTags) {
               links.tsPlusTypeTags = [];
-              const tags = getAllJSDocTags(
-                  statement,
-                  (tag): tag is TsPlusJSDocTypeTag =>
-                    tag.tagName.escapedText === "tsplus" &&
-                    typeof tag.comment === "string" &&
-                    tag.comment.startsWith("type")
-              );
+              const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("type"));
               for (const tag of tags) {
-                const [_, typeTag] = tag.comment.split(" ");
+                const [_, typeTag] = tag.split(" ");
                 if (!typeTag) {
                   error(statement, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
                   continue;
@@ -45332,15 +45302,9 @@ namespace ts {
             const links = getNodeLinks(statement);
             if (!links.tsPlusCompanionTags) {
               links.tsPlusCompanionTags = [];
-              const tags = getAllJSDocTags(
-                  statement,
-                  (tag): tag is TsPlusJSDocTypeTag =>
-                    tag.tagName.escapedText === "tsplus" &&
-                    typeof tag.comment === "string" &&
-                    tag.comment.startsWith("companion")
-              );
+              const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("companion"));
               for (const tag of tags) {
-                const [_, companionTag] = tag.comment.split(" ");
+                const [_, companionTag] = tag.split(" ");
                 if (!companionTag) {
                     error(statement, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
                     continue;
@@ -45354,15 +45318,9 @@ namespace ts {
             const links = getNodeLinks(statement);
             if (!links.tsPlusMacroTags) {
               links.tsPlusMacroTags = [];
-              const tags = getAllJSDocTags(
-                  statement,
-                  (tag): tag is TsPlusJSDocTypeTag =>
-                    tag.tagName.escapedText === "tsplus" &&
-                    typeof tag.comment === "string" &&
-                    tag.comment.startsWith("macro")
-              );
+              const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("macro"));
               for (const tag of tags) {
-                const [_, name] = tag.comment.split(" ");
+                const [_, name] = tag.split(" ");
                 if (!name) {
                     error(statement, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
                     continue;
@@ -45376,15 +45334,9 @@ namespace ts {
             const links = getNodeLinks(statement);
             if (!links.tsPlusUnifyTags) {
               links.tsPlusUnifyTags = [];
-              const tags = getAllJSDocTags(
-                  statement,
-                  (tag): tag is TsPlusJSDocTypeTag =>
-                    tag.tagName.escapedText === "tsplus" &&
-                    typeof tag.comment === "string" &&
-                    tag.comment.startsWith("unify")
-              );
+              const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("unify"));
               for (const tag of tags) {
-                const [_, target] = tag.comment.split(" ");
+                const [_, target] = tag.split(" ");
                 if (!target) {
                     error(statement, Diagnostics.Annotation_of_a_unify_extension_must_have_the_form_tsplus_unify_typename);
                     continue;
@@ -45398,15 +45350,9 @@ namespace ts {
             const links = getNodeLinks(statement);
             if (!links.tsPlusStaticTags) {
                 links.tsPlusStaticTags = [];
-                const tags = getAllJSDocTags(
-                    statement,
-                    (tag): tag is TsPlusJSDocStaticTag =>
-                        tag.tagName.escapedText === "tsplus" &&
-                        typeof tag.comment === "string" &&
-                        tag.comment.startsWith("static")
-                );
+                const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("static"));
                 for (const tag of tags) {
-                    const [_, target, name] = tag.comment.split(" ");
+                    const [_, target, name] = tag.split(" ");
                     if (!target || !name) {
                         error(statement, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
                         continue;
@@ -45420,13 +45366,7 @@ namespace ts {
             const links = getNodeLinks(statement);
             if (!links.tsPlusOperatorTags) {
                 links.tsPlusOperatorTags = [];
-                const tags = getAllJSDocTags(
-                    statement,
-                    (tag): tag is TsPlusJSDocFluentTag =>
-                        tag.tagName.escapedText === "tsplus" &&
-                        typeof tag.comment === "string" &&
-                        tag.comment.startsWith("operator")
-                );
+                const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("operator"));
                 for (const tag of tags) {
                     const parsedTag = parseTsPlusExtensionTag(tag)
                     if (!parsedTag) {
@@ -45442,15 +45382,9 @@ namespace ts {
             const links = getNodeLinks(statement);
             if (!links.tsPlusGetterTags) {
                 links.tsPlusGetterTags = [];
-                const tags = getAllJSDocTags(
-                    statement,
-                    (tag): tag is TsPlusJSDocStaticTag =>
-                        tag.tagName.escapedText === "tsplus" &&
-                        typeof tag.comment === "string" &&
-                        tag.comment.startsWith("getter")
-                );
+                const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("getter"));
                 for (const tag of tags) {
-                    const [_, target, name] = tag.comment.split(" ");
+                    const [_, target, name] = tag.split(" ");
                     if (!target || !name) {
                         error(statement, Diagnostics.Annotation_of_a_getter_extension_must_have_the_form_tsplus_getter_typename_name);
                         continue;
@@ -45468,8 +45402,8 @@ namespace ts {
             }
             return false;
         }
-        function parseTsPlusExtensionTag(tag: TsPlusJSDocFluentTag | TsPlusJSDocOperatorTag): TsPlusPrioritizedExtensionTag | undefined {
-            const [_, typeName, functionName, priority] = tag.comment.split(" ");
+        function parseTsPlusExtensionTag(tag: string): TsPlusPrioritizedExtensionTag | undefined {
+            const [_, typeName, functionName, priority] = tag.split(" ");
             if (!typeName || !functionName) {
                 return undefined;
             }
@@ -45648,14 +45582,14 @@ namespace ts {
             const final = createAnonymousType(symbol, emptySymbols, methods, [], []);
             return [final, createSymbolWithType(symbol, final)] as const;
         }
-        function augmentPipeableIdentifierSymbol(identifier: Identifier, target: string, _exportName: string, name: string, dataFirstType: Type, declaration: FunctionDeclaration | VariableDeclarationWithFunction) {
+        function augmentPipeableIdentifierSymbol(identifier: Identifier, target: string, _exportName: string, name: string, dataFirstType: () => Type, declaration: FunctionDeclaration | VariableDeclarationWithFunction) {
             const identifierType = getTypeOfNode(identifier);
             if (identifierType.symbol) {
                 (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusTag = TsPlusSymbolTag.PipeableIdentifier;
                 (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusDeclaration = declaration;
                 (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusTypeName = target;
                 (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusName = name;
-                (identifierType.symbol as TsPlusPipeableIdentifierSymbol).tsPlusDataFirstType = dataFirstType;
+                (identifierType.symbol as TsPlusPipeableIdentifierSymbol).getTsPlusDataFirstType = dataFirstType;
             }
         }
         function getTsPlusFluentSignatureForPipeableFunction(file: SourceFile, exportName: string, name: string, pipeable: FunctionDeclaration): [Type, TsPlusSignature[]] | undefined {
@@ -46234,36 +46168,42 @@ namespace ts {
             if (declaration.name && isIdentifier(declaration.name)) {
                 const pipeableTags = collectTsPlusPipeableTags(declaration);
                 for (const { target, name } of pipeableTags) {
-                    const typeAndSignatures = getTsPlusFluentSignatureForPipeableFunction(file, declaration.name.escapedText.toString(), name, declaration);
-                    if (typeAndSignatures) {
-                        const [type, signatures] = typeAndSignatures;
-                        if (!pipeableCache.has(target)) {
-                            pipeableCache.set(target, new Map());
+                    if (!pipeableCache.has(target)) {
+                        pipeableCache.set(target, new Map());
+                    }
+                    const exportName = declaration.name.escapedText.toString()
+                    let cached : [Type, TsPlusSignature[]] | false = false
+                    const getTypeAndSignatures = (): [Type, TsPlusSignature[]] => {
+                        if (cached === false) {
+                            const resolved = getTsPlusFluentSignatureForPipeableFunction(file, exportName, name, declaration);
+                            if (resolved) {
+                                cached = resolved;
+                            }
+                            else {
+                                error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
+                                cached = [errorType, []];
+                            }
                         }
-                        const map = pipeableCache.get(target)!;
-                        map.set(name, {
-                            declaration,
-                            type,
-                            signatures,
-                            exportName: declaration.name.escapedText.toString(),
-                            definition: file,
-                            typeName: target,
-                            funcName: name
-                        });
-                        augmentPipeableIdentifierSymbol(
-                            declaration.name,
-                            target,
-                            declaration.name.escapedText.toString(),
-                            name,
-                            type,
-                            declaration
-                        );
-                        getNodeLinks(declaration).tsPlusPipeableExtension = map.get(name);
+                        return [cached[0], [...cached[1]]];
                     }
-                    else {
-                        error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
-                        return;
-                    }
+                    const map = pipeableCache.get(target)!;
+                    map.set(name, {
+                        declaration,
+                        exportName,
+                        definition: file,
+                        typeName: target,
+                        funcName: name,
+                        getTypeAndSignatures
+                    });
+                    augmentPipeableIdentifierSymbol(
+                        declaration.name,
+                        target,
+                        declaration.name.escapedText.toString(),
+                        name,
+                        () => getTypeAndSignatures()[0],
+                        declaration
+                    );
+                    getNodeLinks(declaration).tsPlusPipeableExtension = map.get(name);
                 }
             }
         }
@@ -46281,38 +46221,44 @@ namespace ts {
                         if (!pipeableCache.has(target)) {
                             pipeableCache.set(target, new Map());
                         }
-                        const typeAndSignatures = getTsPlusFluentSignatureForPipeableVariableDeclaration(
-                            file,
+                        const map = pipeableCache.get(target)!;
+                        const exportName = declaration.name.escapedText.toString();
+                        let cached : [Type, TsPlusSignature[]] | false = false
+                        const getTypeAndSignatures = () => {
+                            if (cached === false) {
+                                const resolved = getTsPlusFluentSignatureForPipeableVariableDeclaration(
+                                    file,
+                                    exportName,
+                                    name,
+                                    declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType
+                                )
+                                if (resolved) {
+                                    cached = resolved;
+                                }
+                                else {
+                                    error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
+                                    cached = [errorType, []];
+                                }
+                            }
+                            return cached;
+                        }
+                        map.set(name, {
+                            declaration: declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType,
+                            exportName,
+                            definition: file,
+                            typeName: target,
+                            funcName: name,
+                            getTypeAndSignatures
+                        });
+                        augmentPipeableIdentifierSymbol(
+                            declaration.name,
+                            target,
                             declaration.name.escapedText.toString(),
                             name,
-                            declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType
-                        )
-                        if(typeAndSignatures) {
-                            const [type, signatures] = typeAndSignatures;
-                            const map = pipeableCache.get(target)!;
-                            map.set(name, {
-                                declaration: declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType,
-                                type,
-                                signatures,
-                                exportName: declaration.name.escapedText.toString(),
-                                definition: file,
-                                typeName: target,
-                                funcName: name
-                            })
-                            augmentPipeableIdentifierSymbol(
-                                declaration.name,
-                                target,
-                                declaration.name.escapedText.toString(),
-                                name,
-                                type,
-                                declaration as VariableDeclarationWithFunction
-                            );
-                            getNodeLinks(declaration).tsPlusPipeableExtension = map.get(name);
-                        }
-                        else {
-                            error(statement, Diagnostics.Invalid_declaration_annotated_as_pipeable);
-                            return;
-                        }
+                            () => getTypeAndSignatures()[0],
+                            declaration as VariableDeclarationWithFunction
+                        );
+                        getNodeLinks(declaration).tsPlusPipeableExtension = map.get(name);
                     }
                 }
             }
@@ -46420,6 +46366,13 @@ namespace ts {
             if (hasTsPlusExportedExtensionTags(declaration)) {
                 error(declaration, Diagnostics.Declaration_of_an_extension_must_be_exported);
             }
+        }
+        function getTsPlusTagsOfNode(node: Node) {
+            const links = getNodeLinks(node);
+            if (!links.tsPlusTags) {
+                links.tsPlusTags = getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus").map((tag) => tag.comment as string);
+            }
+            return links.tsPlusTags;
         }
         function collectTsPlusSymbols(file: SourceFile, statements: NodeArray<Statement>, collectTypesIfNotExported = false): void {
             for (const statement of statements) {
@@ -46550,6 +46503,7 @@ namespace ts {
             }
         }
         function initTsPlusTypeChecker() {
+            //console.time("initTsPlusTypeChecker caches")
             fileMap.map = getFileMap(host.getCompilerOptions(), host);
             fluentCache.clear();
             unresolvedFluentCache.clear();
@@ -46569,10 +46523,16 @@ namespace ts {
             tsPlusWorldScope.implicits.clear();
             tsPlusWorldScope.rules.clear();
             unificationInProgress.isRunning = false;
+            //console.timeEnd("initTsPlusTypeChecker caches")
+            //console.time("initTsPlusTypeChecker global")
             initTsPlusTypeCheckerGlobal();
+            //console.timeEnd("initTsPlusTypeChecker global")
+            //console.time("initTsPlusTypeChecker collect")
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);
             }
+            //console.timeEnd("initTsPlusTypeChecker collect")
+            //console.time("initTsPlusTypeChecker joinining signatures")
             unresolvedStaticCache.forEach((map, typeName) => {
                 if (!staticCache.has(typeName)) {
                     staticCache.set(typeName, new Map());
@@ -46623,7 +46583,7 @@ namespace ts {
                         }
                         const allTypes: { type: Type, signatures: readonly TsPlusSignature[] }[] = [];
                         const prioritizedSignaturesMap = new Map<number, TsPlusSignature[]> ()
-
+                        
                         definition.forEach(({ declaration, definition, exportName, priority }) => {
                             if (isFunctionDeclaration(declaration)) {
                                 const typeAndSignatures = getTsPlusFluentSignaturesForFunctionDeclaration(definition, exportName, declaration);
@@ -46652,7 +46612,7 @@ namespace ts {
                                 }
                             }
                         });
-
+                        
                         const prioritizedSignatures: [number, TsPlusSignature[]][] = []
                         prioritizedSignaturesMap.forEach((signatures, priority) => {
                             prioritizedSignatures.push([priority, signatures])
@@ -46660,7 +46620,7 @@ namespace ts {
                         prioritizedSignatures.sort((x, y) => x[0] > y[0] ? 1 : x[0] < y[0] ? -1 : 0)
 
                         const allSignatures = prioritizedSignatures.flatMap((signatures) => signatures[1])
-
+                        
                         if (allSignatures.length === 0) {
                             return undefined;
                         }
@@ -46700,12 +46660,13 @@ namespace ts {
                                     return resolvedMap.get(funcName)!;
                                 }
                             }
-                            const symbol = createTsPlusFluentSymbol(funcName, member.signatures as TsPlusSignature[]);
-                            const type = createAnonymousType(symbol, emptySymbols, member.signatures, [], []);
+                            const [memberType, memberSignatures] = member.getTypeAndSignatures();
+                            const symbol = createTsPlusFluentSymbol(funcName, memberSignatures);
+                            const type = createAnonymousType(symbol, emptySymbols, memberSignatures, [], []);
                             const extension: TsPlusFluentExtension = {
                                 patched: createSymbolWithType(symbol, type),
-                                types: [{ type: member.type, signatures: member.signatures }],
-                                signatures: member.signatures
+                                types: [{ type: memberType, signatures: memberSignatures }],
+                                signatures: memberSignatures
                             };
                             if (!resolvedFluentCache.has(typeName)) {
                                 resolvedFluentCache.set(typeName, new Map());
@@ -46717,7 +46678,10 @@ namespace ts {
                     }
                 });
             })
+            //console.timeEnd("initTsPlusTypeChecker joinining signatures")
+            //console.time("initTsPlusTypeChecker implicits")
             initTsPlusTypeCheckerImplicits();
+            //console.timeEnd("initTsPlusTypeChecker implicits")
         }
         // TSPLUS EXTENSION END
 
@@ -46851,7 +46815,9 @@ namespace ts {
                 }
             });
             amalgamatedDuplicates = undefined;
+            //console.time("initTsPlusTypeChecker")
             initTsPlusTypeChecker();
+            //console.timeEnd("initTsPlusTypeChecker")
         }
 
         function checkExternalEmitHelpers(location: Node, helpers: ExternalEmitHelpers) {
