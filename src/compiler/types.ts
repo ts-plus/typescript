@@ -3466,6 +3466,8 @@ namespace ts {
         signatures: readonly TsPlusSignature[];
         definition: SourceFile;
         exportName: string;
+        typeName: string;
+        funcName: string;
     }
 
     export interface TsPlusUnresolvedStaticExtension {
@@ -5463,6 +5465,7 @@ namespace ts {
         tsPlusMacroTags?: Array<string>;
         tsPlusUnifyTags?: Array<string>;
         tsPlusDeriveTags?: Array<string>;
+        tsPlusPipeableExtension?: TsPlusPipeableExtension;
         isTsPlusGlobal?: boolean;
         isTsPlusImplicit?: boolean;
         isTsPlusTailRec?: boolean;

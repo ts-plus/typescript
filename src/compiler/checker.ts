@@ -30023,19 +30023,16 @@ namespace ts {
                 }
             }
         }
-        function checkFluentPipeableAgreement(pipeableExtension: TsPlusPipeableExtension, typeName: string, funcName: string) {
-            if (!fluentCache.has(typeName)) {
+        function checkFluentPipeableAgreement(pipeableExtension: TsPlusPipeableExtension) {
+            if (!fluentCache.has(pipeableExtension.typeName)) {
                 return;
             }
-            const fluentMap = fluentCache.get(typeName)!;
-            if (!fluentMap.has(funcName)) {
+            const fluentMap = fluentCache.get(pipeableExtension.typeName)!;
+            if (!fluentMap.has(pipeableExtension.funcName)) {
                 return;
             }
-            if (pipeableExtension.definition.isDeclarationFile) {
-                return;
-            }
-            const fluentExtension = fluentMap.get(funcName)!();
-            if (!fluentExtension || some(fluentExtension.types, ({ type: fluentType }) => isTypeAssignableTo(pipeableExtension.type, fluentType))) {
+            const fluentExtension = fluentMap.get(pipeableExtension.funcName)!();
+            if (!fluentExtension || some(fluentExtension.types, ({ type: fluentType }) => isTypeAssignableTo(fluentType, pipeableExtension.type))) {
                 return;
             }
             else {
@@ -38902,6 +38899,10 @@ namespace ts {
                 checkFunctionOrMethodDeclaration(node);
                 checkGrammarForGenerator(node);
                 checkCollisionsForDeclarationName(node, node.name);
+                const links = getNodeLinks(node);
+                if (links.tsPlusPipeableExtension) {
+                    checkFluentPipeableAgreement(links.tsPlusPipeableExtension);
+                }
             }
         }
 
@@ -39869,6 +39870,13 @@ namespace ts {
             checkGrammarVariableDeclaration(node);
             checkVariableLikeDeclaration(node);
             tracing?.pop();
+            addLazyDiagnostic(checkDeferred)
+            function checkDeferred() {
+                const links = getNodeLinks(node);
+                if (links.tsPlusPipeableExtension) {
+                    checkFluentPipeableAgreement(links.tsPlusPipeableExtension);
+                }
+            }
         }
 
         function checkBindingElement(node: BindingElement) {
@@ -46238,7 +46246,9 @@ namespace ts {
                             type,
                             signatures,
                             exportName: declaration.name.escapedText.toString(),
-                            definition: file
+                            definition: file,
+                            typeName: target,
+                            funcName: name
                         });
                         augmentPipeableIdentifierSymbol(
                             declaration.name,
@@ -46248,6 +46258,7 @@ namespace ts {
                             type,
                             declaration
                         );
+                        getNodeLinks(declaration).tsPlusPipeableExtension = map.get(name);
                     }
                     else {
                         error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
@@ -46284,7 +46295,9 @@ namespace ts {
                                 type,
                                 signatures,
                                 exportName: declaration.name.escapedText.toString(),
-                                definition: file
+                                definition: file,
+                                typeName: target,
+                                funcName: name
                             })
                             augmentPipeableIdentifierSymbol(
                                 declaration.name,
@@ -46294,6 +46307,7 @@ namespace ts {
                                 type,
                                 declaration as VariableDeclarationWithFunction
                             );
+                            getNodeLinks(declaration).tsPlusPipeableExtension = map.get(name);
                         }
                         else {
                             error(statement, Diagnostics.Invalid_declaration_annotated_as_pipeable);
@@ -46678,31 +46692,29 @@ namespace ts {
                 }
                 const cache = fluentCache.get(typeName)!;
                 map.forEach((member, funcName) => {
-                    if (cache.has(funcName)) {
-                        checkFluentPipeableAgreement(member, typeName, funcName);
-                        return;
-                    }
-                    cache.set(funcName, () => {
-                        if (resolvedFluentCache.has(typeName)) {
-                            const resolvedMap = resolvedFluentCache.get(typeName)!;
-                            if (resolvedMap.has(funcName)) {
-                                return resolvedMap.get(funcName)!;
+                    if (!cache.has(funcName)) {
+                        cache.set(funcName, () => {
+                            if (resolvedFluentCache.has(typeName)) {
+                                const resolvedMap = resolvedFluentCache.get(typeName)!;
+                                if (resolvedMap.has(funcName)) {
+                                    return resolvedMap.get(funcName)!;
+                                }
                             }
-                        }
-                        const symbol = createTsPlusFluentSymbol(funcName, member.signatures as TsPlusSignature[]);
-                        const type = createAnonymousType(symbol, emptySymbols, member.signatures, [], []);
-                        const extension: TsPlusFluentExtension = {
-                            patched: createSymbolWithType(symbol, type),
-                            types: [{ type: member.type, signatures: member.signatures }],
-                            signatures: member.signatures
-                        };
-                        if (!resolvedFluentCache.has(typeName)) {
-                            resolvedFluentCache.set(typeName, new Map());
-                        }
-                        const resolvedMap = resolvedFluentCache.get(typeName)!;
-                        resolvedMap.set(funcName, extension);
-                        return extension;
-                    });
+                            const symbol = createTsPlusFluentSymbol(funcName, member.signatures as TsPlusSignature[]);
+                            const type = createAnonymousType(symbol, emptySymbols, member.signatures, [], []);
+                            const extension: TsPlusFluentExtension = {
+                                patched: createSymbolWithType(symbol, type),
+                                types: [{ type: member.type, signatures: member.signatures }],
+                                signatures: member.signatures
+                            };
+                            if (!resolvedFluentCache.has(typeName)) {
+                                resolvedFluentCache.set(typeName, new Map());
+                            }
+                            const resolvedMap = resolvedFluentCache.get(typeName)!;
+                            resolvedMap.set(funcName, extension);
+                            return extension;
+                        });
+                    }
                 });
             })
             initTsPlusTypeCheckerImplicits();
