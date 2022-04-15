@@ -33104,10 +33104,10 @@ namespace ts {
             return typeHashCache.get(type)!;
         }
         function hashTypeWorker(type: Type) {
-            if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
+            if ((type.flags & TypeFlags.Object) && ((type as ObjectType).objectFlags & ObjectFlags.Reference) && !isTupleType(type) && type.symbol && type.symbol.declarations) {
                 const hasTags = !!find(type.symbol.declarations, (e) => collectTsPlusTypeTags(e).length > 0);
                 if (hasTags) {
-                    const argumentsHash = hashing.hashArray(map((type as TypeReference).resolvedTypeArguments!, hashType))
+                    const argumentsHash = hashing.hashArray(map(getTypeArguments(type as TypeReference), hashType))
                     const hash = hashing.hashPlainObject({
                         type: type.symbol.escapedName,
                         arguments: argumentsHash
