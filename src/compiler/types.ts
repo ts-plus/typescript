@@ -2906,6 +2906,7 @@ namespace ts {
         /** May be undefined in `export default class { ... }`. */
         readonly name?: Identifier;
         tsPlusTypeTags?: string[]
+        tsPlusCompanionTags?: string[]
     }
 
     export interface ClassExpression extends ClassLikeDeclarationBase, PrimaryExpression {
@@ -5462,7 +5463,6 @@ namespace ts {
         tsPlusGetterTags?: Array<TsPlusExtensionTag>;
         tsPlusPipeableTags?: Array<TsPlusExtensionTag>;
         tsPlusIndexTags?: Array<string>;
-        tsPlusCompanionTags?: Array<string>;
         tsPlusMacroTags?: Array<string>;
         tsPlusUnifyTags?: Array<string>;
         tsPlusDeriveTags?: Array<string>;

@@ -41447,6 +41447,7 @@ namespace ts {
 
             registerForUnusedIdentifiersCheck(node);
             checkTsPlusTypeTags(node);
+            checkTsPlusCompanionTags(node);
         }
 
         function checkClassLikeDeclaration(node: ClassLikeDeclaration) {
@@ -42106,6 +42107,16 @@ namespace ts {
                 const [_, typeTag] = tag.split(" ");
                 if (!typeTag) {
                     error(node, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                }
+            }
+        }
+
+        function checkTsPlusCompanionTags(node: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration) {
+            const tags = getTsPlusTagsOfNode(node).filter((tag) => tag.startsWith("companion"));
+            for (const tag of tags) {
+                const [_, typeTag] = tag.split(" ");
+                if (!typeTag) {
+                    error(node, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
                 }
             }
         }
@@ -45284,21 +45295,11 @@ namespace ts {
             }
             return [];
         }
-        function collectTsPlusCompanionTags(statement: Declaration) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusCompanionTags) {
-              links.tsPlusCompanionTags = [];
-              const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("companion"));
-              for (const tag of tags) {
-                const [_, companionTag] = tag.split(" ");
-                if (!companionTag) {
-                    error(statement, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
-                    continue;
-                }
-                links.tsPlusCompanionTags.push(companionTag);
-              }
+        function collectTsPlusCompanionTags(declaration: Declaration) {
+            if (isClassDeclaration(declaration)) {
+                return declaration.tsPlusCompanionTags || [];
             }
-            return links.tsPlusCompanionTags;
+            return [];
         }
         function collectTsPlusMacroTags(statement: Declaration) {
             const links = getNodeLinks(statement);

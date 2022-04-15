@@ -7222,6 +7222,18 @@ namespace ts {
                 if (typeTags.length > 0) {
                     finished.tsPlusTypeTags = typeTags;
                 }
+                const companionTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
+                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                        const matched = tag.comment.match(/companion (.*)/)
+                        if (matched) {
+                            return [matched[1]]
+                        }
+                    }
+                    return []
+                }))
+                if (companionTags.length > 0) {
+                    finished.tsPlusCompanionTags = companionTags;
+                }
             }
             return finished;
         }
