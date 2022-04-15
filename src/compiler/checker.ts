@@ -38901,6 +38901,9 @@ namespace ts {
                 if (links.tsPlusPipeableExtension) {
                     checkFluentPipeableAgreement(links.tsPlusPipeableExtension);
                 }
+                else {
+                    checkTsPlusPipeableTags(node);
+                }
             }
         }
 
@@ -39873,6 +39876,9 @@ namespace ts {
                 const links = getNodeLinks(node);
                 if (links.tsPlusPipeableExtension) {
                     checkFluentPipeableAgreement(links.tsPlusPipeableExtension);
+                }
+                else {
+                    checkTsPlusPipeableTags(node);
                 }
             }
         }
@@ -42107,6 +42113,17 @@ namespace ts {
                 const [_, typeTag] = tag.split(" ");
                 if (!typeTag) {
                     error(node, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                }
+            }
+        }
+
+        function checkTsPlusPipeableTags(node: VariableDeclaration | FunctionDeclaration) {
+            const tags = getTsPlusTagsOfNode(node).filter((tag) => tag.startsWith("pipeable"));
+            for (const tag of tags) {
+                const [_, target, name] = tag.split(" ");
+                if (!target || !name) {
+                    error(node, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
+                    continue;
                 }
             }
         }
@@ -45257,21 +45274,11 @@ namespace ts {
             }
             return links.tsPlusFluentTags;
         }
-        function collectTsPlusPipeableTags(statement: Declaration) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusPipeableTags) {
-                links.tsPlusPipeableTags = [];
-                const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("pipeable"));
-                for (const tag of tags) {
-                    const [_, target, name] = tag.split(" ");
-                    if (!target || !name) {
-                        error(statement, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
-                        continue;
-                    }
-                    links.tsPlusPipeableTags.push({ target, name })
-                }
+        function collectTsPlusPipeableTags(declaration: Declaration) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusPipeableTags || []
             }
-            return links.tsPlusPipeableTags;
+            return []
         }
         function collectTsPlusIndexTags(statement: Declaration) {
             const links = getNodeLinks(statement);

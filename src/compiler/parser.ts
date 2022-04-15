@@ -6797,6 +6797,19 @@ namespace ts {
                     finished.declarationList.declarations[0].tsPlusDeriveTags = deriveTags.map((_) => _.comment);
                 }
                 finished.declarationList.declarations[0].isTsPlusImplicit = isTsPlusImplicit;
+                const pipeableTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
+                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("pipeable")) {
+                        const [_, target, name] = tag.comment.split(" ");
+                        if (!target || !name) {
+                            return []
+                        }
+                        return [{ target, name }]
+                    }
+                    return []
+                }))
+                if (pipeableTags.length > 0) {
+                    finished.declarationList.declarations[0].tsPlusPipeableTags = pipeableTags;
+                }
             }
             return finished;
         }
@@ -6825,6 +6838,19 @@ namespace ts {
                 ))
                 if (deriveTags.length > 0) {
                     finished.tsPlusDeriveTags = deriveTags.map((_) => _.comment);
+                }
+                const pipeableTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
+                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("pipeable")) {
+                        const [_, target, name] = tag.comment.split(" ");
+                        if (!target || !name) {
+                            return []
+                        }
+                        return [{ target, name }]
+                    }
+                    return []
+                }))
+                if (pipeableTags.length > 0) {
+                    finished.tsPlusPipeableTags = pipeableTags;
                 }
             }
             return finished;

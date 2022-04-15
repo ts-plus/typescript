@@ -1307,6 +1307,7 @@ namespace ts {
         readonly initializer?: Expression;             // Optional initializer
         isTsPlusImplicit: boolean
         tsPlusDeriveTags?: string[]
+        tsPlusPipeableTags?: TsPlusExtensionTag[]
     }
 
     /* @internal */
@@ -1495,6 +1496,7 @@ namespace ts {
         readonly name?: Identifier;
         readonly body?: FunctionBody;
         tsPlusDeriveTags?: string[]
+        tsPlusPipeableTags?: TsPlusExtensionTag[]
     }
 
     export interface MethodSignature extends SignatureDeclarationBase, TypeElement {
@@ -5461,7 +5463,6 @@ namespace ts {
         tsPlusOperatorTags?: Array<TsPlusPrioritizedExtensionTag>;
         tsPlusStaticTags?: Array<TsPlusExtensionTag>;
         tsPlusGetterTags?: Array<TsPlusExtensionTag>;
-        tsPlusPipeableTags?: Array<TsPlusExtensionTag>;
         tsPlusIndexTags?: Array<string>;
         tsPlusMacroTags?: Array<string>;
         tsPlusUnifyTags?: Array<string>;
