@@ -237,10 +237,10 @@ namespace ts {
                             const name = node.escapedText.toString();
                             return sourceFileUniqueNames.get(name).name;
                         }
-                        const { tsPlusGlobalIdentifier } = checker.getNodeLinks(node);
+                        const links = checker.getNodeLinks(node);
                         const globalImport = checker.getTsPlusGlobal(node.escapedText.toString());
-                        if (tsPlusGlobalIdentifier && globalImport) {
-                            return getPathOfGlobalImport(context, importer, node, globalImport.location)
+                        if (links.isTsPlusGlobalIdentifier && globalImport) {
+                            return getPathOfGlobalImport(context, importer, node, globalImport.moduleSpecifier.text)
                         }
                     }
                 }

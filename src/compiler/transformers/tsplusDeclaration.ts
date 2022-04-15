@@ -65,12 +65,12 @@ namespace ts {
             function importVisitor(node: Node): VisitResult<Node> {
                 if (node.kind === SyntaxKind.Identifier) {
                     if (!isTransformable(node)) {
-                        const { tsPlusGlobalIdentifier } = checker.getNodeLinks(node);
+                        const links = checker.getNodeLinks(node);
                         const name = (node as Identifier).escapedText as string;
                         const globalImport = checker.getTsPlusGlobal(name);
-                        if (tsPlusGlobalIdentifier && globalImport && !importer.has(globalImport.location, name)) {
+                        if (links.isTsPlusGlobalIdentifier && globalImport && !importer.has(globalImport.moduleSpecifier.text, name)) {
                             if (isPartOfTypeNode(node) || isPartOfTypeQuery(node)) {
-                                importer.add(globalImport.location, name);
+                                importer.add(globalImport.moduleSpecifier.text, name);
                             }
                         }
                     }

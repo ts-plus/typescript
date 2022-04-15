@@ -7432,7 +7432,12 @@ namespace ts {
 
             parseSemicolon();
             const node = factory.createImportDeclaration(decorators, modifiers, importClause, moduleSpecifier, assertClause);
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (finished.jsDoc && finished.importClause && finished.importClause.namedBindings && isNamedImports(finished.importClause.namedBindings) && isStringLiteral(finished.moduleSpecifier)) {
+                const tags = flatMap(finished.jsDoc, (doc) => filter(doc.tags, (tag) => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("global")));
+                finished.isTsPlusGlobal = tags.length > 0;
+            }
+            return finished;
         }
 
         function parseAssertEntry() {

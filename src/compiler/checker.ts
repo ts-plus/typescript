@@ -851,7 +851,7 @@ namespace ts {
             getNodeLinks,
             collectTsPlusMacroTags,
             getTsPlusGlobals: () => {
-                return arrayFrom(mapIterator(globalSymbolsCache.values(), ({ symbol }) => symbol));
+                return arrayFrom(mapIterator(globalSymbolsCache.values(), ({ importSpecifier }) => getSymbolAtLocation(importSpecifier.name)!));
             },
             getTsPlusGlobal: (name) => {
                 return globalSymbolsCache.get(name);
@@ -2906,7 +2906,8 @@ namespace ts {
             if (!result && originalLocation && checkTsPlusGlobals) {
                 const globalImport = globalSymbolsCache.get(name as string);
                 if (globalImport) {
-                    if (globalImport.targetSymbol.flags & meaning) {
+                    const targetSymbol = getTargetOfImportSpecifier(globalImport.importSpecifier, false);
+                    if (targetSymbol && targetSymbol.flags & meaning) {
                         const withoutGlobals = resolveNameHelper(
                             originalLocation,
                             name,
@@ -2920,8 +2921,8 @@ namespace ts {
                             false
                         );
                         if (!withoutGlobals) {
-                            getNodeLinks(originalLocation).tsPlusGlobalIdentifier = globalImport.symbol;
-                            result = globalImport.targetSymbol;
+                            getNodeLinks(originalLocation).isTsPlusGlobalIdentifier = true;
+                            result = targetSymbol;
                         }
                     }
                 }
@@ -5440,10 +5441,6 @@ namespace ts {
             const firstIdentifier = getFirstIdentifier(entityName);
             const symbol = resolveName(enclosingDeclaration, firstIdentifier.escapedText, meaning, /*nodeNotFoundErrorMessage*/ undefined, /*nameArg*/ undefined, /*isUse*/ false);
             if (symbol && symbol.flags & SymbolFlags.TypeParameter && meaning & SymbolFlags.Type) {
-                return { accessibility: SymbolAccessibility.Accessible };
-            }
-
-            if (symbol && getSymbolLinks(symbol).isTsPlusGlobal) {
                 return { accessibility: SymbolAccessibility.Accessible };
             }
 
@@ -42828,6 +42825,12 @@ namespace ts {
                 }
             }
             checkAssertClause(node);
+            if (node.isTsPlusGlobal) {
+                const location = (node.moduleSpecifier as StringLiteral).text;
+                if (pathIsRelative(location)) {
+                    error(node.moduleSpecifier, Diagnostics.Global_import_path_cannot_be_relative);
+                }
+            }
         }
 
         function checkImportEqualsDeclaration(node: ImportEqualsDeclaration) {
@@ -45201,19 +45204,6 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION START
-        function isTsPlusGlobalImport(statement: ImportDeclaration): boolean {
-            const links = getNodeLinks(statement);
-            if (links.isTsPlusGlobal === undefined) {
-                for (const tag of getTsPlusTagsOfNode(statement)) {
-                    if (tag.startsWith("global")) {
-                        links.isTsPlusGlobal = true;
-                        return links.isTsPlusGlobal;
-                    }
-                }
-                links.isTsPlusGlobal = false;
-            }
-            return links.isTsPlusGlobal;
-        }
         function isTsPlusImplicit(statement: Declaration): boolean {
             const links = getNodeLinks(statement);
             if (links.isTsPlusImplicit === undefined) {
@@ -45868,25 +45858,10 @@ namespace ts {
             }
         }
         function tryCacheTsPlusGlobalSymbol(declaration: ImportDeclaration): void {
-            if (declaration.importClause && declaration.importClause.namedBindings && isNamedImports(declaration.importClause.namedBindings) && isStringLiteral(declaration.moduleSpecifier)) {
-                if (isTsPlusGlobalImport(declaration)) {
-                    const location = declaration.moduleSpecifier.text;
-                    if (pathIsRelative(location)) {
-                        error(declaration, Diagnostics.Global_import_path_cannot_be_relative);
-                        return;
-                    }
-                    const isDeclarationTypeOnly = declaration.importClause.isTypeOnly;
-                    declaration.importClause.namedBindings.elements.forEach((importSpecifier) => {
-                        const symbol = getSymbolAtLocation(importSpecifier.name);
-                        const targetSymbol = getTargetOfImportSpecifier(importSpecifier, false);
-                        if (symbol && targetSymbol) {
-                            const symbolLinks = getSymbolLinks(symbol);
-                            symbolLinks.isTsPlusGlobal = true;
-                            symbolLinks.isTsPlusTypeOnlyGlobal = isDeclarationTypeOnly || importSpecifier.isTypeOnly;
-                            globalSymbolsCache.set(importSpecifier.name.escapedText as string, { symbol, targetSymbol, importSpecifier, location });
-                        }
-                    })
-                }
+            if (declaration.isTsPlusGlobal) {
+                (declaration.importClause!.namedBindings as NamedImports).elements.forEach((importSpecifier) => {
+                    globalSymbolsCache.set(importSpecifier.name.escapedText as string, { declaration, importSpecifier, moduleSpecifier: declaration.moduleSpecifier as StringLiteral });
+                })
             }
         }
         function tryCacheTsPlusType(declaration: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration): void {
@@ -46487,16 +46462,6 @@ namespace ts {
                 }
             }
         }
-        function initTsPlusTypeCheckerGlobal() {
-            globalSymbolsCache.clear();
-            for (const file of host.getSourceFiles()) {
-                for (const statement of file.imports) {
-                    if (isImportDeclaration(statement.parent)) {
-                        tryCacheTsPlusGlobalSymbol(statement.parent);
-                    }
-                }
-            }
-        }
         function initTsPlusTypeCheckerImplicits() {
             for (const file of host.getSourceFiles()) {
                 fillTsPlusLocalScope(file);
@@ -46524,9 +46489,6 @@ namespace ts {
             tsPlusWorldScope.rules.clear();
             unificationInProgress.isRunning = false;
             //console.timeEnd("initTsPlusTypeChecker caches")
-            //console.time("initTsPlusTypeChecker global")
-            initTsPlusTypeCheckerGlobal();
-            //console.timeEnd("initTsPlusTypeChecker global")
             //console.time("initTsPlusTypeChecker collect")
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);
@@ -46686,9 +46648,17 @@ namespace ts {
         // TSPLUS EXTENSION END
 
         function initializeTypeChecker() {
+            globalSymbolsCache.clear();
+
             // Bind all source files and propagate errors
             for (const file of host.getSourceFiles()) {
                 bindSourceFile(file, compilerOptions);
+
+                for (const statement of file.imports) {
+                    if (isImportDeclaration(statement.parent)) {
+                        tryCacheTsPlusGlobalSymbol(statement.parent);
+                    }
+                }
             }
 
             amalgamatedDuplicates = new Map();

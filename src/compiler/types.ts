@@ -3047,6 +3047,7 @@ namespace ts {
         /** If this is not a StringLiteral it will be a grammar error. */
         readonly moduleSpecifier: Expression;
         readonly assertClause?: AssertClause;
+        isTsPlusGlobal: boolean;
     }
 
     export type NamedImportBindings =
@@ -3513,10 +3514,9 @@ namespace ts {
     }
 
     export interface TsPlusGlobalImport {
-        symbol: Symbol;
-        targetSymbol: Symbol;
-        location: string;
+        declaration: ImportDeclaration;
         importSpecifier: ImportSpecifier;
+        moduleSpecifier: StringLiteral;
     }
 
     export interface TsPlusType extends Type {
@@ -5269,10 +5269,6 @@ namespace ts {
         isConstructorDeclaredProperty?: boolean;    // Property declared through 'this.x = ...' assignment in constructor
         tupleLabelDeclaration?: NamedTupleMember | ParameterDeclaration; // Declaration associated with the tuple's label
         accessibleChainCache?: ESMap<string, Symbol[] | undefined>;
-        // TSPLUS EXTENSION START
-        isTsPlusGlobal?: boolean;
-        isTsPlusTypeOnlyGlobal?: boolean;
-        // TSPLUS EXTENSION END
     }
 
     /* @internal */
@@ -5445,7 +5441,7 @@ namespace ts {
         tsPlusDataFirstDeclaration?: FunctionDeclaration | ArrowFunction | FunctionExpression;
         tsPlusOptimizedDataFirst?: { definition: SourceFile, exportName: string };
         tsPlusResolvedType?: Type;
-        tsPlusGlobalIdentifier?: Symbol;
+        isTsPlusGlobalIdentifier?: boolean;
         tsPlusDerivation?: Derivation;
         tsPlusTags?: string[];
         isFluent?: true;
@@ -5466,7 +5462,6 @@ namespace ts {
         tsPlusUnifyTags?: Array<string>;
         tsPlusDeriveTags?: Array<string>;
         tsPlusPipeableExtension?: TsPlusPipeableExtension;
-        isTsPlusGlobal?: boolean;
         isTsPlusImplicit?: boolean;
         isTsPlusTailRec?: boolean;
         // TSPLUS EXTENSION END

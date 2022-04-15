@@ -4043,6 +4043,7 @@ namespace ts {
                 decorators,
                 modifiers
             );
+            node.isTsPlusGlobal = false;
             node.importClause = importClause;
             node.moduleSpecifier = moduleSpecifier;
             node.assertClause = assertClause;
