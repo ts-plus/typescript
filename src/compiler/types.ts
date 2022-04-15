@@ -1305,6 +1305,8 @@ namespace ts {
         readonly exclamationToken?: ExclamationToken;  // Optional definite assignment assertion
         readonly type?: TypeNode;                      // Optional type annotation
         readonly initializer?: Expression;             // Optional initializer
+        isTsPlusImplicit: boolean
+        tsPlusDeriveTags?: string[]
     }
 
     /* @internal */
@@ -1492,6 +1494,7 @@ namespace ts {
         readonly kind: SyntaxKind.FunctionDeclaration;
         readonly name?: Identifier;
         readonly body?: FunctionBody;
+        tsPlusDeriveTags?: string[]
     }
 
     export interface MethodSignature extends SignatureDeclarationBase, TypeElement {
@@ -5462,7 +5465,6 @@ namespace ts {
         tsPlusUnifyTags?: Array<string>;
         tsPlusDeriveTags?: Array<string>;
         tsPlusPipeableExtension?: TsPlusPipeableExtension;
-        isTsPlusImplicit?: boolean;
         isTsPlusTailRec?: boolean;
         // TSPLUS EXTENSION END
     }

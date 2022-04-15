@@ -3626,6 +3626,7 @@ namespace ts {
             if (exclamationToken) {
                 node.transformFlags |= TransformFlags.ContainsTypeScript;
             }
+            node.isTsPlusImplicit = false;
             return node;
         }
 

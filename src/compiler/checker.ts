@@ -1,5 +1,6 @@
 /* @internal */
 namespace ts {
+    const tsPlusDebug = false;
     const ambientModuleSymbolRegex = /^".+"$/;
     const anon = "(anonymous)" as __String & string;
 
@@ -368,7 +369,7 @@ namespace ts {
         };
         const tsPlusWorldScope: {
             implicits: ESMap<number, [Type, Declaration][]>;
-            rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Type, Declaration, Set<string>][] }>;
+            rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Declaration, Set<string>][] }>;
         } = {
             implicits: new Map(),
             rules: new Map()
@@ -830,14 +831,14 @@ namespace ts {
             isTsPlusMacroCall,
             isClassCompanionReference,
             collectTsPlusFluentTags,
-            hasExportedPlusTags: (statement) => {
-                return collectTsPlusFluentTags(statement).length > 0 ||
-                    collectTsPlusGetterTags(statement).length > 0 ||
-                    collectTsPlusOperatorTags(statement).length > 0 ||
-                    collectTsPlusPipeableTags(statement).length > 0 ||
-                    collectTsPlusStaticTags(statement).length > 0 ||
-                    isTsPlusImplicit(statement) ||
-                    collectTsPlusDeriveTags(statement).length > 0
+            hasExportedPlusTags: (declaration) => {
+                return collectTsPlusFluentTags(declaration).length > 0 ||
+                    collectTsPlusGetterTags(declaration).length > 0 ||
+                    collectTsPlusOperatorTags(declaration).length > 0 ||
+                    collectTsPlusPipeableTags(declaration).length > 0 ||
+                    collectTsPlusStaticTags(declaration).length > 0 ||
+                    isTsPlusImplicit(declaration) ||
+                    collectTsPlusDeriveTags(declaration).length > 0
             },
             getFluentExtensionForPipeableSymbol,
             getPrimitiveTypeName,
@@ -33149,7 +33150,7 @@ namespace ts {
             return flatMap(collectRelevantSymbols(type), (s) => typeSymbolCache.get(s));
         }
         function getTsPlusDerivationRules(symbol: Symbol, targetTypes: readonly Type[]) {
-            const mergedRules: { lazyRule: Declaration | undefined; rules: [Rule, number, Type, Declaration, Set<string>][]; } = {
+            const mergedRules: { lazyRule: Declaration | undefined; rules: [Rule, number, Declaration, Set<string>][]; } = {
                 lazyRule: void 0,
                 rules: []
             }
@@ -33170,8 +33171,8 @@ namespace ts {
                         mergedRules.lazyRule = foundRules.lazyRule;
                     }
                     foundRules.rules.forEach((rule) => {
-                        if (!dedupe.has(rule[3])) {
-                            dedupe.add(rule[3]);
+                        if (!dedupe.has(rule[2])) {
+                            dedupe.add(rule[2]);
                             mergedRules.rules.push(rule);
                         }
                     });
@@ -33272,7 +33273,7 @@ namespace ts {
             if ((type.flags & TypeFlags.Object) && ((type as ObjectType).objectFlags & ObjectFlags.Reference) && !isTupleType(type) && type.symbol && type.symbol.declarations) {
                 const targetTypes = getTypeArguments(type as TypeReference);
                 const mergedRules = getTsPlusDerivationRules(type.symbol, targetTypes);
-                ruleCheck: for (const [rule, _, ruleType, ruleDeclaration, options] of mergedRules.rules) {
+                ruleCheck: for (const [rule, _, ruleDeclaration, options] of mergedRules.rules) {
                     const toCheck: Type[] = [];
                     if (rule.paramActions.length !== targetTypes.length) {
                         continue ruleCheck;
@@ -33311,7 +33312,7 @@ namespace ts {
                     if (toCheck.length !== targetTypes.length) {
                         continue ruleCheck;
                     }
-                    const signatures = getSignaturesOfType(ruleType, SignatureKind.Call);
+                    const signatures = getSignaturesOfType(getTypeOfNode(ruleDeclaration), SignatureKind.Call);
                     for (const signature of signatures) {
                         if (signature.typeParameters && signature.typeParameters.length === toCheck.length) {
                             const mapper = createTypeMapper(signature.typeParameters, toCheck);
@@ -45204,18 +45205,11 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION START
-        function isTsPlusImplicit(statement: Declaration): boolean {
-            const links = getNodeLinks(statement);
-            if (links.isTsPlusImplicit === undefined) {
-                for (const tag of getTsPlusTagsOfNode(statement)) {
-                    if (tag.startsWith("implicit") && !tag.includes("local")) {
-                        links.isTsPlusImplicit = true;
-                        return links.isTsPlusImplicit;
-                    }
-                }
-                links.isTsPlusImplicit = false;
+        function isTsPlusImplicit(declaration: Declaration): boolean {
+            if (isVariableDeclaration(declaration)) {
+                return declaration.isTsPlusImplicit;
             }
-            return links.isTsPlusImplicit;
+            return false;
         }
         function collectTsPlusDeriveTags(statement: Declaration) {
             const links = getNodeLinks(statement);
@@ -46429,31 +46423,30 @@ namespace ts {
                                 }
                                 indexedImplicits.get(hash)!.push([typeOfNode, declaration]);
                             }
-                            const deriveTags = collectTsPlusDeriveTags(declaration);
-                            for (const tag of deriveTags) {
-                                const match = tag.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
-                                if (match) {
-                                    const [, typeTag, paramActions, rest] = match;
-                                    const [priority, ...options] = rest.split(" ");
-                                    if (!derivationRules.has(typeTag)) {
-                                        derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
-                                    }
-                                    const typeOfNode = getTypeOfNode(declaration);
-                                    derivationRules.get(typeTag)?.rules.push([
-                                        { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) },
-                                        Number.parseFloat(priority),
-                                        typeOfNode,
-                                        declaration,
-                                        new Set(options)
-                                    ]);
-                                } else {
-                                    const match = tag.match(/^derive ([^<]*) lazy$/);
+                            else if((isFunctionDeclaration(declaration) || isVariableDeclaration(declaration)) && declaration.tsPlusDeriveTags) {
+                                for (const tag of declaration.tsPlusDeriveTags) {
+                                    const match = tag.match(/^derive ([^<]*)<([^>]*)> (.*)$/);
                                     if (match) {
-                                        const [, typeTag] = match;
+                                        const [, typeTag, paramActions, rest] = match;
+                                        const [priority, ...options] = rest.split(" ");
                                         if (!derivationRules.has(typeTag)) {
                                             derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
                                         }
-                                        derivationRules.get(typeTag)!.lazyRule = declaration;
+                                        derivationRules.get(typeTag)?.rules.push([
+                                            { typeTag, paramActions: paramActions.split(",").map((s) => s.trim()) },
+                                            Number.parseFloat(priority),
+                                            declaration,
+                                            new Set(options)
+                                        ]);
+                                    } else {
+                                        const match = tag.match(/^derive ([^<]*) lazy$/);
+                                        if (match) {
+                                            const [, typeTag] = match;
+                                            if (!derivationRules.has(typeTag)) {
+                                                derivationRules.set(typeTag, { lazyRule: void 0, rules: [] });
+                                            }
+                                            derivationRules.get(typeTag)!.lazyRule = declaration;
+                                        }
                                     }
                                 }
                             }
@@ -46468,7 +46461,7 @@ namespace ts {
             }
         }
         function initTsPlusTypeChecker() {
-            //console.time("initTsPlusTypeChecker caches")
+            tsPlusDebug && console.time("initTsPlusTypeChecker caches")
             fileMap.map = getFileMap(host.getCompilerOptions(), host);
             fluentCache.clear();
             unresolvedFluentCache.clear();
@@ -46488,13 +46481,13 @@ namespace ts {
             tsPlusWorldScope.implicits.clear();
             tsPlusWorldScope.rules.clear();
             unificationInProgress.isRunning = false;
-            //console.timeEnd("initTsPlusTypeChecker caches")
-            //console.time("initTsPlusTypeChecker collect")
+            tsPlusDebug && console.timeEnd("initTsPlusTypeChecker caches")
+            tsPlusDebug && console.time("initTsPlusTypeChecker collect")
             for (const file of host.getSourceFiles()) {
                 collectTsPlusSymbols(file, file.statements);
             }
-            //console.timeEnd("initTsPlusTypeChecker collect")
-            //console.time("initTsPlusTypeChecker joinining signatures")
+            tsPlusDebug && console.timeEnd("initTsPlusTypeChecker collect")
+            tsPlusDebug && console.time("initTsPlusTypeChecker joinining signatures")
             unresolvedStaticCache.forEach((map, typeName) => {
                 if (!staticCache.has(typeName)) {
                     staticCache.set(typeName, new Map());
@@ -46640,10 +46633,10 @@ namespace ts {
                     }
                 });
             })
-            //console.timeEnd("initTsPlusTypeChecker joinining signatures")
-            //console.time("initTsPlusTypeChecker implicits")
+            tsPlusDebug && console.timeEnd("initTsPlusTypeChecker joinining signatures")
+            tsPlusDebug && console.time("initTsPlusTypeChecker implicits")
             initTsPlusTypeCheckerImplicits();
-            //console.timeEnd("initTsPlusTypeChecker implicits")
+            tsPlusDebug && console.timeEnd("initTsPlusTypeChecker implicits")
         }
         // TSPLUS EXTENSION END
 
@@ -46785,9 +46778,9 @@ namespace ts {
                 }
             });
             amalgamatedDuplicates = undefined;
-            //console.time("initTsPlusTypeChecker")
+            tsPlusDebug && console.time("initTsPlusTypeChecker")
             initTsPlusTypeChecker();
-            //console.timeEnd("initTsPlusTypeChecker")
+            tsPlusDebug && console.timeEnd("initTsPlusTypeChecker")
         }
 
         function checkExternalEmitHelpers(location: Node, helpers: ExternalEmitHelpers) {
