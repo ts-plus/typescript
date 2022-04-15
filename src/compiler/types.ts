@@ -2905,6 +2905,7 @@ namespace ts {
         readonly kind: SyntaxKind.ClassDeclaration;
         /** May be undefined in `export default class { ... }`. */
         readonly name?: Identifier;
+        tsPlusTypeTags?: string[]
     }
 
     export interface ClassExpression extends ClassLikeDeclarationBase, PrimaryExpression {
@@ -2933,6 +2934,7 @@ namespace ts {
         readonly typeParameters?: NodeArray<TypeParameterDeclaration>;
         readonly heritageClauses?: NodeArray<HeritageClause>;
         readonly members: NodeArray<TypeElement>;
+        tsPlusTypeTags?: string[]
     }
 
     export interface HeritageClause extends Node {
@@ -2947,6 +2949,7 @@ namespace ts {
         readonly name: Identifier;
         readonly typeParameters?: NodeArray<TypeParameterDeclaration>;
         readonly type: TypeNode;
+        tsPlusTypeTags?: string[]
     }
 
     export interface EnumMember extends NamedDeclaration, JSDocContainer {
@@ -5453,7 +5456,6 @@ namespace ts {
         needsUniqueNameInSope?: boolean;
         uniqueNameInScope?: Identifier;
 
-        tsPlusTypeTags?: Array<string>;
         tsPlusFluentTags?: Array<TsPlusPrioritizedExtensionTag>;
         tsPlusOperatorTags?: Array<TsPlusPrioritizedExtensionTag>;
         tsPlusStaticTags?: Array<TsPlusExtensionTag>;

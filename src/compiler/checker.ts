@@ -41446,6 +41446,7 @@ namespace ts {
             forEach(node.members, checkSourceElement);
 
             registerForUnusedIdentifiersCheck(node);
+            checkTsPlusTypeTags(node);
         }
 
         function checkClassLikeDeclaration(node: ClassLikeDeclaration) {
@@ -42099,6 +42100,15 @@ namespace ts {
             return !(getFalsyFlags(flowType) & TypeFlags.Undefined);
         }
 
+        function checkTsPlusTypeTags(node: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration) {
+            const tags = getTsPlusTagsOfNode(node).filter((tag) => tag.startsWith("type"));
+            for (const tag of tags) {
+                const [_, typeTag] = tag.split(" ");
+                if (!typeTag) {
+                    error(node, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                }
+            }
+        }
 
         function checkInterfaceDeclaration(node: InterfaceDeclaration) {
             // Grammar checking
@@ -42140,6 +42150,7 @@ namespace ts {
                 checkTypeForDuplicateIndexSignatures(node);
                 registerForUnusedIdentifiersCheck(node);
             });
+            checkTsPlusTypeTags(node);
         }
 
         function checkTypeAliasDeclaration(node: TypeAliasDeclaration) {
@@ -42157,6 +42168,7 @@ namespace ts {
                 checkSourceElement(node.type);
                 registerForUnusedIdentifiersCheck(node);
             }
+            checkTsPlusTypeTags(node);
         }
 
         function computeEnumMemberValues(node: EnumDeclaration) {
@@ -45266,21 +45278,11 @@ namespace ts {
             }
             return links.tsPlusIndexTags;
         }
-        function collectTsPlusTypeTags(statement: Declaration) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusTypeTags) {
-              links.tsPlusTypeTags = [];
-              const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("type"));
-              for (const tag of tags) {
-                const [_, typeTag] = tag.split(" ");
-                if (!typeTag) {
-                  error(statement, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
-                  continue;
-                }
-                links.tsPlusTypeTags.push(typeTag);
-              }
+        function collectTsPlusTypeTags(declaration: Declaration) {
+            if (isInterfaceDeclaration(declaration) || isTypeAliasDeclaration(declaration) || isClassDeclaration(declaration)) {
+                return declaration.tsPlusTypeTags || [];
             }
-            return links.tsPlusTypeTags;
+            return [];
         }
         function collectTsPlusCompanionTags(statement: Declaration) {
             const links = getNodeLinks(statement);

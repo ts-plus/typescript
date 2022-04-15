@@ -7208,7 +7208,22 @@ namespace ts {
             const node = kind === SyntaxKind.ClassDeclaration
                 ? factory.createClassDeclaration(decorators, modifiers, name, typeParameters, heritageClauses, members)
                 : factory.createClassExpression(decorators, modifiers, name, typeParameters, heritageClauses, members);
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            if (isClassDeclaration(finished)) {
+                const typeTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
+                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                        const matched = tag.comment.match(/type (.*)/)
+                        if (matched) {
+                            return [matched[1]]
+                        }
+                    }
+                    return []
+                }))
+                if (typeTags.length > 0) {
+                    finished.tsPlusTypeTags = typeTags;
+                }
+            }
+            return finished;
         }
 
         function parseNameOfClassDeclarationOrExpression(): Identifier | undefined {
@@ -7276,7 +7291,20 @@ namespace ts {
             const heritageClauses = parseHeritageClauses();
             const members = parseObjectTypeMembers();
             const node = factory.createInterfaceDeclaration(decorators, modifiers, name, typeParameters, heritageClauses, members);
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            const typeTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
+                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                    const matched = tag.comment.match(/type (.*)/)
+                    if (matched) {
+                        return [matched[1]]
+                    }
+                }
+                return []
+            }))
+            if (typeTags.length > 0) {
+                finished.tsPlusTypeTags = typeTags;
+            }
+            return finished;
         }
 
         function parseTypeAliasDeclaration(pos: number, hasJSDoc: boolean, decorators: NodeArray<Decorator> | undefined, modifiers: NodeArray<Modifier> | undefined): TypeAliasDeclaration {
@@ -7287,7 +7315,20 @@ namespace ts {
             const type = token() === SyntaxKind.IntrinsicKeyword && tryParse(parseKeywordAndNoDot) || parseType();
             parseSemicolon();
             const node = factory.createTypeAliasDeclaration(decorators, modifiers, name, typeParameters, type);
-            return withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            const typeTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
+                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                    const matched = tag.comment.match(/type (.*)/)
+                    if (matched) {
+                        return [matched[1]]
+                    }
+                }
+                return []
+            }))
+            if (typeTags.length > 0) {
+                finished.tsPlusTypeTags = typeTags;
+            }
+            return finished;
         }
 
         // In an ambient declaration, the grammar only allows integer literals as initializers.
