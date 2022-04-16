@@ -45860,7 +45860,8 @@ namespace ts {
                         priority: tag.priority,
                     });
                 }
-            }        }
+            }        
+        }
         function cacheTsPlusGetterVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
             for (const { target, name } of collectTsPlusGetterTags(declaration)) {
                 if (!getterCache.has(target)) {
