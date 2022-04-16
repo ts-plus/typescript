@@ -582,7 +582,7 @@ namespace ts {
                                             if (traceInScope) {
                                                 args.push(traceInScope);
                                             } else {
-                                                args.push(getTrace(source, statement.declarationList.declarations[0].initializer));
+                                                args.push(getTrace(source, statement.declarationList.declarations[0].initializer.expression));
                                             }
                                         }
                                     }
@@ -617,7 +617,7 @@ namespace ts {
                                             if (traceInScope) {
                                                 args.push(traceInScope);
                                             } else {
-                                                args.push(getTrace(source, statement.declarationList.declarations[0].initializer));
+                                                args.push(getTrace(source, statement.declarationList.declarations[0].initializer.expression));
                                             }
                                         }
                                     }
@@ -647,7 +647,7 @@ namespace ts {
                                             if (traceInScope) {
                                                 args.push(traceInScope);
                                             } else {
-                                                args.push(getTrace(source, statement.expression));
+                                                args.push(getTrace(source, statement.expression.expression));
                                             }
                                         }
                                     }
@@ -674,7 +674,7 @@ namespace ts {
                                             if (traceInScope) {
                                                 args.push(traceInScope);
                                             } else {
-                                                args.push(getTrace(source, statement.expression));
+                                                args.push(getTrace(source, statement.expression.expression));
                                             }
                                         }
                                     }
