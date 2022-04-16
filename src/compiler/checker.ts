@@ -33615,7 +33615,7 @@ namespace ts {
                                 const mapper = createTypeMapper(original.typeParameters, original.typeParameters.map(() => anyType));
                                 const p0 = instantiateType(getTypeOfSymbol(original.parameters[0]), mapper);
                                 if (types.every((target) => isTypeAssignableTo(target[1], p0))) {
-                                    return original;
+                                    return signature as TsPlusSignature;
                                 }
                             }
                         }
@@ -33648,10 +33648,14 @@ namespace ts {
                         error(node, Diagnostics.Cannot_find_a_valid_0_that_can_handle_all_the_types_of_1, "flatMap", typeToString(getUnionType(types.map((t) => t[1]))))
                         return errorType;
                     }
+                    getNodeLinks(node).tsPlusDoFunctions = {
+                        flatMap: flatMapFn,
+                        map: mapFn
+                    };
                     const lastBind = types[types.length - 1];
-                    const mapped = tsPlusDoCheckLastBind(lastBind[0], mapFn, lastBind[1], checked);
+                    const mapped = tsPlusDoCheckLastBind(lastBind[0], mapFn.tsPlusOriginal, lastBind[1], checked);
                     const toBeFlatMapped = types.map((t, i) => i !== types.length - 1 ? t : [t[0], mapped] as typeof t);
-                    return tsPlusDoCheckChain(toBeFlatMapped, flatMapFn);
+                    return tsPlusDoCheckChain(toBeFlatMapped, flatMapFn.tsPlusOriginal);
                 } else {
                     error(node, Diagnostics.A_Do_block_must_contain_at_least_1_bound_value);
                     return errorType;

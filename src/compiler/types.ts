@@ -5495,6 +5495,10 @@ namespace ts {
         tsPlusDoTypes?: ESMap<CallExpression, Type>;
         isTsPlusTailRec?: boolean;
         isTsPlusDoCall?: boolean;
+        tsPlusDoFunctions?: {
+            map: TsPlusSignature
+            flatMap: TsPlusSignature
+        }
         // TSPLUS EXTENSION END
     }
 

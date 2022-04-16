@@ -530,6 +530,158 @@ namespace ts {
                     []
                 );
             }
+            function visitDo(
+                source: SourceFile,
+                node: CallExpression,
+                visitor: Visitor,
+                context: TransformationContext,
+                functions: {
+                    map: TsPlusSignature;
+                    flatMap: TsPlusSignature;
+                },
+                types: ESMap<CallExpression, Type>
+            ): VisitResult<Node> {
+                if (isArrowFunction(node.arguments[0])) {
+                    const body = node.arguments[0].body;
+                    if (isBlock(body)) {
+                        let currentScope: Statement[] = []
+                        let isLast = true;
+                        for (let i = body.statements.length - 1; i >= 0; i--) {
+                            const statement = body.statements[i];
+                            if (
+                                isVariableStatement(statement) &&
+                                statement.declarationList.declarations.length === 1 &&
+                                statement.declarationList.declarations[0].initializer &&
+                                statement.declarationList.declarations[0].name &&
+                                isIdentifier(statement.declarationList.declarations[0].name) &&
+                                isCallExpression(statement.declarationList.declarations[0].initializer) &&
+                                types.has(statement.declarationList.declarations[0].initializer)
+                            ) {
+                                if (isLast) {
+                                    isLast = false
+                                    const mapper = factory.createArrowFunction(
+                                        undefined,
+                                        undefined,
+                                        [factory.createParameterDeclaration(
+                                            undefined,
+                                            undefined,
+                                            undefined,
+                                            statement.declarationList.declarations[0].name,
+                                            undefined,
+                                            undefined,
+                                            undefined
+                                        )],
+                                        undefined,
+                                        factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                                        getArrowBody(currentScope)
+                                    );
+                                    currentScope = [
+                                        factory.createReturnStatement(factory.createCallExpression(
+                                            getPathOfExtension(context, importer, { definition: functions.map.tsPlusFile, exportName: functions.map.tsPlusExportName }, source, sourceFileUniqueNames),
+                                            undefined,
+                                            [visitNode(statement.declarationList.declarations[0].initializer.arguments[0], visitor), mapper]
+                                        ))
+                                    ];
+                                }
+                                else {
+                                    const mapper = factory.createArrowFunction(
+                                        undefined,
+                                        undefined,
+                                        [factory.createParameterDeclaration(
+                                            undefined,
+                                            undefined,
+                                            undefined,
+                                            statement.declarationList.declarations[0].name,
+                                            undefined,
+                                            undefined,
+                                            undefined
+                                        )],
+                                        undefined,
+                                        factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                                        getArrowBody(currentScope)
+                                    );
+                                    currentScope = [
+                                        factory.createReturnStatement(factory.createCallExpression(
+                                            getPathOfExtension(context, importer, { definition: functions.flatMap.tsPlusFile, exportName: functions.flatMap.tsPlusExportName }, source, sourceFileUniqueNames),
+                                            undefined,
+                                            [visitNode(statement.declarationList.declarations[0].initializer.arguments[0], visitor), mapper]
+                                        ))
+                                    ];
+                                }
+                            }
+                            else if (isExpressionStatement(statement) && isCallExpression(statement.expression) && types.has(statement.expression)) {
+                                if (isLast) {
+                                    isLast = false
+                                    const mapper = factory.createArrowFunction(
+                                        undefined,
+                                        undefined,
+                                        [],
+                                        undefined,
+                                        factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                                        getArrowBody(currentScope)
+                                    );
+                                    currentScope = [
+                                        factory.createReturnStatement(factory.createCallExpression(
+                                            getPathOfExtension(context, importer, { definition: functions.map.tsPlusFile, exportName: functions.map.tsPlusExportName }, source, sourceFileUniqueNames),
+                                            undefined,
+                                            [visitNode(statement.expression.arguments[0], visitor), mapper]
+                                        ))
+                                    ];
+                                }
+                                else {
+                                    const mapper = factory.createArrowFunction(
+                                        undefined,
+                                        undefined,
+                                        [],
+                                        undefined,
+                                        factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                                        getArrowBody(currentScope)
+                                    );
+                                    currentScope = [
+                                        factory.createReturnStatement(factory.createCallExpression(
+                                            getPathOfExtension(context, importer, { definition: functions.flatMap.tsPlusFile, exportName: functions.flatMap.tsPlusExportName }, source, sourceFileUniqueNames),
+                                            undefined,
+                                            [visitNode(statement.expression.arguments[0], visitor), mapper]
+                                        ))
+                                    ];
+                                }
+                            }
+                            else {
+                                currentScope.push(
+                                    visitNode(statement, visitor)
+                                )
+                            }
+                        }
+                        if (currentScope.length === 1 && isReturnStatement(currentScope[0]) && currentScope[0].expression) {
+                            return currentScope[0].expression;
+                        }
+                        const mapper = factory.createArrowFunction(
+                            undefined,
+                            undefined,
+                            [],
+                            undefined,
+                            factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                            factory.createBlock(
+                                currentScope.reverse(),
+                                true
+                            )
+                        );
+                        return factory.createCallExpression(
+                            factory.createParenthesizedExpression(mapper),
+                            undefined,
+                            []
+                        )
+                    }
+                }
+                return node;
+            }
+            function getArrowBody(currentScope: Statement[]): ConciseBody {
+                return currentScope.length === 0
+                    ? factory.createVoidZero()
+                    : currentScope.length === 1 && isReturnStatement(currentScope[0]) && currentScope[0].expression
+                        ? currentScope[0].expression
+                        : factory.createBlock(currentScope.reverse(), true);
+            }
             function visitCallExpressionOrFluentCallExpression(source: SourceFile, traceInScope: Identifier | undefined, node: CallExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
                 if (checker.isPipeCall(node)) {
                     return optimizePipe(visitNodes(node.arguments, visitor), context.factory, source);
@@ -560,6 +712,16 @@ namespace ts {
                     return visitCallExpression(source, traceInScope, node, visitor, context);
                 }
                 const nodeLinks = checker.getNodeLinks(node);
+                if (nodeLinks.tsPlusDoFunctions && nodeLinks.tsPlusDoTypes && nodeLinks.tsPlusDoTypes.size > 0) {
+                    return visitDo(
+                        source,
+                        node,
+                        visitor,
+                        context,
+                        nodeLinks.tsPlusDoFunctions,
+                        nodeLinks.tsPlusDoTypes
+                    );
+                }
                 if (nodeLinks.tsPlusCallExtension) {
                     const visited = visitCallExpression(source, traceInScope, node, visitor, context);
                     if (isExpressionWithReferencedGlobalImport(visited.expression)) {
