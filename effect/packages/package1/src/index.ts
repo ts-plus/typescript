@@ -2,6 +2,7 @@ import { Effect } from "./prelude.js";
 import { Maybe } from "./prelude.js";
 import { Nothing } from "./prelude/definition/Maybe.js";
 import { pipe } from "./primitives.js";
+import { LazyArgument } from "./utils/LazyArgument.js";
 
 export const isPositive = (n: number) =>
   n > 0 ? Maybe.just("positive") : Maybe.nothing();
@@ -49,8 +50,8 @@ declare global {
 /**
  * @tsplus fluent Array map0
  */
-export function arrayFunc<A>(self: Array<A>, f: (a: A) => A): Array<A> {
-  return self.map(f);
+export function arrayFunc<A>(self: LazyArgument<Array<A>>, f: (a: A) => A): Array<A> {
+  return self().map(f);
 }
 
 /**
@@ -66,9 +67,8 @@ export function arrayGetter<A>(self: Array<A>): Array<A> {
 export function arrayHead<A>(self: Array<A>): A | undefined {
   return self[0]
 }
-
+const xxx6 = [1, 2, 3].map0((a) => a)
 const a = [1, 2, 3].map0((a) => a).getter.map0((a) => a).getter.head
-
 
 /**
  * @tsplus fluent Array sum

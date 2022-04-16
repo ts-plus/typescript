@@ -853,6 +853,20 @@ namespace ts {
                         importer.remove(visited.expression.tsPlusReferencedGlobalImport);
                     }
                     if (fluentExtension.tsPlusPipeable) {
+                        const signature = checker.getResolvedSignature(node);
+                        let expression = simplyfy((visited.expression as PropertyAccessExpression).expression);
+                        if (signature?.thisParameter) {
+                            if (checker.shouldMakeLazy(signature.thisParameter, checker.getTypeAtLocation(((visited as CallExpression).expression)))) {
+                                expression = context.factory.createArrowFunction(
+                                    void 0,
+                                    void 0,
+                                    [],
+                                    void 0,
+                                    void 0,
+                                    expression
+                                )
+                            }
+                        }
                         return factory.updateCallExpression(
                             visited,
                             factory.createCallExpression(
@@ -861,15 +875,29 @@ namespace ts {
                                 visited.arguments
                             ),
                             undefined,
-                            [simplyfy((visited.expression as PropertyAccessExpression).expression)]
+                            [expression]
                         )
                     }
                     else {
+                        const signature = checker.getResolvedSignature(node);
+                        let expression = simplyfy(((visited as CallExpression).expression as PropertyAccessExpression).expression);
+                        if (signature?.thisParameter) {
+                            if (checker.shouldMakeLazy(signature.thisParameter, checker.getTypeAtLocation(((visited as CallExpression).expression)))) {
+                                expression = context.factory.createArrowFunction(
+                                    void 0,
+                                    void 0,
+                                    [],
+                                    void 0,
+                                    void 0,
+                                    expression
+                                )
+                            }
+                        }
                         return factory.updateCallExpression(
                             visited as CallExpression,
                             getPathOfExtension(context, importer, { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName }, source, sourceFileUniqueNames),
                             (visited as CallExpression).typeArguments,
-                            [simplyfy(((visited as CallExpression).expression as PropertyAccessExpression).expression), ...(visited as CallExpression).arguments]
+                            [expression, ...(visited as CallExpression).arguments]
                         );
                     }
                 }

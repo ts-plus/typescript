@@ -1193,17 +1193,19 @@ namespace ts {
         function isExtensionValidForTarget(extension: Type, targetType: Type): boolean {
             return getSignaturesOfType(extension, SignatureKind.Call).find((candidate) => {
                 if (candidate.thisParameter) {
-                    const thisType = getTypeOfSymbol(candidate.thisParameter);
+                    const _paramType = getTypeOfSymbol(candidate.thisParameter);
+                    const isLazy = isLazyParameterByType(_paramType);
+                    const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
                     if (!candidate.typeParameters) {
-                        return isTypeAssignableTo(targetType, thisType);
+                        return isTypeAssignableTo(targetType, paramType);
                     } else {
                         const inferenceContext = createInferenceContext(
                             candidate.typeParameters,
                             candidate,
                             InferenceFlags.None
                         );
-                        inferTypes(inferenceContext.inferences, targetType, thisType);
-                        const instantiatedThisType = instantiateType(thisType, inferenceContext.mapper);
+                        inferTypes(inferenceContext.inferences, targetType, paramType);
+                        const instantiatedThisType = instantiateType(paramType, inferenceContext.mapper);
                         return isTypeAssignableTo(targetType, instantiatedThisType);
                     }
                 }
@@ -31083,8 +31085,12 @@ namespace ts {
 
             const thisType = getThisTypeOfSignature(signature);
             if (thisType && couldContainTypeVariables(thisType)) {
+                // TSPLUS EXTENTION BEGIN
+                const isLazy = isLazyParameterByType(thisType);
+                const paramType = isLazy ? getUnionType([thisType, (thisType as TypeReference).resolvedTypeArguments![0]]) : thisType;
                 const thisArgumentNode = getThisArgumentOfCall(node);
-                inferTypes(context.inferences, getThisArgumentType(thisArgumentNode), thisType);
+                inferTypes(context.inferences, getThisArgumentType(thisArgumentNode), paramType);
+                // TSPLUS EXTENTION END
             }
 
             for (let i = 0; i < argCount; i++) {
@@ -31339,6 +31345,10 @@ namespace ts {
             }
             const thisType = getThisTypeOfSignature(signature);
             if (thisType && thisType !== voidType && node.kind !== SyntaxKind.NewExpression) {
+                 // TSPLUS EXTENTION BEGIN
+                 const isLazy = isLazyParameterByType(thisType);
+                 const paramType = isLazy ? getUnionType([thisType, (thisType as TypeReference).resolvedTypeArguments![0]]) : thisType;
+                  // TSPLUS EXTENTION END
                 // If the called expression is not of the form `x.f` or `x["f"]`, then sourceType = voidType
                 // If the signature's 'this' type is voidType, then the check is skipped -- anything is compatible.
                 // If the expression is a new expression, then the check is skipped.
@@ -31346,7 +31356,7 @@ namespace ts {
                 const thisArgumentType = getThisArgumentType(thisArgumentNode);
                 const errorNode = reportErrors ? (thisArgumentNode || node) : undefined;
                 const headMessage = Diagnostics.The_this_context_of_type_0_is_not_assignable_to_method_s_this_of_type_1;
-                if (!checkTypeRelatedTo(thisArgumentType, thisType, relation, errorNode, headMessage, containingMessageChain, errorOutputContainer)) {
+                if (!checkTypeRelatedTo(thisArgumentType, paramType, relation, errorNode, headMessage, containingMessageChain, errorOutputContainer)) {
                     Debug.assert(!reportErrors || !!errorOutputContainer.errors, "this parameter should have errors when reporting errors");
                     return errorOutputContainer.errors || emptyArray;
                 }
