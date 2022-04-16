@@ -705,6 +705,7 @@ namespace ts {
         public pragmas!: PragmaMap;
         public localJsxFactory: EntityName | undefined;
         public localJsxNamespace: __String | undefined;
+        public tsPlusContext!: SourceFile["tsPlusContext"];
 
         constructor(kind: SyntaxKind, pos: number, end: number) {
             super(kind, pos, end);

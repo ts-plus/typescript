@@ -3971,8 +3971,19 @@ namespace ts {
         /* @internal */ endFlowNode?: FlowNode;
 
         // TSPLUS EXTENSION START
-        tsPlusImportAs?: () => string | undefined
-        tsPlusGlobalImports?: ImportDeclaration[]
+        tsPlusImportAs?: () => string | undefined;
+        tsPlusGlobalImports?: ImportDeclaration[];
+        tsPlusContext: {
+            type: (InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration)[];
+            companion: ClassDeclaration[];
+            fluent: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
+            pipeable: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
+            operator: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
+            static: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
+            getter: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
+            unify: FunctionDeclaration[];
+            index: FunctionDeclaration[];
+        }
         // TSPLUS EXTENSION END
     }
 

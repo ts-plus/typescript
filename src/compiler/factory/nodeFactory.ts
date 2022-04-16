@@ -5277,6 +5277,17 @@ namespace ts {
             node.transformFlags |=
                 propagateChildrenFlags(node.statements) |
                 propagateChildFlags(node.endOfFileToken);
+            node.tsPlusContext = {
+                type: [],
+                companion: [],
+                fluent: [],
+                pipeable: [],
+                operator: [],
+                static: [],
+                getter: [],
+                unify: [],
+                index: []
+            }
             return node;
         }
 

@@ -1137,10 +1137,82 @@ namespace ts {
                 fixupParentReferences(sourceFile);
             }
 
+            collectTsPlusFileSymbols(sourceFile, sourceFile.statements, false);
+
             return sourceFile;
 
             function reportPragmaDiagnostic(pos: number, end: number, diagnostic: DiagnosticMessage) {
                 parseDiagnostics.push(createDetachedDiagnostic(fileName, pos, end, diagnostic));
+            }
+        }
+
+        function collectTsPlusFileSymbols(file: SourceFile, statements: NodeArray<Statement>, collectTypesIfNotExported = false) {
+            for (const statement of statements) {
+                if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
+                    if (statement.name.kind === SyntaxKind.Identifier && (statement.name as Identifier).escapedText === "global" as __String) {
+                        collectTsPlusFileSymbols(file, statement.body.statements, true);
+                    }
+                    else if (statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
+                        collectTsPlusFileSymbols(file, statement.body.statements, true)
+                    }
+                    else {
+                        collectTsPlusFileSymbols(file, statement.body.statements);
+                    }
+                }
+                if (
+                    collectTypesIfNotExported ||
+                    (statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1)
+                ) {
+                    if ((isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement) || isClassDeclaration(statement)) && statement.tsPlusTypeTags && statement.tsPlusTypeTags.length > 0) {
+                        file.tsPlusContext.type.push(statement);                        
+                    }
+                    if (isClassDeclaration(statement) && statement.tsPlusCompanionTags && statement.tsPlusCompanionTags.length > 0) {
+                        file.tsPlusContext.companion.push(statement);
+                    }
+                    if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                        const declaration = statement.declarationList.declarations[0];
+                        if (declaration.name && declaration.name.kind === SyntaxKind.Identifier) {
+                            if (declaration.tsPlusFluentTags && declaration.tsPlusFluentTags.length > 0) {
+                                file.tsPlusContext.fluent.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                            if (declaration.tsPlusPipeableTags && declaration.tsPlusPipeableTags.length > 0) {
+                                file.tsPlusContext.pipeable.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                            if (declaration.tsPlusOperatorTags && declaration.tsPlusOperatorTags.length > 0) {
+                                file.tsPlusContext.operator.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                            if (declaration.tsPlusStaticTags && declaration.tsPlusStaticTags.length > 0) {
+                                file.tsPlusContext.static.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                            if (declaration.tsPlusGetterTags && declaration.tsPlusGetterTags.length > 0) {
+                                file.tsPlusContext.static.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                        }
+                    }
+                    if (isFunctionDeclaration(statement) && statement.name) {
+                        if (statement.tsPlusFluentTags && statement.tsPlusFluentTags.length > 0) {
+                            file.tsPlusContext.fluent.push(statement);
+                        }
+                        if (statement.tsPlusPipeableTags && statement.tsPlusPipeableTags.length > 0) {
+                            file.tsPlusContext.pipeable.push(statement);
+                        }
+                        if (statement.tsPlusOperatorTags && statement.tsPlusOperatorTags.length > 0) {
+                            file.tsPlusContext.operator.push(statement);
+                        }
+                        if (statement.tsPlusStaticTags && statement.tsPlusStaticTags.length > 0) {
+                            file.tsPlusContext.static.push(statement);
+                        }
+                        if (statement.tsPlusGetterTags && statement.tsPlusGetterTags.length > 0) {
+                            file.tsPlusContext.getter.push(statement);
+                        }
+                        if (statement.tsPlusUnifyTags && statement.tsPlusUnifyTags.length > 0) {
+                            file.tsPlusContext.unify.push(statement);
+                        }
+                        if (statement.tsPlusIndexTags && statement.tsPlusIndexTags.length > 0) {
+                            file.tsPlusContext.index.push(statement);
+                        }
+                    }
+                }
             }
         }
 
