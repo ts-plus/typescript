@@ -532,6 +532,7 @@ namespace ts {
             }
             function visitDo(
                 source: SourceFile,
+                traceInScope: Identifier | undefined,
                 node: CallExpression,
                 visitor: Visitor,
                 context: TransformationContext,
@@ -575,11 +576,21 @@ namespace ts {
                                         factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
                                         getArrowBody(currentScope)
                                     );
+                                    const args = [visitNode(statement.declarationList.declarations[0].initializer.arguments[0], visitor), mapper];
+                                    if (args.length === functions.map.tsPlusOriginal.parameters.length - 1) {
+                                        if (functions.map.tsPlusOriginal.parameters[functions.map.tsPlusOriginal.parameters.length - 1].escapedName === "___tsplusTrace") {
+                                            if (traceInScope) {
+                                                args.push(traceInScope);
+                                            } else {
+                                                args.push(getTrace(source, statement.declarationList.declarations[0].initializer));
+                                            }
+                                        }
+                                    }
                                     currentScope = [
                                         factory.createReturnStatement(factory.createCallExpression(
                                             getPathOfExtension(context, importer, { definition: functions.map.tsPlusFile, exportName: functions.map.tsPlusExportName }, source, sourceFileUniqueNames),
                                             undefined,
-                                            [visitNode(statement.declarationList.declarations[0].initializer.arguments[0], visitor), mapper]
+                                            args
                                         ))
                                     ];
                                 }
@@ -600,11 +611,21 @@ namespace ts {
                                         factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
                                         getArrowBody(currentScope)
                                     );
+                                    const args = [visitNode(statement.declarationList.declarations[0].initializer.arguments[0], visitor), mapper];
+                                    if (args.length === functions.flatMap.tsPlusOriginal.parameters.length - 1) {
+                                        if (functions.flatMap.tsPlusOriginal.parameters[functions.flatMap.tsPlusOriginal.parameters.length - 1].escapedName === "___tsplusTrace") {
+                                            if (traceInScope) {
+                                                args.push(traceInScope);
+                                            } else {
+                                                args.push(getTrace(source, statement.declarationList.declarations[0].initializer));
+                                            }
+                                        }
+                                    }
                                     currentScope = [
                                         factory.createReturnStatement(factory.createCallExpression(
                                             getPathOfExtension(context, importer, { definition: functions.flatMap.tsPlusFile, exportName: functions.flatMap.tsPlusExportName }, source, sourceFileUniqueNames),
                                             undefined,
-                                            [visitNode(statement.declarationList.declarations[0].initializer.arguments[0], visitor), mapper]
+                                            args
                                         ))
                                     ];
                                 }
@@ -620,6 +641,16 @@ namespace ts {
                                         factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
                                         getArrowBody(currentScope)
                                     );
+                                    const args = [visitNode(statement.expression.arguments[0], visitor), mapper];
+                                    if (args.length === functions.map.tsPlusOriginal.parameters.length - 1) {
+                                        if (functions.map.tsPlusOriginal.parameters[functions.map.tsPlusOriginal.parameters.length - 1].escapedName === "___tsplusTrace") {
+                                            if (traceInScope) {
+                                                args.push(traceInScope);
+                                            } else {
+                                                args.push(getTrace(source, statement.expression));
+                                            }
+                                        }
+                                    }
                                     currentScope = [
                                         factory.createReturnStatement(factory.createCallExpression(
                                             getPathOfExtension(context, importer, { definition: functions.map.tsPlusFile, exportName: functions.map.tsPlusExportName }, source, sourceFileUniqueNames),
@@ -637,11 +668,21 @@ namespace ts {
                                         factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
                                         getArrowBody(currentScope)
                                     );
+                                    const args = [visitNode(statement.expression.arguments[0], visitor), mapper];
+                                    if (args.length === functions.flatMap.tsPlusOriginal.parameters.length - 1) {
+                                        if (functions.flatMap.tsPlusOriginal.parameters[functions.flatMap.tsPlusOriginal.parameters.length - 1].escapedName === "___tsplusTrace") {
+                                            if (traceInScope) {
+                                                args.push(traceInScope);
+                                            } else {
+                                                args.push(getTrace(source, statement.expression));
+                                            }
+                                        }
+                                    }
                                     currentScope = [
                                         factory.createReturnStatement(factory.createCallExpression(
                                             getPathOfExtension(context, importer, { definition: functions.flatMap.tsPlusFile, exportName: functions.flatMap.tsPlusExportName }, source, sourceFileUniqueNames),
                                             undefined,
-                                            [visitNode(statement.expression.arguments[0], visitor), mapper]
+                                            args
                                         ))
                                     ];
                                 }
@@ -715,6 +756,7 @@ namespace ts {
                 if (nodeLinks.tsPlusDoFunctions && nodeLinks.tsPlusDoTypes && nodeLinks.tsPlusDoTypes.size > 0) {
                     return visitDo(
                         source,
+                        traceInScope,
                         node,
                         visitor,
                         context,
