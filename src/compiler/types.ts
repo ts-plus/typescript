@@ -1315,6 +1315,7 @@ namespace ts {
         tsPlusMacroTags?: string[];
         tsPlusUnifyTags?: string[];
         tsPlusIndexTags?: string[];
+        tsPlusValidFluent?: boolean
     }
 
     /* @internal */
@@ -1511,6 +1512,7 @@ namespace ts {
         tsPlusMacroTags?: string[];
         tsPlusUnifyTags?: string[];
         tsPlusIndexTags?: string[];
+        tsPlusValidFluent?: boolean
     }
 
     export interface MethodSignature extends SignatureDeclarationBase, TypeElement {

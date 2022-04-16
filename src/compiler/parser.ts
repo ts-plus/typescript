@@ -1,4 +1,5 @@
 namespace ts {
+    const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/;
     const enum SignatureFlags {
         None = 0,
         Yield = 1 << 0,
@@ -1128,6 +1129,9 @@ namespace ts {
             sourceFile.nodeCount = nodeCount;
             sourceFile.identifierCount = identifierCount;
             sourceFile.identifiers = identifiers;
+
+            collectTsPlusFileSymbols(sourceFile, sourceFile.statements);
+
             sourceFile.parseDiagnostics = attachFileToDiagnostics(parseDiagnostics, sourceFile);
             if (jsDocDiagnostics) {
                 sourceFile.jsDocDiagnostics = attachFileToDiagnostics(jsDocDiagnostics, sourceFile);
@@ -1137,7 +1141,6 @@ namespace ts {
                 fixupParentReferences(sourceFile);
             }
 
-            collectTsPlusFileSymbols(sourceFile, sourceFile.statements, false);
 
             return sourceFile;
 
@@ -1156,7 +1159,7 @@ namespace ts {
                         collectTsPlusFileSymbols(file, statement.body.statements, true)
                     }
                     else {
-                        collectTsPlusFileSymbols(file, statement.body.statements);
+                        collectTsPlusFileSymbols(file, statement.body.statements, collectTypesIfNotExported);
                     }
                 }
                 if (
@@ -1169,6 +1172,8 @@ namespace ts {
                     if (isClassDeclaration(statement) && statement.tsPlusCompanionTags && statement.tsPlusCompanionTags.length > 0) {
                         file.tsPlusContext.companion.push(statement);
                     }
+                }
+                if(statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
                     if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
                         const declaration = statement.declarationList.declarations[0];
                         if (declaration.name && declaration.name.kind === SyntaxKind.Identifier) {
@@ -1213,7 +1218,60 @@ namespace ts {
                         }
                     }
                 }
+                else {
+                    if (!collectTypesIfNotExported) {
+                        if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
+                            checkTsPlusNonExportedExtension(statement)
+                        }
+                        if (isClassDeclaration(statement)) {
+                            checkTsPlusNonExportedExtension(statement)
+                        }
+                    }
+                    if (isFunctionDeclaration(statement)) {
+                        checkTsPlusNonExportedExtension(statement)
+                    }
+                    if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
+                        checkTsPlusNonExportedVariableExtension(statement, statement.declarationList.declarations[0]);
+                    }
+                }
             }
+        }
+        function hasTsPlusExportedExtensionTags(statement: InterfaceDeclaration | ClassDeclaration | TypeAliasDeclaration | FunctionDeclaration | VariableStatement) {
+            for (const tag of flatMap(statement.jsDoc, (doc) => doc.tags)) {
+                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tsPlusExportedExtensionRegex.test(tag.comment)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        function checkTsPlusNonExportedExtension(declaration: InterfaceDeclaration | ClassDeclaration | TypeAliasDeclaration | FunctionDeclaration): void {
+            if (hasTsPlusExportedExtensionTags(declaration)) {
+                parseErrorAt(declaration.name!.pos + 1, declaration.name!.end, Diagnostics.Declaration_of_an_extension_must_be_exported);
+            }
+        }
+        function checkTsPlusNonExportedVariableExtension(statement: VariableStatement, declaration: VariableDeclaration): void {
+            if (hasTsPlusExportedExtensionTags(statement)) {
+                parseErrorAt(declaration.name!.pos + 1, declaration.name!.end, Diagnostics.Declaration_of_an_extension_must_be_exported);
+            }
+        }
+        function checkFluentDeclarationValidity(declaration: FunctionDeclaration | VariableDeclaration): boolean {
+            if (typeof declaration.tsPlusValidFluent !== "undefined") {
+                return declaration.tsPlusValidFluent;
+            }
+            let firstParam: ParameterDeclaration | undefined
+            if (isFunctionDeclaration(declaration)) {
+                firstParam = declaration.parameters[0]
+            }
+            else if (declaration.initializer && (isArrowFunction(declaration.initializer) || isFunctionExpression(declaration.initializer))) {
+                firstParam = declaration.initializer.parameters[0]
+            }
+            if (firstParam && isRestParameter(firstParam)) {
+                parseErrorAt(declaration.name!.pos + 1, declaration.name!.end, Diagnostics.The_first_parameter_of_a_fluent_function_cannot_be_a_rest_parameter);
+                declaration.tsPlusValidFluent = false;
+                return false;
+            }
+            declaration.tsPlusValidFluent = true;
+            return true;
         }
 
         function withJSDoc<T extends HasJSDoc>(node: T, hasJSDoc: boolean): T {
@@ -6833,7 +6891,7 @@ namespace ts {
             node.decorators = decorators;
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
             if (finished.jsDoc && finished.declarationList.declarations.length === 1) {
-                addTsPlusValueTags(finished.declarationList.declarations[0], finished.jsDoc)
+                addTsPlusValueTags(finished.declarationList.declarations[0], finished.jsDoc, finished.declarationList.declarations[0].name.pos + 1, finished.declarationList.declarations[0].end);
             }
             return finished;
         }
@@ -6862,8 +6920,36 @@ namespace ts {
             }
             return undefined;
         }
-
-        function addTsPlusValueTags(declaration: FunctionDeclaration | VariableDeclaration, jsDoc: JSDoc[] | undefined): void {
+        function checkTsPlusMacroAnnotations(declaration: VariableDeclaration | FunctionDeclaration, name: string, start: number, end: number): boolean {
+            if (name === "identity") {
+                if (isVariableDeclaration(declaration)) {
+                    if (!declaration.initializer || !isFunctionExpressionOrArrowFunction(declaration.initializer)) {
+                        parseErrorAt(start, end, Diagnostics.Declaration_annotated_with_identity_macro_must_be_a_function);
+                        return false;
+                    }
+                    if (declaration.initializer.parameters.length === 0 || declaration.initializer.parameters.length > 1) {
+                        parseErrorAt(start, end, Diagnostics.Function_annotated_with_identity_macro_must_have_one_argument);
+                        return false;
+                    }
+                }
+                else {
+                    if (declaration.parameters.length === 0 || declaration.parameters.length > 1) {
+                        parseErrorAt(start, end, Diagnostics.Function_annotated_with_identity_macro_must_have_one_argument);
+                        return false;
+                    }
+                }
+            }
+            if (name === "remove") {
+                if (isVariableDeclaration(declaration)) {
+                    if (!declaration.initializer || !isFunctionExpressionOrArrowFunction(declaration.initializer)) {
+                        parseErrorAt(start, end, Diagnostics.Declaration_annotated_with_remove_macro_must_be_a_function);
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+        function addTsPlusValueTags(declaration: FunctionDeclaration | VariableDeclaration, jsDoc: JSDoc[] | undefined, start: number, end: number): void {
             if (!jsDoc) return;
             const deriveTags: string[] = [];
             const fluentTags: TsPlusPrioritizedExtensionTag[] = [];
@@ -6889,6 +6975,9 @@ namespace ts {
                                     const parsedTag = parseTsPlusExtensionTag(target, name, priority);
                                     if (!parsedTag) {
                                         parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
+                                        break;
+                                    }
+                                    if (!checkFluentDeclarationValidity(declaration)) {
                                         break;
                                     }
                                     fluentTags.push(parsedTag);
@@ -6936,6 +7025,9 @@ namespace ts {
                                 case "macro": {
                                     if (!target) {
                                         parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
+                                        break;
+                                    }
+                                    if (!checkTsPlusMacroAnnotations(declaration, target, start, end)) {
                                         break;
                                     }
                                     macroTags.push(target);
@@ -6994,7 +7086,9 @@ namespace ts {
             setAwaitContext(savedAwaitContext);
             const node = factory.createFunctionDeclaration(decorators, modifiers, asteriskToken, name, typeParameters, parameters, type, body);
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
-            addTsPlusValueTags(finished, finished.jsDoc)
+            if (finished.name) {
+                addTsPlusValueTags(finished, finished.jsDoc, finished.name!.pos + 1, finished.name!.end);
+            }
             return finished;
         }
 

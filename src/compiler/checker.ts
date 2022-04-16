@@ -1,6 +1,6 @@
 /* @internal */
 namespace ts {
-    const tsPlusDebug = true;
+    const tsPlusDebug = false;
     const ambientModuleSymbolRegex = /^".+"$/;
     const anon = "(anonymous)" as __String & string;
 
@@ -388,7 +388,6 @@ namespace ts {
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
         const globalSymbolsCache = new Map<string, TsPlusGlobalImport>()
-        // const tsPlusExportedExtensionRegex = /^(fluent|getter|static|operator|index|unify|pipeable|type|companion).*/
         const unificationInProgress = {
             isRunning: false
         };
@@ -38901,9 +38900,6 @@ namespace ts {
                 if (links.tsPlusPipeableExtension) {
                     checkFluentPipeableAgreement(links.tsPlusPipeableExtension);
                 }
-                if (node.tsPlusFluentTags && node.tsPlusFluentTags.length > 0) {
-                    checkFluentDeclarationValidity(node, true);
-                }
             }
         }
 
@@ -39872,9 +39868,6 @@ namespace ts {
             checkVariableLikeDeclaration(node);
             tracing?.pop();
             addLazyDiagnostic(checkDeferred)
-            if (node.tsPlusFluentTags && node.tsPlusFluentTags.length > 0) {
-                checkFluentDeclarationValidity(node, true);
-            }
             function checkDeferred() {
                 const links = getNodeLinks(node);
                 if (links.tsPlusPipeableExtension) {
@@ -45282,14 +45275,6 @@ namespace ts {
             }
             return [];
         }
-        //function hasTsPlusExportedExtensionTags(statement: Node) {
-        //    for (const tag of getJSDocTags(statement)) {
-        //        if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tsPlusExportedExtensionRegex.test(tag.comment)) {
-        //            return true;
-        //        }
-        //    }
-        //    return false;
-        //}
         function createTsPlusSignature(call: Signature, exportName: string, file: SourceFile): TsPlusSignature {
             const signature = cloneSignature(call) as TsPlusSignature
             signature.tsPlusTag = "TsPlusSignature";
@@ -45700,22 +45685,6 @@ namespace ts {
             }
             return false;
         }
-        function checkFluentDeclarationValidity(declaration: FunctionDeclaration | VariableDeclaration, reportErrors: boolean): boolean {
-            let firstParam: ParameterDeclaration | undefined
-            if (isFunctionDeclaration(declaration)) {
-                firstParam = declaration.parameters[0]
-            }
-            else if (declaration.initializer && (isArrowFunction(declaration.initializer) || isFunctionExpression(declaration.initializer))) {
-                firstParam = declaration.initializer.parameters[0]
-            }
-            if (firstParam && isRestParameter(firstParam)) {
-                if (reportErrors) {
-                    error(declaration, Diagnostics.The_first_parameter_of_a_fluent_function_cannot_be_a_rest_parameter);
-                }
-                return false;
-            }
-            return true;
-        }
         function addToTypeSymbolCache(symbol: Symbol, tag: string, priority: "before" | "after") {
             if (!typeSymbolCache.has(symbol)) {
                 typeSymbolCache.set(symbol, []);
@@ -45864,37 +45833,34 @@ namespace ts {
             }
         }
         function cacheTsPlusFluentVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
-            if (checkFluentDeclarationValidity(declaration, false)) {
-                const fluentTags = collectTsPlusFluentTags(declaration);
-                for (const tag of fluentTags) {
-                    if (!unresolvedFluentCache.has(tag.target)) {
-                        unresolvedFluentCache.set(tag.target, new Map());
-                    }
-                    const map = unresolvedFluentCache.get(tag.target)!;
-                    if (!map.has(tag.name)) {
-                        map.set(tag.name, {
-                            target: tag.target,
-                            name: tag.name,
-                            definition: new Set([{
-                                definition: file,
-                                declaration: declaration as VariableDeclaration & { name: Identifier },
-                                exportName: declaration.name.escapedText.toString(),
-                                priority: tag.priority,
-                            }])
-                        });
-                    }
-                    else {
-                        const extension = map.get(tag.name)!;
-                        extension.definition.add({
+            const fluentTags = collectTsPlusFluentTags(declaration);
+            for (const tag of fluentTags) {
+                if (!unresolvedFluentCache.has(tag.target)) {
+                    unresolvedFluentCache.set(tag.target, new Map());
+                }
+                const map = unresolvedFluentCache.get(tag.target)!;
+                if (!map.has(tag.name)) {
+                    map.set(tag.name, {
+                        target: tag.target,
+                        name: tag.name,
+                        definition: new Set([{
                             definition: file,
                             declaration: declaration as VariableDeclaration & { name: Identifier },
                             exportName: declaration.name.escapedText.toString(),
                             priority: tag.priority,
-                        });
-                    }
+                        }])
+                    });
                 }
-            }
-        }
+                else {
+                    const extension = map.get(tag.name)!;
+                    extension.definition.add({
+                        definition: file,
+                        declaration: declaration as VariableDeclaration & { name: Identifier },
+                        exportName: declaration.name.escapedText.toString(),
+                        priority: tag.priority,
+                    });
+                }
+            }        }
         function cacheTsPlusGetterVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
             for (const { target, name } of collectTsPlusGetterTags(declaration)) {
                 if (!getterCache.has(target)) {
@@ -45960,34 +45926,32 @@ namespace ts {
             }
         }
         function cacheTsPlusFluentFunction(file: SourceFile, declaration: FunctionDeclaration) {
-            if (checkFluentDeclarationValidity(declaration, false)) {
-                const fluentTags = collectTsPlusFluentTags(declaration);
-                for (const tag of fluentTags) {
-                    if (!unresolvedFluentCache.has(tag.target)) {
-                        unresolvedFluentCache.set(tag.target, new Map());
-                    }
-                    const map = unresolvedFluentCache.get(tag.target)!;
-                    if (!map.has(tag.name)) {
-                        map.set(tag.name, {
-                            target: tag.target,
-                            name: tag.name,
-                            definition: new Set([{
-                                definition: file,
-                                declaration,
-                                exportName: declaration.name!.escapedText.toString(),
-                                priority: tag.priority,
-                            }]),
-                        });
-                    }
-                    else {
-                        const extension = map.get(tag.name)!;
-                        extension.definition.add({
+            const fluentTags = collectTsPlusFluentTags(declaration);
+            for (const tag of fluentTags) {
+                if (!unresolvedFluentCache.has(tag.target)) {
+                    unresolvedFluentCache.set(tag.target, new Map());
+                }
+                const map = unresolvedFluentCache.get(tag.target)!;
+                if (!map.has(tag.name)) {
+                    map.set(tag.name, {
+                        target: tag.target,
+                        name: tag.name,
+                        definition: new Set([{
                             definition: file,
                             declaration,
                             exportName: declaration.name!.escapedText.toString(),
                             priority: tag.priority,
-                        });
-                    }
+                        }]),
+                    });
+                }
+                else {
+                    const extension = map.get(tag.name)!;
+                    extension.definition.add({
+                        definition: file,
+                        declaration,
+                        exportName: declaration.name!.escapedText.toString(),
+                        priority: tag.priority,
+                    });
                 }
             }
         }
@@ -46151,41 +46115,6 @@ namespace ts {
                 }
             }
         }
-        //function checkTsPlusMacroAnnotations(declaration: VariableDeclaration | FunctionDeclaration): void {
-        //    for (const name of collectTsPlusMacroTags(declaration)) {
-        //        if (name === "identity") {
-        //            if (isVariableDeclaration(declaration)) {
-        //                if (!declaration.initializer || !isFunctionExpressionOrArrowFunction(declaration.initializer)) {
-        //                    error(declaration, Diagnostics.Declaration_annotated_with_identity_macro_must_be_a_function);
-        //                    return;
-        //                }
-        //                if (declaration.initializer.parameters.length === 0 || declaration.initializer.parameters.length > 1) {
-        //                    error(declaration, Diagnostics.Function_annotated_with_identity_macro_must_have_one_argument);
-        //                    return;
-        //                }
-        //            }
-        //            else {
-        //                if (declaration.parameters.length === 0 || declaration.parameters.length > 1) {
-        //                    error(declaration, Diagnostics.Function_annotated_with_identity_macro_must_have_one_argument);
-        //                    return;
-        //                }
-        //            }
-        //        }
-        //        if (name === "remove") {
-        //            if (isVariableDeclaration(declaration)) {
-        //                if (!declaration.initializer || !isFunctionExpressionOrArrowFunction(declaration.initializer)) {
-        //                    error(declaration, Diagnostics.Declaration_annotated_with_remove_macro_must_be_a_function);
-        //                    return;
-        //                }
-        //            }
-        //        }
-        //    }
-        //}
-        // function checkTsPlusNonExportedExtension(declaration: Declaration): void {
-        //     if (hasTsPlusExportedExtensionTags(declaration)) {
-        //         error(declaration, Diagnostics.Declaration_of_an_extension_must_be_exported);
-        //     }
-        // }
         function collectTsPlusSymbols(file: SourceFile): void {
             for (const declaration of file.tsPlusContext.type) {
                 cacheTsPlusType(declaration);
@@ -46239,31 +46168,6 @@ namespace ts {
             for (const declaration of file.tsPlusContext.index) {
                 cacheTsPlusIndexFunction(declaration);                        
             }
-            //for (const statement of statements) {
-            //    if(statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
-            //    } else {
-            //        //if (!collectTypesIfNotExported) {
-            //        //    if (isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)) {
-            //        //        checkTsPlusNonExportedExtension(statement)
-            //        //    }
-            //        //    if (isClassDeclaration(statement)) {
-            //        //        checkTsPlusNonExportedExtension(statement)
-            //        //    }
-            //        //}
-            //        //if (isFunctionDeclaration(statement)) {
-            //        //    checkTsPlusNonExportedExtension(statement)
-            //        //}
-            //        //if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
-            //        //    checkTsPlusNonExportedExtension(statement.declarationList.declarations[0]);
-            //        //}
-            //    }
-            //    // if (isFunctionDeclaration(statement)) {
-            //    //     checkTsPlusMacroAnnotations(statement);
-            //    // }
-            //    // if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
-            //    //     checkTsPlusMacroAnnotations(statement.declarationList.declarations[0]);
-            //    // }
-            //}
         }
         function fillTsPlusLocalScope(file: SourceFile) {
             const indexedImplicits = tsPlusWorldScope.implicits;

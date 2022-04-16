@@ -9,6 +9,6 @@ export interface Promise {}
  *
  * @tsplus fluent ets/Promise await
  */
-export function _await(): void {}
+export function _await(_self: Promise): void {}
 
 export { _await as await }
