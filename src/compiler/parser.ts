@@ -6783,7 +6783,7 @@ namespace ts {
             const node = factory.createVariableStatement(modifiers, declarationList);
             // Decorators are not allowed on a variable statement, so we keep track of them to report them in the grammar checker.
             node.decorators = decorators;
-            let finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
             if (finished.jsDoc && finished.declarationList.declarations.length === 1) {
                 addTsPlusValueTags(finished.declarationList.declarations[0], finished.jsDoc)
             }
