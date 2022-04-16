@@ -6783,35 +6783,152 @@ namespace ts {
             const node = factory.createVariableStatement(modifiers, declarationList);
             // Decorators are not allowed on a variable statement, so we keep track of them to report them in the grammar checker.
             node.decorators = decorators;
-            const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            let finished = withJSDoc(finishNode(node, pos), hasJSDoc);
             if (finished.jsDoc && finished.declarationList.declarations.length === 1) {
-                const isTsPlusImplicit = flatMap(finished.jsDoc, (doc) => filter(
-                    doc.tags,
-                    (tag): tag is TsPlusJSDocImplicitTag => 
-                        tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("implicit") && !tag.comment.includes("local")
-                )).length > 0;
-                const deriveTags = flatMap(finished.jsDoc, (doc) => filter(doc.tags, (tag): tag is TsPlusJSDocDeriveTag => 
-                    tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("derive")
-                ))
-                if (deriveTags.length > 0) {
-                    finished.declarationList.declarations[0].tsPlusDeriveTags = deriveTags.map((_) => _.comment);
-                }
-                finished.declarationList.declarations[0].isTsPlusImplicit = isTsPlusImplicit;
-                const pipeableTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
-                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("pipeable")) {
-                        const [_, target, name] = tag.comment.split(" ");
-                        if (!target || !name) {
-                            return []
-                        }
-                        return [{ target, name }]
-                    }
-                    return []
-                }))
-                if (pipeableTags.length > 0) {
-                    finished.declarationList.declarations[0].tsPlusPipeableTags = pipeableTags;
-                }
+                addTsPlusFunctionTags(finished.declarationList.declarations[0], finished.jsDoc)
             }
             return finished;
+        }
+
+        function parseTsPlusExtensionTag(typeName: string | undefined, functionName: string | undefined, priority: string | undefined): TsPlusPrioritizedExtensionTag | undefined {
+            if (!typeName || !functionName) {
+                return undefined;
+            }
+            let parsedPriority: number;
+            if (priority) {
+                const n = Number.parseFloat(priority);
+                if (Number.isNaN(n)) {
+                    return undefined;
+                }
+                if (n >= 0) {
+                    parsedPriority = n;
+                }
+            }
+            parsedPriority ||= 0;
+            return { target: typeName, name: functionName, priority: parsedPriority };
+        }
+
+        function undefinedIfZeroLength<A>(as: A[]): A[] | undefined {
+            if (as.length > 0) {
+                return as;
+            }
+            return undefined;
+        }
+
+        function addTsPlusFunctionTags(declaration: FunctionDeclaration | VariableDeclaration, jsDoc: JSDoc[] | undefined): void {
+            if (!jsDoc) return;
+            const deriveTags: string[] = [];
+            const fluentTags: TsPlusPrioritizedExtensionTag[] = [];
+            const staticTags: TsPlusExtensionTag[] = [];
+            const pipeableTags: TsPlusExtensionTag[] = [];
+            const getterTags: TsPlusExtensionTag[] = [];
+            const operatorTags: TsPlusPrioritizedExtensionTag[] = [];
+            const unifyTags: string[] = [];
+            const macroTags: string[] = [];
+            const indexTags: string[] = [];
+            let isImplicit = false;
+            for (const doc of jsDoc) {
+                if (doc.tags) {
+                    for (const tag of doc.tags) {
+                        if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                            const [tagType, target, name, priority] = tag.comment.split(" ")
+                            switch(tagType) {
+                                case "derive": {
+                                    deriveTags.push(tag.comment);
+                                    break;
+                                }
+                                case "fluent": {
+                                    const parsedTag = parseTsPlusExtensionTag(target, name, priority);
+                                    if (!parsedTag) {
+                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
+                                        break;
+                                    }
+                                    fluentTags.push(parsedTag);
+                                    break;
+                                }
+                                case "static": {
+                                    if (!target || !name) {
+                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
+                                        break;
+                                    }
+                                    staticTags.push({ target, name });
+                                    break;
+                                }
+                                case "pipeable": {
+                                    if(!target || !name) {
+                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
+                                        break;
+                                    }
+                                    pipeableTags.push({ target, name });
+                                    break;
+                                }
+                                case "getter": {
+                                    if (!target || !name) {
+                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_getter_extension_must_have_the_form_tsplus_getter_typename_name);
+                                        break;
+                                    }
+                                    getterTags.push({ target, name });
+                                    break;
+                                }
+                                case "operator": {
+                                    const parsedTag = parseTsPlusExtensionTag(target, name, priority);
+                                    if (!parsedTag) {
+                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
+                                        break;
+                                    }
+                                    operatorTags.push(parsedTag);
+                                    break;
+                                }
+                                case "implicit": {
+                                    if (!tag.comment.includes("local")) {
+                                        isImplicit = true;
+                                    }
+                                    break;
+                                }
+                                case "macro": {
+                                    if (!target) {
+                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
+                                        break;
+                                    }
+                                    macroTags.push(target);
+                                    break;
+                                }
+                                case "unify": {
+                                    if (!target) {
+                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_unify_extension_must_have_the_form_tsplus_unify_typename);
+                                        break;
+                                    }
+                                    unifyTags.push(target);
+                                    break;
+                                }
+                                case "index": {
+                                    if (!target) {
+                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_an_index_extension_must_have_the_form_tsplus_index_typename);
+                                        break;
+                                    }
+                                    indexTags.push(target);
+                                    break;
+                                }
+                                default: {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            declaration.tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
+            declaration.tsPlusFluentTags = undefinedIfZeroLength(fluentTags);
+            declaration.tsPlusStaticTags = undefinedIfZeroLength(staticTags);
+            declaration.tsPlusPipeableTags = undefinedIfZeroLength(pipeableTags);
+            declaration.tsPlusGetterTags = undefinedIfZeroLength(getterTags);
+            declaration.tsPlusOperatorTags = undefinedIfZeroLength(operatorTags);
+            declaration.tsPlusMacroTags = undefinedIfZeroLength(macroTags);
+            declaration.tsPlusUnifyTags = undefinedIfZeroLength(unifyTags);
+            declaration.tsPlusIndexTags = undefinedIfZeroLength(indexTags);
+            if (isVariableDeclaration(declaration)) {
+                declaration.isTsPlusImplicit = isImplicit;
+            }
         }
 
         function parseFunctionDeclaration(pos: number, hasJSDoc: boolean, decorators: NodeArray<Decorator> | undefined, modifiers: NodeArray<Modifier> | undefined): FunctionDeclaration {
@@ -6832,27 +6949,7 @@ namespace ts {
             setAwaitContext(savedAwaitContext);
             const node = factory.createFunctionDeclaration(decorators, modifiers, asteriskToken, name, typeParameters, parameters, type, body);
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
-            if (finished.jsDoc) {
-                const deriveTags = flatMap(finished.jsDoc, (doc) => filter(doc.tags, (tag): tag is TsPlusJSDocDeriveTag => 
-                    tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("derive")
-                ))
-                if (deriveTags.length > 0) {
-                    finished.tsPlusDeriveTags = deriveTags.map((_) => _.comment);
-                }
-                const pipeableTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
-                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && tag.comment.startsWith("pipeable")) {
-                        const [_, target, name] = tag.comment.split(" ");
-                        if (!target || !name) {
-                            return []
-                        }
-                        return [{ target, name }]
-                    }
-                    return []
-                }))
-                if (pipeableTags.length > 0) {
-                    finished.tsPlusPipeableTags = pipeableTags;
-                }
-            }
+            addTsPlusFunctionTags(finished, finished.jsDoc)
             return finished;
         }
 

@@ -1305,9 +1305,16 @@ namespace ts {
         readonly exclamationToken?: ExclamationToken;  // Optional definite assignment assertion
         readonly type?: TypeNode;                      // Optional type annotation
         readonly initializer?: Expression;             // Optional initializer
-        isTsPlusImplicit: boolean
-        tsPlusDeriveTags?: string[]
-        tsPlusPipeableTags?: TsPlusExtensionTag[]
+        isTsPlusImplicit: boolean;
+        tsPlusDeriveTags?: string[];
+        tsPlusPipeableTags?: TsPlusExtensionTag[];
+        tsPlusFluentTags?: TsPlusPrioritizedExtensionTag[];
+        tsPlusStaticTags?: TsPlusExtensionTag[];
+        tsPlusGetterTags?: TsPlusExtensionTag[];
+        tsPlusOperatorTags?: TsPlusPrioritizedExtensionTag[];
+        tsPlusMacroTags?: string[];
+        tsPlusUnifyTags?: string[];
+        tsPlusIndexTags?: string[];
     }
 
     /* @internal */
@@ -1495,8 +1502,15 @@ namespace ts {
         readonly kind: SyntaxKind.FunctionDeclaration;
         readonly name?: Identifier;
         readonly body?: FunctionBody;
-        tsPlusDeriveTags?: string[]
-        tsPlusPipeableTags?: TsPlusExtensionTag[]
+        tsPlusDeriveTags?: string[];
+        tsPlusPipeableTags?: TsPlusExtensionTag[];
+        tsPlusFluentTags?: TsPlusPrioritizedExtensionTag[];
+        tsPlusStaticTags?: TsPlusExtensionTag[];
+        tsPlusGetterTags?: TsPlusExtensionTag[];
+        tsPlusOperatorTags?: TsPlusPrioritizedExtensionTag[];
+        tsPlusMacroTags?: string[];
+        tsPlusUnifyTags?: string[];
+        tsPlusIndexTags?: string[];
     }
 
     export interface MethodSignature extends SignatureDeclarationBase, TypeElement {
@@ -3419,6 +3433,8 @@ namespace ts {
     export type VariableDeclarationWithFunction = Omit<VariableDeclaration, "name" | "initializer"> & { name: Identifier, initializer: ArrowFunction | FunctionExpression };
 
     export type VariableDeclarationWithFunctionType = Omit<VariableDeclaration, "name" | "type"> & { name: Identifier, type: FunctionTypeNode };
+
+    export type VariableDeclarationWithIdentifier = VariableDeclaration & { name: Identifier };
 
     export interface TsPlusUnresolvedStaticSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.UnresolvedStatic

@@ -45259,42 +45259,22 @@ namespace ts {
             return links.tsPlusDeriveTags;
         }
         function collectTsPlusFluentTags(statement: Declaration) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusFluentTags) {
-                links.tsPlusFluentTags = [];
-                const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("fluent"));
-                for (const tag of tags) {
-                    const parsedTag = parseTsPlusExtensionTag(tag)
-                    if (!parsedTag) {
-                        error(statement, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
-                        continue;
-                    }
-                    links.tsPlusFluentTags.push(parsedTag);
-                }
+            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
+                return statement.tsPlusFluentTags || [];
             }
-            return links.tsPlusFluentTags;
+            return [];
         }
         function collectTsPlusPipeableTags(declaration: Declaration) {
             if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
-                return declaration.tsPlusPipeableTags || []
+                return declaration.tsPlusPipeableTags || [];
             }
-            return []
+            return [];
         }
         function collectTsPlusIndexTags(statement: Declaration) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusIndexTags) {
-              links.tsPlusIndexTags = [];
-              const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("index"))
-              for (const tag of tags) {
-                const [_, typeTag] = tag.split(" ");
-                if (!typeTag) {
-                  error(statement, Diagnostics.Annotation_of_an_index_extension_must_have_the_form_tsplus_index_typename);
-                  continue;
-                }
-                links.tsPlusIndexTags.push(typeTag);
-              }
+            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
+                return statement.tsPlusIndexTags || [];
             }
-            return links.tsPlusIndexTags;
+            return [];
         }
         function collectTsPlusTypeTags(declaration: Declaration) {
             if (isInterfaceDeclaration(declaration) || isTypeAliasDeclaration(declaration) || isClassDeclaration(declaration)) {
@@ -45309,84 +45289,34 @@ namespace ts {
             return [];
         }
         function collectTsPlusMacroTags(statement: Declaration) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusMacroTags) {
-              links.tsPlusMacroTags = [];
-              const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("macro"));
-              for (const tag of tags) {
-                const [_, name] = tag.split(" ");
-                if (!name) {
-                    error(statement, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
-                    continue;
-                }
-                links.tsPlusMacroTags.push(name);
-              }
+            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
+                return statement.tsPlusMacroTags || [];
             }
-            return links.tsPlusMacroTags;
+            return [];
         }
         function collectTsPlusUnifyTags(statement: Declaration) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusUnifyTags) {
-              links.tsPlusUnifyTags = [];
-              const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("unify"));
-              for (const tag of tags) {
-                const [_, target] = tag.split(" ");
-                if (!target) {
-                    error(statement, Diagnostics.Annotation_of_a_unify_extension_must_have_the_form_tsplus_unify_typename);
-                    continue;
-                }
-                links.tsPlusUnifyTags.push(target);
-              }
+            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
+                return statement.tsPlusUnifyTags || [];
             }
-            return links.tsPlusUnifyTags;
+            return [];
         }
         function collectTsPlusStaticTags(statement: Node) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusStaticTags) {
-                links.tsPlusStaticTags = [];
-                const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("static"));
-                for (const tag of tags) {
-                    const [_, target, name] = tag.split(" ");
-                    if (!target || !name) {
-                        error(statement, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
-                        continue;
-                    }
-                    links.tsPlusStaticTags.push({ target, name })
-                }
+            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
+                return statement.tsPlusStaticTags || [];
             }
-            return links.tsPlusStaticTags;
+            return [];
         }
         function collectTsPlusOperatorTags(statement: Node) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusOperatorTags) {
-                links.tsPlusOperatorTags = [];
-                const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("operator"));
-                for (const tag of tags) {
-                    const parsedTag = parseTsPlusExtensionTag(tag)
-                    if (!parsedTag) {
-                        error(statement, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
-                        continue;
-                    }
-                    links.tsPlusOperatorTags.push(parsedTag);
-                }
+            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
+                return statement.tsPlusOperatorTags || [];
             }
-            return links.tsPlusOperatorTags;
+            return [];
         }
         function collectTsPlusGetterTags(statement: Node) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusGetterTags) {
-                links.tsPlusGetterTags = [];
-                const tags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("getter"));
-                for (const tag of tags) {
-                    const [_, target, name] = tag.split(" ");
-                    if (!target || !name) {
-                        error(statement, Diagnostics.Annotation_of_a_getter_extension_must_have_the_form_tsplus_getter_typename_name);
-                        continue;
-                    }
-                    links.tsPlusGetterTags.push({ target, name })
-                }
+            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
+                return statement.tsPlusGetterTags || [];
             }
-            return links.tsPlusGetterTags;
+            return [];
         }
         function hasTsPlusExportedExtensionTags(statement: Node) {
             for (const tag of getJSDocTags(statement)) {
@@ -45395,24 +45325,6 @@ namespace ts {
                 }
             }
             return false;
-        }
-        function parseTsPlusExtensionTag(tag: string): TsPlusPrioritizedExtensionTag | undefined {
-            const [_, typeName, functionName, priority] = tag.split(" ");
-            if (!typeName || !functionName) {
-                return undefined;
-            }
-            let parsedPriority: number;
-            if (priority) {
-                const n = Number.parseFloat(priority);
-                if (Number.isNaN(n)) {
-                    return undefined;
-                }
-                if (n >= 0) {
-                    parsedPriority = n;
-                }
-            }
-            parsedPriority ||= 0;
-            return { target: typeName, name: functionName, priority: parsedPriority };
         }
         function createTsPlusSignature(call: Signature, exportName: string, file: SourceFile): TsPlusSignature {
             const signature = cloneSignature(call) as TsPlusSignature
@@ -45969,10 +45881,9 @@ namespace ts {
                 }
             }
         }
-        function tryCacheTsPlusStaticVariable(file: SourceFile, statement: VariableStatement) {
-            const staticTags = collectTsPlusStaticTags(statement);
+        function tryCacheTsPlusStaticVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+            const staticTags = collectTsPlusStaticTags(declaration);
             if (staticTags.length > 0) {
-                const declaration = statement.declarationList.declarations[0];
                 const symbol = getSymbolAtLocation(declaration.name);
                 if (symbol) {
                     for (const { target, name } of staticTags) {
@@ -45992,65 +45903,55 @@ namespace ts {
                 }
             }
         }
-        function tryCacheTsPlusFluentVariable(file: SourceFile, statement: VariableStatement) {
-            if (statement.declarationList.declarations.length === 1) {
-                const declaration = statement.declarationList.declarations[0];
-                if(isIdentifier(declaration.name)) {
-                    const fluentTags = collectTsPlusFluentTags(declaration);
-                    if (fluentTags.length > 0) {
-                        if (!checkFluentDeclarationValidity(declaration)) {
-                            return;
-                        }
-                    }
-                    for (const tag of fluentTags) {
-                        if (!unresolvedFluentCache.has(tag.target)) {
-                            unresolvedFluentCache.set(tag.target, new Map());
-                        }
-                        const map = unresolvedFluentCache.get(tag.target)!;
-                        if (!map.has(tag.name)) {
-                            map.set(tag.name, {
-                                target: tag.target,
-                                name: tag.name,
-                                definition: new Set([{
-                                    definition: file,
-                                    declaration: declaration as VariableDeclaration & { name: Identifier },
-                                    exportName: declaration.name.escapedText.toString(),
-                                    priority: tag.priority,
-                                }])
-                            });
-                        }
-                        else {
-                            const extension = map.get(tag.name)!;
-                            extension.definition.add({
-                                definition: file,
-                                declaration: declaration as VariableDeclaration & { name: Identifier },
-                                exportName: declaration.name.escapedText.toString(),
-                                priority: tag.priority,
-                            });
-                        }
-                    }
+        function tryCacheTsPlusFluentVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+            const fluentTags = collectTsPlusFluentTags(declaration);
+            if (fluentTags.length > 0) {
+                if (!checkFluentDeclarationValidity(declaration)) {
+                    return;
+                }
+            }
+            for (const tag of fluentTags) {
+                if (!unresolvedFluentCache.has(tag.target)) {
+                    unresolvedFluentCache.set(tag.target, new Map());
+                }
+                const map = unresolvedFluentCache.get(tag.target)!;
+                if (!map.has(tag.name)) {
+                    map.set(tag.name, {
+                        target: tag.target,
+                        name: tag.name,
+                        definition: new Set([{
+                            definition: file,
+                            declaration: declaration as VariableDeclaration & { name: Identifier },
+                            exportName: declaration.name.escapedText.toString(),
+                            priority: tag.priority,
+                        }])
+                    });
+                }
+                else {
+                    const extension = map.get(tag.name)!;
+                    extension.definition.add({
+                        definition: file,
+                        declaration: declaration as VariableDeclaration & { name: Identifier },
+                        exportName: declaration.name.escapedText.toString(),
+                        priority: tag.priority,
+                    });
                 }
             }
         }
-        function tryCacheTsPlusGetterVariable(file: SourceFile, statement: VariableStatement) {
-            if (statement.declarationList.declarations.length === 1) {
-                const declaration = statement.declarationList.declarations[0];
-                if (isIdentifier(declaration.name)) {
-                    for (const { target, name } of collectTsPlusGetterTags(declaration)) {
-                        if (!getterCache.has(target)) {
-                            getterCache.set(target, new Map());
-                        }
-                        const map = getterCache.get(target)!;
-                        map.set(name, {
-                            patched: getTsPlusGetterSymbolForVariableDeclaration(
-                                name,
-                                (declaration as VariableDeclaration & { name: Identifier })
-                            ),
-                            exportName: declaration.name.escapedText.toString(),
-                            definition: file
-                        });
-                    }
+        function tryCacheTsPlusGetterVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+            for (const { target, name } of collectTsPlusGetterTags(declaration)) {
+                if (!getterCache.has(target)) {
+                    getterCache.set(target, new Map());
                 }
+                const map = getterCache.get(target)!;
+                map.set(name, {
+                    patched: getTsPlusGetterSymbolForVariableDeclaration(
+                        name,
+                        (declaration as VariableDeclaration & { name: Identifier })
+                    ),
+                    exportName: declaration.name.escapedText.toString(),
+                    definition: file
+                });
             }
         }
         function tryCacheTsPlusOperatorFunction(file: SourceFile, declaration: FunctionDeclaration) {
@@ -46078,30 +45979,25 @@ namespace ts {
                 }
             }
         }
-        function tryCacheTsPlusOperatorVariable(file: SourceFile, statement: VariableStatement) {
-            if (statement.declarationList.declarations.length === 1) {
-                const declaration = statement.declarationList.declarations[0];
-                if(isIdentifier(declaration.name)) {
-                    const operatorTags = collectTsPlusOperatorTags(declaration);
-                    if (operatorTags.length > 0) {
-                        const symbol = getSymbolAtLocation(declaration.name);
-                        if (symbol) {
-                            for (const tag of operatorTags) {
-                                if (!operatorCache.has(tag.target)) {
-                                    operatorCache.set(tag.target, new Map());
-                                }
-                                const map = operatorCache.get(tag.target)!;
-                                if (!map.has(tag.name)) {
-                                    map.set(tag.name, []);
-                                }
-                                map.get(tag.name)!.push({
-                                    patched: symbol,
-                                    exportName: declaration.name.escapedText.toString(),
-                                    definition: file,
-                                    priority: tag.priority,
-                                });
-                            }
+        function tryCacheTsPlusOperatorVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+            const operatorTags = collectTsPlusOperatorTags(declaration);
+            if (operatorTags.length > 0) {
+                const symbol = getSymbolAtLocation(declaration.name);
+                if (symbol) {
+                    for (const tag of operatorTags) {
+                        if (!operatorCache.has(tag.target)) {
+                            operatorCache.set(tag.target, new Map());
                         }
+                        const map = operatorCache.get(tag.target)!;
+                        if (!map.has(tag.name)) {
+                            map.set(tag.name, []);
+                        }
+                        map.get(tag.name)!.push({
+                            patched: symbol,
+                            exportName: declaration.name.escapedText.toString(),
+                            definition: file,
+                            priority: tag.priority,
+                        });
                     }
                 }
             }
@@ -46186,59 +46082,51 @@ namespace ts {
                 }
             }
         }
-        function tryCacheTsPlusPipeableVariable(file: SourceFile, statement: VariableStatement) {
-            if (statement.declarationList.declarations.length === 1) {
-                const declaration = statement.declarationList.declarations[0];
-                if(
-                    isIdentifier(declaration.name) &&
-                    (
-                        (declaration.initializer && (isArrowFunction(declaration.initializer) || isFunctionExpression(declaration.initializer))) ||
-                        (declaration.type && isFunctionTypeNode(declaration.type))
-                    )
-                ) {
-                    for (const { target, name } of collectTsPlusPipeableTags(declaration)) {
-                        if (!pipeableCache.has(target)) {
-                            pipeableCache.set(target, new Map());
-                        }
-                        const map = pipeableCache.get(target)!;
-                        const exportName = declaration.name.escapedText.toString();
-                        let cached : [Type, TsPlusSignature[]] | false = false
-                        const getTypeAndSignatures = () => {
-                            if (cached === false) {
-                                const resolved = getTsPlusFluentSignatureForPipeableVariableDeclaration(
-                                    file,
-                                    exportName,
-                                    name,
-                                    declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType
-                                )
-                                if (resolved) {
-                                    cached = resolved;
-                                }
-                                else {
-                                    error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
-                                    cached = [errorType, []];
-                                }
-                            }
-                            return cached;
-                        }
-                        map.set(name, {
-                            declaration: declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType,
-                            exportName,
-                            definition: file,
-                            typeName: target,
-                            funcName: name,
-                            getTypeAndSignatures
-                        });
-                        augmentPipeableIdentifierSymbol(
-                            declaration.name,
-                            target,
-                            declaration.name.escapedText.toString(),
-                            name,
-                            () => getTypeAndSignatures()[0],
-                            declaration as VariableDeclarationWithFunction
-                        );
-                        getNodeLinks(declaration).tsPlusPipeableExtension = map.get(name);
+        function tryCacheTsPlusPipeableVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+            if((declaration.initializer && isFunctionLikeDeclaration(declaration.initializer)) ||
+                (declaration.type && isFunctionTypeNode(declaration.type))) {
+                for (const { target, name } of collectTsPlusPipeableTags(declaration)) {
+                    if (!pipeableCache.has(target)) {
+                        pipeableCache.set(target, new Map());
                     }
+                    const map = pipeableCache.get(target)!;
+                    const exportName = declaration.name.escapedText.toString();
+                    let cached : [Type, TsPlusSignature[]] | false = false
+                    const getTypeAndSignatures = () => {
+                        if (cached === false) {
+                            const resolved = getTsPlusFluentSignatureForPipeableVariableDeclaration(
+                                file,
+                                exportName,
+                                name,
+                                declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType
+                            )
+                            if (resolved) {
+                                cached = resolved;
+                            }
+                            else {
+                                error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
+                                cached = [errorType, []];
+                            }
+                        }
+                        return cached;
+                    }
+                    map.set(name, {
+                        declaration: declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType,
+                        exportName,
+                        definition: file,
+                        typeName: target,
+                        funcName: name,
+                        getTypeAndSignatures
+                    });
+                    augmentPipeableIdentifierSymbol(
+                        declaration.name,
+                        target,
+                        declaration.name.escapedText.toString(),
+                        name,
+                        () => getTypeAndSignatures()[0],
+                        declaration as VariableDeclarationWithFunction
+                    );
+                    getNodeLinks(declaration).tsPlusPipeableExtension = map.get(name);
                 }
             }
         }
@@ -46377,12 +46265,12 @@ namespace ts {
                     }
                 }
                 if(statement.modifiers && findIndex(statement.modifiers, t => t.kind === SyntaxKind.ExportKeyword) !== -1) {
-                    if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1) {
-                        tryCacheTsPlusOperatorVariable(file, statement);
-                        tryCacheTsPlusStaticVariable(file, statement);
-                        tryCacheTsPlusFluentVariable(file, statement);
-                        tryCacheTsPlusGetterVariable(file, statement);
-                        tryCacheTsPlusPipeableVariable(file, statement);
+                    if (isVariableStatement(statement) && statement.declarationList.declarations.length === 1 && isIdentifier(statement.declarationList.declarations[0].name)) {
+                        tryCacheTsPlusOperatorVariable(file, statement.declarationList.declarations[0] as VariableDeclarationWithIdentifier);
+                        tryCacheTsPlusStaticVariable(file, statement.declarationList.declarations[0] as VariableDeclarationWithIdentifier);
+                        tryCacheTsPlusFluentVariable(file, statement.declarationList.declarations[0] as VariableDeclarationWithIdentifier);
+                        tryCacheTsPlusGetterVariable(file, statement.declarationList.declarations[0] as VariableDeclarationWithIdentifier);
+                        tryCacheTsPlusPipeableVariable(file, statement.declarationList.declarations[0] as VariableDeclarationWithIdentifier);
                     }
                     if (isFunctionDeclaration(statement)) {
                         tryCacheTsPlusOperatorFunction(file, statement);
