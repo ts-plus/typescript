@@ -1190,7 +1190,7 @@ namespace ts {
                                 file.tsPlusContext.static.push(declaration as VariableDeclarationWithIdentifier);
                             }
                             if (declaration.tsPlusGetterTags && declaration.tsPlusGetterTags.length > 0) {
-                                file.tsPlusContext.static.push(declaration as VariableDeclarationWithIdentifier);
+                                file.tsPlusContext.getter.push(declaration as VariableDeclarationWithIdentifier);
                             }
                         }
                     }
