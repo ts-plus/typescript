@@ -6785,7 +6785,7 @@ namespace ts {
             node.decorators = decorators;
             let finished = withJSDoc(finishNode(node, pos), hasJSDoc);
             if (finished.jsDoc && finished.declarationList.declarations.length === 1) {
-                addTsPlusFunctionTags(finished.declarationList.declarations[0], finished.jsDoc)
+                addTsPlusValueTags(finished.declarationList.declarations[0], finished.jsDoc)
             }
             return finished;
         }
@@ -6815,7 +6815,7 @@ namespace ts {
             return undefined;
         }
 
-        function addTsPlusFunctionTags(declaration: FunctionDeclaration | VariableDeclaration, jsDoc: JSDoc[] | undefined): void {
+        function addTsPlusValueTags(declaration: FunctionDeclaration | VariableDeclaration, jsDoc: JSDoc[] | undefined): void {
             if (!jsDoc) return;
             const deriveTags: string[] = [];
             const fluentTags: TsPlusPrioritizedExtensionTag[] = [];
@@ -6946,7 +6946,7 @@ namespace ts {
             setAwaitContext(savedAwaitContext);
             const node = factory.createFunctionDeclaration(decorators, modifiers, asteriskToken, name, typeParameters, parameters, type, body);
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
-            addTsPlusFunctionTags(finished, finished.jsDoc)
+            addTsPlusValueTags(finished, finished.jsDoc)
             return finished;
         }
 
