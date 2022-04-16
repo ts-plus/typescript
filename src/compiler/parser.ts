@@ -6840,7 +6840,7 @@ namespace ts {
                                 case "fluent": {
                                     const parsedTag = parseTsPlusExtensionTag(target, name, priority);
                                     if (!parsedTag) {
-                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
+                                        parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
                                         break;
                                     }
                                     fluentTags.push(parsedTag);
@@ -6848,7 +6848,7 @@ namespace ts {
                                 }
                                 case "static": {
                                     if (!target || !name) {
-                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
+                                        parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
                                         break;
                                     }
                                     staticTags.push({ target, name });
@@ -6856,7 +6856,7 @@ namespace ts {
                                 }
                                 case "pipeable": {
                                     if(!target || !name) {
-                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
+                                        parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
                                         break;
                                     }
                                     pipeableTags.push({ target, name });
@@ -6864,7 +6864,7 @@ namespace ts {
                                 }
                                 case "getter": {
                                     if (!target || !name) {
-                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_getter_extension_must_have_the_form_tsplus_getter_typename_name);
+                                        parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_a_getter_extension_must_have_the_form_tsplus_getter_typename_name);
                                         break;
                                     }
                                     getterTags.push({ target, name });
@@ -6873,7 +6873,7 @@ namespace ts {
                                 case "operator": {
                                     const parsedTag = parseTsPlusExtensionTag(target, name, priority);
                                     if (!parsedTag) {
-                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
+                                        parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
                                         break;
                                     }
                                     operatorTags.push(parsedTag);
@@ -6887,7 +6887,7 @@ namespace ts {
                                 }
                                 case "macro": {
                                     if (!target) {
-                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
+                                        parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
                                         break;
                                     }
                                     macroTags.push(target);
@@ -6895,7 +6895,7 @@ namespace ts {
                                 }
                                 case "unify": {
                                     if (!target) {
-                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_a_unify_extension_must_have_the_form_tsplus_unify_typename);
+                                        parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_a_unify_extension_must_have_the_form_tsplus_unify_typename);
                                         break;
                                     }
                                     unifyTags.push(target);
@@ -6903,13 +6903,10 @@ namespace ts {
                                 }
                                 case "index": {
                                     if (!target) {
-                                        parseErrorAt(doc.pos, doc.end, Diagnostics.Annotation_of_an_index_extension_must_have_the_form_tsplus_index_typename);
+                                        parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_an_index_extension_must_have_the_form_tsplus_index_typename);
                                         break;
                                     }
                                     indexTags.push(target);
-                                    break;
-                                }
-                                default: {
                                     break;
                                 }
                             }
@@ -7333,29 +7330,38 @@ namespace ts {
                 : factory.createClassExpression(decorators, modifiers, name, typeParameters, heritageClauses, members);
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
             if (isClassDeclaration(finished)) {
-                const typeTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
-                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
-                        const matched = tag.comment.match(/type (.*)/)
-                        if (matched) {
-                            return [matched[1]]
+                if (finished.jsDoc) {
+                    const typeTags: string[] = [];
+                    const companionTags: string[] = [];
+                    for (const doc of finished.jsDoc) {
+                        if (doc.tags) {
+                            for (const tag of doc.tags) {
+                                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                                    const [tagName, target] = tag.comment.split(" ");
+                                    switch (tagName) {
+                                        case "type": {
+                                            if (!target) {
+                                                parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                                break;
+                                            }
+                                            typeTags.push(target);
+                                            break;
+                                        }
+                                        case "companion": {
+                                            if (!target) {
+                                                parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
+                                                break;
+                                            }
+                                            companionTags.push(target);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                    return []
-                }))
-                if (typeTags.length > 0) {
-                    finished.tsPlusTypeTags = typeTags;
-                }
-                const companionTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
-                    if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
-                        const matched = tag.comment.match(/companion (.*)/)
-                        if (matched) {
-                            return [matched[1]]
-                        }
-                    }
-                    return []
-                }))
-                if (companionTags.length > 0) {
-                    finished.tsPlusCompanionTags = companionTags;
+                    finished.tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+                    finished.tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
                 }
             }
             return finished;
@@ -7427,17 +7433,25 @@ namespace ts {
             const members = parseObjectTypeMembers();
             const node = factory.createInterfaceDeclaration(decorators, modifiers, name, typeParameters, heritageClauses, members);
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
-            const typeTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
-                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
-                    const matched = tag.comment.match(/type (.*)/)
-                    if (matched) {
-                        return [matched[1]]
+            if (finished.jsDoc) {
+                const typeTags: string[] = [];
+                for (const doc of finished.jsDoc) {
+                    if (doc.tags) {
+                        for (const tag of doc.tags) {
+                            if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                                const [tagName, target] = tag.comment.split(" ");
+                                if (tagName === "type") {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                        continue;
+                                    }
+                                    typeTags.push(target);
+                                }
+                            }
+                        }
                     }
                 }
-                return []
-            }))
-            if (typeTags.length > 0) {
-                finished.tsPlusTypeTags = typeTags;
+                finished.tsPlusTypeTags = undefinedIfZeroLength(typeTags);
             }
             return finished;
         }
@@ -7451,17 +7465,25 @@ namespace ts {
             parseSemicolon();
             const node = factory.createTypeAliasDeclaration(decorators, modifiers, name, typeParameters, type);
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
-            const typeTags = flatMapToMutable(finished.jsDoc, (doc) => flatMap(doc.tags, (tag) => {
-                if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
-                    const matched = tag.comment.match(/type (.*)/)
-                    if (matched) {
-                        return [matched[1]]
+            if (finished.jsDoc) {
+                const typeTags: string[] = [];
+                for (const doc of finished.jsDoc) {
+                    if (doc.tags) {
+                        for (const tag of doc.tags) {
+                            if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
+                                const [tagName, target] = tag.comment.split(" ");
+                                if (tagName === "type") {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                        continue;
+                                    }
+                                    typeTags.push(target);
+                                }
+                            }
+                        }
                     }
                 }
-                return []
-            }))
-            if (typeTags.length > 0) {
-                finished.tsPlusTypeTags = typeTags;
+                finished.tsPlusTypeTags = undefinedIfZeroLength(typeTags);
             }
             return finished;
         }

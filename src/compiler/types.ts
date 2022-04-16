@@ -5475,14 +5475,6 @@ namespace ts {
         needsUniqueNameInSope?: boolean;
         uniqueNameInScope?: Identifier;
 
-        tsPlusFluentTags?: Array<TsPlusPrioritizedExtensionTag>;
-        tsPlusOperatorTags?: Array<TsPlusPrioritizedExtensionTag>;
-        tsPlusStaticTags?: Array<TsPlusExtensionTag>;
-        tsPlusGetterTags?: Array<TsPlusExtensionTag>;
-        tsPlusIndexTags?: Array<string>;
-        tsPlusMacroTags?: Array<string>;
-        tsPlusUnifyTags?: Array<string>;
-        tsPlusDeriveTags?: Array<string>;
         tsPlusPipeableExtension?: TsPlusPipeableExtension;
         isTsPlusTailRec?: boolean;
         // TSPLUS EXTENSION END

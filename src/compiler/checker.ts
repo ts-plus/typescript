@@ -38901,9 +38901,6 @@ namespace ts {
                 if (links.tsPlusPipeableExtension) {
                     checkFluentPipeableAgreement(links.tsPlusPipeableExtension);
                 }
-                else {
-                    checkTsPlusPipeableTags(node);
-                }
             }
         }
 
@@ -39876,9 +39873,6 @@ namespace ts {
                 const links = getNodeLinks(node);
                 if (links.tsPlusPipeableExtension) {
                     checkFluentPipeableAgreement(links.tsPlusPipeableExtension);
-                }
-                else {
-                    checkTsPlusPipeableTags(node);
                 }
             }
         }
@@ -41452,8 +41446,6 @@ namespace ts {
             forEach(node.members, checkSourceElement);
 
             registerForUnusedIdentifiersCheck(node);
-            checkTsPlusTypeTags(node);
-            checkTsPlusCompanionTags(node);
         }
 
         function checkClassLikeDeclaration(node: ClassLikeDeclaration) {
@@ -42107,37 +42099,6 @@ namespace ts {
             return !(getFalsyFlags(flowType) & TypeFlags.Undefined);
         }
 
-        function checkTsPlusTypeTags(node: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration) {
-            const tags = getTsPlusTagsOfNode(node).filter((tag) => tag.startsWith("type"));
-            for (const tag of tags) {
-                const [_, typeTag] = tag.split(" ");
-                if (!typeTag) {
-                    error(node, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
-                }
-            }
-        }
-
-        function checkTsPlusPipeableTags(node: VariableDeclaration | FunctionDeclaration) {
-            const tags = getTsPlusTagsOfNode(node).filter((tag) => tag.startsWith("pipeable"));
-            for (const tag of tags) {
-                const [_, target, name] = tag.split(" ");
-                if (!target || !name) {
-                    error(node, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
-                    continue;
-                }
-            }
-        }
-
-        function checkTsPlusCompanionTags(node: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration) {
-            const tags = getTsPlusTagsOfNode(node).filter((tag) => tag.startsWith("companion"));
-            for (const tag of tags) {
-                const [_, typeTag] = tag.split(" ");
-                if (!typeTag) {
-                    error(node, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
-                }
-            }
-        }
-
         function checkInterfaceDeclaration(node: InterfaceDeclaration) {
             // Grammar checking
             if (!checkGrammarDecoratorsAndModifiers(node)) checkGrammarInterfaceDeclaration(node);
@@ -42178,7 +42139,6 @@ namespace ts {
                 checkTypeForDuplicateIndexSignatures(node);
                 registerForUnusedIdentifiersCheck(node);
             });
-            checkTsPlusTypeTags(node);
         }
 
         function checkTypeAliasDeclaration(node: TypeAliasDeclaration) {
@@ -42196,7 +42156,6 @@ namespace ts {
                 checkSourceElement(node.type);
                 registerForUnusedIdentifiersCheck(node);
             }
-            checkTsPlusTypeTags(node);
         }
 
         function computeEnumMemberValues(node: EnumDeclaration) {
@@ -45251,16 +45210,15 @@ namespace ts {
             }
             return false;
         }
-        function collectTsPlusDeriveTags(statement: Declaration) {
-            const links = getNodeLinks(statement);
-            if (!links.tsPlusDeriveTags) {
-                links.tsPlusDeriveTags = getTsPlusTagsOfNode(statement).filter((tag) => tag.startsWith("derive"));
+        function collectTsPlusDeriveTags(declaration: Declaration) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusDeriveTags || [];
             }
-            return links.tsPlusDeriveTags;
+            return [];
         }
-        function collectTsPlusFluentTags(statement: Declaration) {
-            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
-                return statement.tsPlusFluentTags || [];
+        function collectTsPlusFluentTags(declaration: Declaration) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusFluentTags || [];
             }
             return [];
         }
@@ -45270,9 +45228,9 @@ namespace ts {
             }
             return [];
         }
-        function collectTsPlusIndexTags(statement: Declaration) {
-            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
-                return statement.tsPlusIndexTags || [];
+        function collectTsPlusIndexTags(declaration: Declaration) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusIndexTags || [];
             }
             return [];
         }
@@ -45288,33 +45246,33 @@ namespace ts {
             }
             return [];
         }
-        function collectTsPlusMacroTags(statement: Declaration) {
-            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
-                return statement.tsPlusMacroTags || [];
+        function collectTsPlusMacroTags(declaration: Declaration) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusMacroTags || [];
             }
             return [];
         }
-        function collectTsPlusUnifyTags(statement: Declaration) {
-            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
-                return statement.tsPlusUnifyTags || [];
+        function collectTsPlusUnifyTags(declaration: Declaration) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusUnifyTags || [];
             }
             return [];
         }
-        function collectTsPlusStaticTags(statement: Node) {
-            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
-                return statement.tsPlusStaticTags || [];
+        function collectTsPlusStaticTags(declaration: Node) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusStaticTags || [];
             }
             return [];
         }
-        function collectTsPlusOperatorTags(statement: Node) {
-            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
-                return statement.tsPlusOperatorTags || [];
+        function collectTsPlusOperatorTags(declaration: Node) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusOperatorTags || [];
             }
             return [];
         }
-        function collectTsPlusGetterTags(statement: Node) {
-            if (isVariableDeclaration(statement) || isFunctionDeclaration(statement)) {
-                return statement.tsPlusGetterTags || [];
+        function collectTsPlusGetterTags(declaration: Node) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusGetterTags || [];
             }
             return [];
         }
@@ -46233,13 +46191,6 @@ namespace ts {
             if (hasTsPlusExportedExtensionTags(declaration)) {
                 error(declaration, Diagnostics.Declaration_of_an_extension_must_be_exported);
             }
-        }
-        function getTsPlusTagsOfNode(node: Node) {
-            const links = getNodeLinks(node);
-            if (!links.tsPlusTags) {
-                links.tsPlusTags = getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus").map((tag) => tag.comment as string);
-            }
-            return links.tsPlusTags;
         }
         function collectTsPlusSymbols(file: SourceFile, statements: NodeArray<Statement>, collectTypesIfNotExported = false): void {
             for (const statement of statements) {
