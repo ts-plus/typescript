@@ -32846,7 +32846,6 @@ namespace ts {
             return getSymbolOfNode(decl);
         }
 
-
         function getAssignedJSPrototype(node: Node) {
             if (!node.parent) {
                 return false;
@@ -32860,7 +32859,7 @@ namespace ts {
                 return isObjectLiteralExpression(right) && right;
             }
         }
-
+        // TSPLUS EXTENSION START
         function tryCacheOptimizedPipeableCall(node: CallExpression): void {
             if (isIdentifier(node.expression)) {
                 const identifierType = getTypeOfNode(node.expression);
@@ -32935,7 +32934,6 @@ namespace ts {
                 }
             }
         }
-
         function getDerivationDebugDiagnostic(location: CallExpression, derivation: Derivation): Diagnostic {
             switch(derivation._tag) {
                 case "EmptyObjectDerivation": {
@@ -33072,7 +33070,6 @@ namespace ts {
             }
             return nodeLinks.tsPlusDerivation.type;
         }
-
         function getSelfExportStatement(location: Node) {
             let current = location;
             while (!isVariableStatement(current) && current.parent) {
@@ -33082,14 +33079,12 @@ namespace ts {
                 return current;
             }
         }
-
         function hashType(type: Type) {
             if (!typeHashCache.has(type)) {
                 typeHashCache.set(type, hashTypeWorker(type));
             }
             return typeHashCache.get(type)!;
         }
-
         function hashTypeWorker(type: Type) {
             if ("resolvedTypeArguments" in type && !isTupleType(type) && type.symbol && type.symbol.declarations) {
                 const hasTags = !!find(type.symbol.declarations, (e) => collectTsPlusTypeTags(e).length > 0);
@@ -33116,15 +33111,12 @@ namespace ts {
             }
             return hashing.hashArray(map(getPropertiesOfType(type), (x) => x.escapedName).sort());
         }
-
         function isIdenticalInDerivation(self: Type, that: Type) {
             return hashType(self) === hashType(that) && isTypeIdenticalTo(self, that)
         }
-
         function isLocalImplicit(node: Node): boolean {
             return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === 'string' && tag.comment === 'implicit local').length > 0;
         }
-
         function getAllBlockScopedDeclarations(location: Node): { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] {
             const blockScopedImplicits: { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] = [];
             forEachEnclosingBlockScopeContainer(location, (container) => {
@@ -33145,7 +33137,7 @@ namespace ts {
             })
             return blockScopedImplicits;
         }
-        function flatTags(toFlat: string[][]): readonly string[] {
+        function tsPlusFlattenTags(toFlat: string[][]): readonly string[] {
             let strings: readonly string[] = toFlat[0];
             for (let i = 1; i < toFlat.length; i++) {
                 strings = flatMap(strings, (prefix) => toFlat[i].map((post) => prefix + "," + post))
@@ -33160,7 +33152,7 @@ namespace ts {
                 lazyRule: void 0,
                 rules: []
             }
-            const paramExtensions = flatTags(map(targetTypes, (t) => ["_", ...collectTypeTagsOfType(t)]));
+            const paramExtensions = tsPlusFlattenTags(map(targetTypes, (t) => ["_", ...collectTypeTagsOfType(t)]));
             const dedupe = new Set<Declaration>();
             forEach(map(symbol.declarations, collectTsPlusTypeTags), (tags) => {
                 forEach(tags, (tag) => {
@@ -33483,11 +33475,10 @@ namespace ts {
             return {
                 _tag: "InvalidDerivation",
                 type: errorType
-            };;
+            };
         }
-        // TSPLUS EXTENSION START
-        function getTsPlusDoBindOutput(node: CallExpression, resultType: Type, doNode: CallExpression) {
-            const mapFluent = getFluentExtension(resultType, "flatMap");
+        function tsPlusDoGetBindOutput(node: CallExpression, resultType: Type, doNode: CallExpression) {
+            const mapFluent = getFluentExtension(resultType, "map");
             if (mapFluent) {
                 for (const signature of getSignaturesOfType(mapFluent, SignatureKind.Call)) {
                     const original = (signature as TsPlusSignature).tsPlusOriginal;
@@ -33510,7 +33501,7 @@ namespace ts {
             diagnostics.add(error(node, Diagnostics.Cannot_find_a_valid_flatMap_extension_for_type_0, typeToString(resultType)));
             return errorType;
         }
-        function checkTsPlusDoBind(node: CallExpression, resultType: Type) {
+        function tsPlusDoCheckBind(node: CallExpression, resultType: Type) {
             if (
                 isVariableDeclaration(node.parent) &&
                 isVariableDeclarationList(node.parent.parent) &&
@@ -33523,7 +33514,7 @@ namespace ts {
                 const callExp = node.parent.parent.parent.parent.parent.parent as CallExpression;
                 const links = getNodeLinks(callExp);
                 if (links.isTsPlusDoCall) {
-                    return getTsPlusDoBindOutput(node, resultType, callExp);
+                    return tsPlusDoGetBindOutput(node, resultType, callExp);
                 }
             }
             else if (
@@ -33535,21 +33526,18 @@ namespace ts {
                 const callExp = node.parent.parent.parent.parent as CallExpression;
                 const links = getNodeLinks(callExp);
                 if (links.isTsPlusDoCall) {
-                    return getTsPlusDoBindOutput(node, resultType, callExp);
+                    return tsPlusDoGetBindOutput(node, resultType, callExp);
                 }
             }
             diagnostics.add(error(node, Diagnostics.A_call_to_bind_is_only_allowed_in_the_context_of_a_Do));
             return errorType;
         }
-        function getReturnOfDoWithSignature(types: readonly [CallExpression, Type][], original: Signature): Type {
-            if (types.length > 1) {
-                const [[, type], ...tail] = types;
-                const context = createInferenceContext(original.typeParameters!, original, InferenceFlags.None);
-                inferTypes(context.inferences, type, getTypeOfSymbol(original.parameters[0]));
-                const child = getReturnOfDoWithSignature(tail, original);
-                if (isErrorType(child)) {
-                    return child;
-                }
+        function tsPlusDoCheckChain(types: readonly [CallExpression, Type][], signature: Signature): Type {
+            let current = types[types.length - 1][1];
+            for (let i = types.length - 2; i >= 0; i--) {
+                const [node, type] = types[i];
+                const context = createInferenceContext(signature.typeParameters!, signature, InferenceFlags.None);
+                inferTypes(context.inferences, type, getTypeOfSymbol(signature.parameters[0]));
                 const childType = createAnonymousType(
                     void 0,
                     emptySymbols,
@@ -33558,7 +33546,7 @@ namespace ts {
                         [],
                         void 0,
                         [],
-                        child,
+                        current,
                         void 0,
                         0,
                         SignatureFlags.None
@@ -33566,99 +33554,119 @@ namespace ts {
                     [],
                     []
                 );
-                inferTypes(context.inferences, childType, getTypeOfSymbol(original.parameters[1]));
-                const instantiated = getSignatureInstantiation(original, getInferredTypes(context), /* isJavascript */ false);
-                if (
-                    isTypeAssignableTo(type, getTypeOfSymbol(instantiated.parameters[0])) &&
-                    isTypeAssignableTo(childType, getTypeOfSymbol(instantiated.parameters[1]))
-                ) {
-                    return getReturnTypeOfSignature(instantiated);
+                inferTypes(context.inferences, childType, getTypeOfSymbol(signature.parameters[1]));
+                const instantiated = getSignatureInstantiation(signature, getInferredTypes(context), /* isJavascript */ false);
+                if (!isTypeAssignableTo(type, getTypeOfSymbol(instantiated.parameters[0]))) {
+                    error(node, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(type), typeToString(getTypeOfSymbol(instantiated.parameters[0])));
+                    return errorType;
                 }
+                if (!isTypeAssignableTo(childType, getTypeOfSymbol(instantiated.parameters[1]))) {
+                    error(node, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(childType), typeToString(getTypeOfSymbol(instantiated.parameters[1])));
+                    return errorType;
+                }
+                current = getReturnTypeOfSignature(instantiated);
+                if (isErrorType(current)) {
+                    return errorType;
+                }
+            }
+            return current;
+        }
+        function tsPlusDoCheckLastBind(node: CallExpression, mapFunction: Signature, lastBind: Type, result: Type) {
+            const context = createInferenceContext(mapFunction.typeParameters!, mapFunction, InferenceFlags.None);
+            const createdFunction = createAnonymousType(
+                void 0,
+                emptySymbols,
+                [createSignature(
+                    void 0,
+                    [],
+                    void 0,
+                    [],
+                    result,
+                    void 0,
+                    0,
+                    SignatureFlags.None
+                )],
+                [],
+                []
+            );
+            inferTypes(context.inferences, lastBind, getTypeOfSymbol(mapFunction.parameters[0]));
+            inferTypes(context.inferences, createdFunction, getTypeOfSymbol(mapFunction.parameters[1]));
+            const instantiated = getSignatureInstantiation(mapFunction, getInferredTypes(context), /* isJavascript */ false);
+            if (!isTypeAssignableTo(lastBind, getTypeOfSymbol(instantiated.parameters[0]))) {
+                error(node, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(lastBind), typeToString(getTypeOfSymbol(instantiated.parameters[0])));
                 return errorType;
             }
-            return types[0][1];
+            if (!isTypeAssignableTo(createdFunction, getTypeOfSymbol(instantiated.parameters[1]))) {
+                error(node, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(createdFunction), typeToString(getTypeOfSymbol(instantiated.parameters[1])));
+                return errorType;
+            }
+            return getReturnTypeOfSignature(instantiated);
         }
-        function getReturnOfDo(types: readonly [CallExpression, Type][]) {
-            const seen = new Set<Signature>()
-            for (const [node, resultType] of types) {
-                const flatMapFluent = getFluentExtension(resultType, "flatMap");
-                if (flatMapFluent) {
-                    for (const signature of getSignaturesOfType(flatMapFluent, SignatureKind.Call)) {
+        function tsPlusDoChooseImplementation(types: [CallExpression, Type][], name: string) {
+            const seen = new Set<Signature>();
+            for (const [_, type] of types) {
+                const flatMap = getFluentExtension(type, name);
+                if (flatMap) {
+                    for (const signature of getSignaturesOfType(flatMap, SignatureKind.Call)) {
                         const original = (signature as TsPlusSignature).tsPlusOriginal;
                         if (!seen.has(original)) {
                             seen.add(original);
                             if (original.minArgumentCount === 2 && original.typeParameters) {
-                                const res = getReturnOfDoWithSignature(types, original);
-                                if (!isErrorType(res)) {
-                                    return res;
+                                const mapper = createTypeMapper(original.typeParameters, original.typeParameters.map(() => anyType));
+                                const p0 = instantiateType(getTypeOfSymbol(original.parameters[0]), mapper);
+                                if (types.every((target) => isTypeAssignableTo(target[1], p0))) {
+                                    return original;
                                 }
                             }
                         }
                     }
                 }
-                diagnostics.add(error(node, Diagnostics.Cannot_find_a_valid_flatMap_extension_for_type_0, typeToString(resultType)));
-                return errorType;
             }
-            return errorType;
         }
-        function getReturnOfDoFinal(node: CallExpression, resultType: Type, asType: Type) {
-            const mapFluent = getFluentExtension(resultType, "map");
-            if (mapFluent) {
-                for (const signature of getSignaturesOfType(mapFluent, SignatureKind.Call)) {
-                    const original = (signature as TsPlusSignature).tsPlusOriginal;
-                    if (original.minArgumentCount === 2 && original.typeParameters) {
-                        const context = createInferenceContext(original.typeParameters, original, InferenceFlags.None);
-                        inferTypes(context.inferences, resultType, getTypeOfSymbol(original.parameters[0]));
-                        inferTypes(context.inferences, createAnonymousType(
-                            void 0,
-                            emptySymbols,
-                            [createSignature(
-                                void 0,
-                                [],
-                                void 0,
-                                [],
-                                asType,
-                                void 0,
-                                0,
-                                SignatureFlags.None
-                            )],
-                            [],
-                            []
-                        ), getTypeOfSymbol(original.parameters[1]));
-                        const instantiated = getSignatureInstantiation(original, getInferredTypes(context), /* isJavascript */ false);
-                        return getReturnTypeOfSignature(instantiated);
+        function tsPlusDoCheckDo(node: CallExpression, checked: Type) {
+            if (isArrowFunction(node.arguments[0])) {
+                if (isBlock(node.arguments[0].body)) {
+                    forEach(node.arguments[0].body.statements, checkSourceElement);
+                }
+                else {
+                    checkExpression(node.arguments[0].body);
+                }
+                const links = getNodeLinks(node);
+                if (links.tsPlusDoTypes) {
+                    const types = arrayFrom(links.tsPlusDoTypes.entries());
+                    if (types.length === 0) {
+                        error(node, Diagnostics.A_Do_block_must_contain_at_least_1_bound_value);
+                        return errorType;
                     }
+                    const mapFn = tsPlusDoChooseImplementation(types, "map");
+                    if (!mapFn) {
+                        error(node, Diagnostics.Cannot_find_a_valid_0_that_can_handle_all_the_types_of_1, "map", typeToString(getUnionType(types.map((t) => t[1]))))
+                        return errorType;
+                    }
+                    const flatMapFn = tsPlusDoChooseImplementation(types, "flatMap");
+                    if (!flatMapFn) {
+                        error(node, Diagnostics.Cannot_find_a_valid_0_that_can_handle_all_the_types_of_1, "flatMap", typeToString(getUnionType(types.map((t) => t[1]))))
+                        return errorType;
+                    }
+                    const lastBind = types[types.length - 1];
+                    const mapped = tsPlusDoCheckLastBind(lastBind[0], mapFn, lastBind[1], checked);
+                    const toBeFlatMapped = types.map((t, i) => i !== types.length - 1 ? t : [t[0], mapped] as typeof t);
+                    return tsPlusDoCheckChain(toBeFlatMapped, flatMapFn);
+                } else {
+                    error(node, Diagnostics.A_Do_block_must_contain_at_least_1_bound_value);
+                    return errorType;
                 }
             }
-            diagnostics.add(error(node, Diagnostics.Cannot_find_a_valid_map_extension_for_type_0, typeToString(resultType)));
+            error(node, Diagnostics.The_first_argument_of_a_Do_must_be_an_arrow_function);
             return errorType;
         }
         function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
             const checked = checkCallExpressionOriginal(node, checkMode);
             if (isTsPlusMacroCall(node, "Bind") && !isErrorType(checked)) {
-                return checkTsPlusDoBind(node, checked);
+                return tsPlusDoCheckBind(node, checked);
             }
             if (isTsPlusMacroCall(node, "Do") && !isErrorType(checked)) {
-                if (isArrowFunction(node.arguments[0])) {
-                    if (isBlock(node.arguments[0].body)) {
-                        forEach(node.arguments[0].body.statements, checkSourceElement);
-                    }
-                    else {
-                        checkExpression(node.arguments[0].body);
-                    }
-                    const links = getNodeLinks(node);
-                    if (links.tsPlusDoTypes) {
-                        const types = arrayFrom(links.tsPlusDoTypes.entries());
-                        const flattened = getReturnOfDo(types);
-                        if (isErrorType(flattened)) {
-                            error(node, Diagnostics.Cannot_find_a_valid_flatMap_that_can_handle_all_the_types_of_0, typeToString(getUnionType(types.map((t) => t[1]))))
-                            return flattened;
-                        }
-                        return getReturnOfDoFinal(node, flattened, checked);
-                    }
-                }
-                error(node, Diagnostics.A_Do_block_must_contain_at_least_1_bound_value);
-                return errorType;
+                return tsPlusDoCheckDo(node, checked);
             }
             if (isTsPlusMacroCall(node, "Derive") && !isErrorType(checked)) {
                 return deriveType(node, checked);

@@ -18,7 +18,8 @@ export const res = Do(($) => {
     $(Effect.fail("b" as const))
 })
 
-
-Do(($) => {
+export const res2 = Do(($) => {
     const a = $(Either.right(0))
+    const b = $(Either.right(1))
+    return `${a} + ${b}`
 })
