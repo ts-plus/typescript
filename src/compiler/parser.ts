@@ -1254,30 +1254,9 @@ namespace ts {
                 parseErrorAt(declaration.name!.pos + 1, declaration.name!.end, Diagnostics.Declaration_of_an_extension_must_be_exported);
             }
         }
-        function checkFluentDeclarationValidity(declaration: FunctionDeclaration | VariableDeclaration): boolean {
-            if (typeof declaration.tsPlusValidFluent !== "undefined") {
-                return declaration.tsPlusValidFluent;
-            }
-            let firstParam: ParameterDeclaration | undefined
-            if (isFunctionDeclaration(declaration)) {
-                firstParam = declaration.parameters[0]
-            }
-            else if (declaration.initializer && (isArrowFunction(declaration.initializer) || isFunctionExpression(declaration.initializer))) {
-                firstParam = declaration.initializer.parameters[0]
-            }
-            if (firstParam && isRestParameter(firstParam)) {
-                parseErrorAt(declaration.name!.pos + 1, declaration.name!.end, Diagnostics.The_first_parameter_of_a_fluent_function_cannot_be_a_rest_parameter);
-                declaration.tsPlusValidFluent = false;
-                return false;
-            }
-            declaration.tsPlusValidFluent = true;
-            return true;
-        }
-
         function withJSDoc<T extends HasJSDoc>(node: T, hasJSDoc: boolean): T {
             return hasJSDoc ? addJSDocComment(node) : node;
         }
-
         let hasDeprecatedTag = false;
         function addJSDocComment<T extends HasJSDoc>(node: T): T {
             Debug.assert(!node.jsDoc); // Should only be called once per node
@@ -6891,7 +6870,7 @@ namespace ts {
             node.decorators = decorators;
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
             if (finished.jsDoc && finished.declarationList.declarations.length === 1) {
-                addTsPlusValueTags(finished.declarationList.declarations[0], finished.jsDoc, finished.declarationList.declarations[0].name.pos + 1, finished.declarationList.declarations[0].end);
+                addTsPlusValueTags(finished.declarationList.declarations[0], finished.jsDoc);
             }
             return finished;
         }
@@ -6920,36 +6899,7 @@ namespace ts {
             }
             return undefined;
         }
-        function checkTsPlusMacroAnnotations(declaration: VariableDeclaration | FunctionDeclaration, name: string, start: number, end: number): boolean {
-            if (name === "identity") {
-                if (isVariableDeclaration(declaration)) {
-                    if (!declaration.initializer || !isFunctionExpressionOrArrowFunction(declaration.initializer)) {
-                        parseErrorAt(start, end, Diagnostics.Declaration_annotated_with_identity_macro_must_be_a_function);
-                        return false;
-                    }
-                    if (declaration.initializer.parameters.length === 0 || declaration.initializer.parameters.length > 1) {
-                        parseErrorAt(start, end, Diagnostics.Function_annotated_with_identity_macro_must_have_one_argument);
-                        return false;
-                    }
-                }
-                else {
-                    if (declaration.parameters.length === 0 || declaration.parameters.length > 1) {
-                        parseErrorAt(start, end, Diagnostics.Function_annotated_with_identity_macro_must_have_one_argument);
-                        return false;
-                    }
-                }
-            }
-            if (name === "remove") {
-                if (isVariableDeclaration(declaration)) {
-                    if (!declaration.initializer || !isFunctionExpressionOrArrowFunction(declaration.initializer)) {
-                        parseErrorAt(start, end, Diagnostics.Declaration_annotated_with_remove_macro_must_be_a_function);
-                        return false;
-                    }
-                }
-            }
-            return true;
-        }
-        function addTsPlusValueTags(declaration: FunctionDeclaration | VariableDeclaration, jsDoc: JSDoc[] | undefined, start: number, end: number): void {
+        function addTsPlusValueTags(declaration: FunctionDeclaration | VariableDeclaration, jsDoc: JSDoc[] | undefined): void {
             if (!jsDoc) return;
             const deriveTags: string[] = [];
             const fluentTags: TsPlusPrioritizedExtensionTag[] = [];
@@ -6975,9 +6925,6 @@ namespace ts {
                                     const parsedTag = parseTsPlusExtensionTag(target, name, priority);
                                     if (!parsedTag) {
                                         parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
-                                        break;
-                                    }
-                                    if (!checkFluentDeclarationValidity(declaration)) {
                                         break;
                                     }
                                     fluentTags.push(parsedTag);
@@ -7025,9 +6972,6 @@ namespace ts {
                                 case "macro": {
                                     if (!target) {
                                         parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_macro_must_have_the_form_tsplus_macro_name);
-                                        break;
-                                    }
-                                    if (!checkTsPlusMacroAnnotations(declaration, target, start, end)) {
                                         break;
                                     }
                                     macroTags.push(target);
@@ -7086,9 +7030,7 @@ namespace ts {
             setAwaitContext(savedAwaitContext);
             const node = factory.createFunctionDeclaration(decorators, modifiers, asteriskToken, name, typeParameters, parameters, type, body);
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
-            if (finished.name) {
-                addTsPlusValueTags(finished, finished.jsDoc, finished.name!.pos + 1, finished.name!.end);
-            }
+            addTsPlusValueTags(finished, finished.jsDoc);
             return finished;
         }
 

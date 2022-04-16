@@ -7391,45 +7391,33 @@
         "category": "Error",
         "code": 50015
     },
-    "Function annotated with 'identity' macro must have one argument.": {
+    "Invalid declaration annotated as 'pipeable'.": {
         "category": "Error",
         "code": 50016
     },
-    "Declaration annotated with 'identity' macro must be a function.": {
+    "Annotation of a pipeable extension must have the form '@tsplus pipeable [typename] [name]'.": {
         "category": "Error",
         "code": 50017
     },
-    "Declaration annotated with 'remove' macro must be a function.": {
+    "Declaration annotated as 'pipeable' is not assignable to its corresponding fluent declaration.": {
         "category": "Error",
         "code": 50018
     },
-    "Invalid declaration annotated as 'pipeable'.": {
+    "The first parameter of a fluent function cannot be a rest parameter.": {
         "category": "Error",
         "code": 50019
     },
-    "Annotation of a pipeable extension must have the form '@tsplus pipeable [typename] [name]'.": {
+    "The first parameter of a 'pipeable' annotated function cannot be a rest parameter.": {
         "category": "Error",
         "code": 50020
     },
-    "Declaration annotated as 'pipeable' is not assignable to its corresponding fluent declaration.": {
+    "Declaration of an extension must be exported.": {
         "category": "Error",
         "code": 50021
     },
-    "The first parameter of a fluent function cannot be a rest parameter.": {
-        "category": "Error",
-        "code": 50022
-    },
-    "The first parameter of a 'pipeable' annotated function cannot be a rest parameter.": {
-        "category": "Error",
-        "code": 50023
-    },
-    "Declaration of an extension must be exported.": {
-        "category": "Error",
-        "code": 50024
-    },
     "Global import path cannot be relative.": {
         "category": "Error",
-        "code": 50025
+        "code": 50022
     },
     "Cannot derive type '{0}' and no derivation rules are found.": {
         "category": "Error",
