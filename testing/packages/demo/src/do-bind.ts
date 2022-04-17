@@ -23,3 +23,9 @@ export const res2 = Do(($) => {
     const b = $(Either.right(1))
     return `${a} + ${b}`
 })
+
+export const res3 = Do(($) => {
+    const a = $(Either.right(0))
+    const b = $(Either.right(1))
+    return $(Either.right(`${a} + ${b}`))
+})

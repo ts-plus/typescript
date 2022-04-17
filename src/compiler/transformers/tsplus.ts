@@ -687,6 +687,12 @@ namespace ts {
                                     ];
                                 }
                             }
+                            else if (isReturnStatement(statement) && statement.expression && isCallExpression(statement.expression) && types.has(statement.expression)) {
+                                isLast = false
+                                currentScope = [
+                                    factory.createReturnStatement(visitNode(statement.expression.arguments[0], visitor))
+                                ];
+                            }
                             else {
                                 currentScope.push(
                                     visitNode(statement, visitor)
