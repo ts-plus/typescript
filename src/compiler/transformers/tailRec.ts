@@ -180,7 +180,7 @@ namespace ts {
                                         factory.createExpressionStatement(
                                             factory.createAssignment(
                                                 tempNames[propIndex],
-                                                visitEachChild(arg, visitExpression(originalParamNames, paramNames, checker, factory, context), context)
+                                                visitNode(arg, visitExpression(originalParamNames, paramNames, checker, factory, context))
                                             )
                                         )
                                     );
