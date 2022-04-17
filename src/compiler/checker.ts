@@ -33548,8 +33548,14 @@ namespace ts {
                 const callExp = node.parent.parent.parent.parent as CallExpression;
                 const links = getNodeLinks(callExp);
                 if (links.isTsPlusDoCall) {
+                    // Avoid double-checking a bound return type
+                    if (links.isTsPlusDoReturnBound) {
+                        links.tsPlusDoBoundReturnType = links.tsPlusDoTypes!.get(node)!;
+                        return links.tsPlusDoBoundReturnType;
+                    }
                     links.isTsPlusDoReturnBound = true;
-                    return tsPlusDoGetBindOutput(node, resultType, callExp);
+                    links.tsPlusDoBoundReturnType = tsPlusDoGetBindOutput(node, resultType, callExp);
+                    return links.tsPlusDoBoundReturnType;
                 }
             }
             diagnostics.add(error(node, Diagnostics.A_call_to_bind_is_only_allowed_in_the_context_of_a_Do));
@@ -33676,7 +33682,13 @@ namespace ts {
                         map: mapFn
                     };
                     const lastBind = types[types.length - 1];
-                    const mapped = links.isTsPlusDoReturnBound ? lastBind[1] : tsPlusDoCheckLastBind(lastBind[0], mapFn.tsPlusOriginal, lastBind[1], checked);
+                    let mapped: Type | undefined;
+                    if (links.isTsPlusDoReturnBound) {
+                        mapped = links.tsPlusDoBoundReturnType;
+                    }
+                    if (!mapped) {
+                        mapped = tsPlusDoCheckLastBind(lastBind[0], mapFn.tsPlusOriginal, lastBind[1], checked);
+                    }
                     const toBeFlatMapped = types.map((t, i) => i !== types.length - 1 ? t : [t[0], mapped] as typeof t);
                     return tsPlusDoCheckChain(toBeFlatMapped, flatMapFn.tsPlusOriginal);
                 } else {

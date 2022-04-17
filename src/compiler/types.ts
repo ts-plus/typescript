@@ -5496,6 +5496,7 @@ namespace ts {
         isTsPlusTailRec?: boolean;
         isTsPlusDoCall?: boolean;
         isTsPlusDoReturnBound?: boolean;
+        tsPlusDoBoundReturnType?: Type;
         tsPlusDoFunctions?: {
             map: TsPlusSignature
             flatMap: TsPlusSignature
