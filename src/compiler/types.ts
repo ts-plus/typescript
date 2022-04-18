@@ -5490,13 +5490,12 @@ namespace ts {
         uniqueNames?: Set<NamedDeclaration & { name: Identifier }>;
         needsUniqueNameInSope?: boolean;
         uniqueNameInScope?: Identifier;
-
         tsPlusPipeableExtension?: TsPlusPipeableExtension;
-        tsPlusDoTypes?: ESMap<CallExpression, Type>;
+        tsPlusDoBindType?: [CallExpression, Type];
+        tsPlusDoBindTypes?: [CallExpression, Type][];
         isTsPlusTailRec?: boolean;
         isTsPlusDoCall?: boolean;
         isTsPlusDoReturnBound?: boolean;
-        tsPlusDoBoundReturnType?: Type;
         tsPlusDoFunctions?: {
             map: TsPlusSignature
             flatMap: TsPlusSignature

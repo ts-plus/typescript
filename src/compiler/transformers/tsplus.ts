@@ -539,8 +539,7 @@ namespace ts {
                 functions: {
                     map: TsPlusSignature;
                     flatMap: TsPlusSignature;
-                },
-                types: ESMap<CallExpression, Type>
+                }
             ): VisitResult<Node> {
                 if (isArrowFunction(node.arguments[0])) {
                     const body = node.arguments[0].body;
@@ -551,12 +550,12 @@ namespace ts {
                             const statement = body.statements[i];
                             if (
                                 isVariableStatement(statement) &&
+                                checker.getNodeLinks(statement).tsPlusDoBindType &&
                                 statement.declarationList.declarations.length === 1 &&
                                 statement.declarationList.declarations[0].initializer &&
                                 statement.declarationList.declarations[0].name &&
                                 isIdentifier(statement.declarationList.declarations[0].name) &&
-                                isCallExpression(statement.declarationList.declarations[0].initializer) &&
-                                types.has(statement.declarationList.declarations[0].initializer)
+                                isCallExpression(statement.declarationList.declarations[0].initializer)
                             ) {
                                 if (isLast) {
                                     isLast = false
@@ -630,7 +629,7 @@ namespace ts {
                                     ];
                                 }
                             }
-                            else if (isExpressionStatement(statement) && isCallExpression(statement.expression) && types.has(statement.expression)) {
+                            else if (isExpressionStatement(statement) && isCallExpression(statement.expression) && checker.getNodeLinks(statement).tsPlusDoBindType) {
                                 if (isLast) {
                                     isLast = false
                                     const mapper = factory.createArrowFunction(
@@ -687,7 +686,7 @@ namespace ts {
                                     ];
                                 }
                             }
-                            else if (isReturnStatement(statement) && statement.expression && isCallExpression(statement.expression) && types.has(statement.expression)) {
+                            else if (isReturnStatement(statement) && statement.expression && isCallExpression(statement.expression) && checker.getNodeLinks(statement).tsPlusDoBindType) {
                                 isLast = false
                                 currentScope = [
                                     factory.createReturnStatement(visitNode(statement.expression.arguments[0], visitor))
@@ -759,15 +758,14 @@ namespace ts {
                     return visitCallExpression(source, traceInScope, node, visitor, context);
                 }
                 const nodeLinks = checker.getNodeLinks(node);
-                if (nodeLinks.tsPlusDoFunctions && nodeLinks.tsPlusDoTypes && nodeLinks.tsPlusDoTypes.size > 0) {
+                if (nodeLinks.tsPlusDoFunctions && nodeLinks.tsPlusDoBindTypes && nodeLinks.tsPlusDoBindTypes.length > 0) {
                     return visitDo(
                         source,
                         traceInScope,
                         node,
                         visitor,
                         context,
-                        nodeLinks.tsPlusDoFunctions,
-                        nodeLinks.tsPlusDoTypes
+                        nodeLinks.tsPlusDoFunctions
                     );
                 }
                 if (nodeLinks.tsPlusCallExtension) {

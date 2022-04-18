@@ -33487,7 +33487,7 @@ namespace ts {
                 type: errorType
             };
         }
-        function tsPlusDoGetBindOutput(node: CallExpression, resultType: Type, doNode: CallExpression) {
+        function tsPlusDoGetBindOutput(node: CallExpression, resultType: Type, statementNode: Statement) {
             const mapFluent = getFluentExtension(resultType, "map");
             if (mapFluent) {
                 for (const signature of getSignaturesOfType(mapFluent, SignatureKind.Call)) {
@@ -33498,11 +33498,8 @@ namespace ts {
                         const instantiated = getSignatureInstantiation(original, getInferredTypes(context), /* isJavascript */ false);
                         if (isTypeAssignableTo(resultType, getTypeOfSymbol(instantiated.parameters[0]))) {
                             const funcType = getTypeOfSymbol(instantiated.parameters[1]);
-                            const links = getNodeLinks(doNode);
-                            if (!links.tsPlusDoTypes) {
-                                links.tsPlusDoTypes = new Map()
-                            }
-                            links.tsPlusDoTypes.set(node, resultType);
+                            const statementLinks = getNodeLinks(statementNode);
+                            statementLinks.tsPlusDoBindType = [node, resultType];
                             return getTypeOfSymbol(getSignaturesOfType(funcType, SignatureKind.Call)[0].parameters[0]);
                         }
                     }
@@ -33512,6 +33509,13 @@ namespace ts {
             return errorType;
         }
         function tsPlusDoCheckBind(node: CallExpression, resultType: Type) {
+            const links = getNodeLinks(node);
+            if (!links.tsPlusResolvedType) {
+                links.tsPlusResolvedType = tsPlusDoCheckBindWorker(node, resultType);
+            }
+            return links.tsPlusResolvedType;
+        }
+        function tsPlusDoCheckBindWorker(node: CallExpression, resultType: Type) {
             if (
                 isVariableDeclaration(node.parent) &&
                 isVariableDeclarationList(node.parent.parent) &&
@@ -33524,7 +33528,7 @@ namespace ts {
                 const callExp = node.parent.parent.parent.parent.parent.parent as CallExpression;
                 const links = getNodeLinks(callExp);
                 if (links.isTsPlusDoCall) {
-                    return tsPlusDoGetBindOutput(node, resultType, callExp);
+                    return tsPlusDoGetBindOutput(node, resultType, node.parent.parent.parent);
                 }
             }
             else if (
@@ -33536,7 +33540,7 @@ namespace ts {
                 const callExp = node.parent.parent.parent.parent as CallExpression;
                 const links = getNodeLinks(callExp);
                 if (links.isTsPlusDoCall) {
-                    return tsPlusDoGetBindOutput(node, resultType, callExp);
+                    return tsPlusDoGetBindOutput(node, resultType, node.parent);
                 }
             }
             else if (
@@ -33548,14 +33552,8 @@ namespace ts {
                 const callExp = node.parent.parent.parent.parent as CallExpression;
                 const links = getNodeLinks(callExp);
                 if (links.isTsPlusDoCall) {
-                    // Avoid double-checking a bound return type
-                    if (links.isTsPlusDoReturnBound) {
-                        links.tsPlusDoBoundReturnType = links.tsPlusDoTypes!.get(node)!;
-                        return links.tsPlusDoBoundReturnType;
-                    }
                     links.isTsPlusDoReturnBound = true;
-                    links.tsPlusDoBoundReturnType = tsPlusDoGetBindOutput(node, resultType, callExp);
-                    return links.tsPlusDoBoundReturnType;
+                    return tsPlusDoGetBindOutput(node, resultType, node.parent);
                 }
             }
             diagnostics.add(error(node, Diagnostics.A_call_to_bind_is_only_allowed_in_the_context_of_a_Do));
@@ -33653,48 +33651,46 @@ namespace ts {
             }
         }
         function tsPlusDoCheckDo(node: CallExpression, checked: Type) {
-            if (isArrowFunction(node.arguments[0])) {
-                if (isBlock(node.arguments[0].body)) {
-                    forEach(node.arguments[0].body.statements, checkSourceElement);
-                }
-                else {
-                    checkExpression(node.arguments[0].body);
-                }
-                const links = getNodeLinks(node);
-                if (links.tsPlusDoTypes) {
-                    const types = arrayFrom(links.tsPlusDoTypes.entries());
-                    if (types.length === 0) {
-                        error(node, Diagnostics.A_Do_block_must_contain_at_least_1_bound_value);
-                        return errorType;
+            const links = getNodeLinks(node);
+            if (!links.tsPlusResolvedType) {
+                links.tsPlusResolvedType = tsPlusDoCheckDoWorker(node, checked);
+            }
+            return links.tsPlusResolvedType;
+        }
+        function tsPlusDoCheckDoWorker(node: CallExpression, checked: Type) {
+            if (isArrowFunction(node.arguments[0]) && isBlock(node.arguments[0].body)) {
+                const types: [CallExpression, Type][] = [];
+                forEach(node.arguments[0].body.statements, (statement) => {
+                    checkSourceElement(statement);
+                    const links = getNodeLinks(statement);
+                    if (links.tsPlusDoBindType) {
+                        types.push(links.tsPlusDoBindType);
                     }
-                    const mapFn = tsPlusDoChooseImplementation(types, "map");
-                    if (!mapFn) {
-                        error(node, Diagnostics.Cannot_find_a_valid_0_that_can_handle_all_the_types_of_1, "map", typeToString(getUnionType(types.map((t) => t[1]))))
-                        return errorType;
-                    }
-                    const flatMapFn = tsPlusDoChooseImplementation(types, "flatMap");
-                    if (!flatMapFn) {
-                        error(node, Diagnostics.Cannot_find_a_valid_0_that_can_handle_all_the_types_of_1, "flatMap", typeToString(getUnionType(types.map((t) => t[1]))))
-                        return errorType;
-                    }
-                    getNodeLinks(node).tsPlusDoFunctions = {
-                        flatMap: flatMapFn,
-                        map: mapFn
-                    };
-                    const lastBind = types[types.length - 1];
-                    let mapped: Type | undefined;
-                    if (links.isTsPlusDoReturnBound) {
-                        mapped = links.tsPlusDoBoundReturnType;
-                    }
-                    if (!mapped) {
-                        mapped = tsPlusDoCheckLastBind(lastBind[0], mapFn.tsPlusOriginal, lastBind[1], checked);
-                    }
-                    const toBeFlatMapped = types.map((t, i) => i !== types.length - 1 ? t : [t[0], mapped] as typeof t);
-                    return tsPlusDoCheckChain(toBeFlatMapped, flatMapFn.tsPlusOriginal);
-                } else {
+                });
+                if (types.length === 0) {
                     error(node, Diagnostics.A_Do_block_must_contain_at_least_1_bound_value);
                     return errorType;
                 }
+                getNodeLinks(node).tsPlusDoBindTypes = types;
+                const mapFn = tsPlusDoChooseImplementation(types, "map");
+                if (!mapFn) {
+                    error(node, Diagnostics.Cannot_find_a_valid_0_that_can_handle_all_the_types_of_1, "map", typeToString(getUnionType(types.map((t) => t[1]))))
+                    return errorType;
+                }
+                const flatMapFn = tsPlusDoChooseImplementation(types, "flatMap");
+                if (!flatMapFn) {
+                    error(node, Diagnostics.Cannot_find_a_valid_0_that_can_handle_all_the_types_of_1, "flatMap", typeToString(getUnionType(types.map((t) => t[1]))))
+                    return errorType;
+                }
+                getNodeLinks(node).tsPlusDoFunctions = {
+                    flatMap: flatMapFn,
+                    map: mapFn
+                };
+                const lastBind = types[types.length - 1];
+                const links = getNodeLinks(node);
+                const mapped = links.isTsPlusDoReturnBound ? lastBind[1] : tsPlusDoCheckLastBind(lastBind[0], mapFn.tsPlusOriginal, lastBind[1], checked)
+                const toBeFlatMapped = types.map((t, i) => i !== types.length - 1 ? t : [t[0], mapped] as typeof t);
+                return tsPlusDoCheckChain(toBeFlatMapped, flatMapFn.tsPlusOriginal);
             }
             error(node, Diagnostics.The_first_argument_of_a_Do_must_be_an_arrow_function);
             return errorType;
