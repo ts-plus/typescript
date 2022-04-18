@@ -1188,6 +1188,7 @@ namespace ts {
         | EntityNameExpression;
 
     export interface Declaration extends Node {
+        // __debugGetText?(): string
         _declarationBrand: any;
     }
 

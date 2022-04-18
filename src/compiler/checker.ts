@@ -15422,9 +15422,8 @@ namespace ts {
         // TSPLUS EXTENSION START
         function checkTsPlusCustomCallMulti(
             nodeForLink: Node,
-            signatures: readonly Signature[],
+            candidates: readonly Signature[],
             args: Expression[],
-            checkMode: CheckMode | undefined,
             addDiagnostic?: (_: Diagnostic) => void,
         ): Type {
             const node = factory.createCallExpression(
@@ -15432,55 +15431,67 @@ namespace ts {
                 [],
                 args
             );
-            let sig: Signature | undefined = void 0;
-            for (let candidate of signatures) {
+            let checkCandidate: Signature | undefined = void 0;
+            const isSingleNonGenericCandidate = candidates.length === 1 && !candidates[0].typeParameters;
+            let argCheckMode = !isSingleNonGenericCandidate && some(args, isContextSensitive) ? CheckMode.SkipContextSensitive : CheckMode.Normal;
+            for (let candidate of candidates) {
+                let inferenceContext: InferenceContext | undefined;
+                let typeArgumentTypes: Type[] | undefined;
                 if (candidate.typeParameters && candidate.declaration) {
                     setParent(node, candidate.declaration);
-                    const inferenceContext = createInferenceContext(
+                    inferenceContext = createInferenceContext(
                         candidate.typeParameters,
                         candidate,
                         InferenceFlags.None
                     );
-                    const typeArgumentTypes = inferTypeArguments(
+                    typeArgumentTypes = inferTypeArguments(
                         node,
                         candidate,
                         args,
-                        checkMode || CheckMode.Normal,
+                        argCheckMode | CheckMode.SkipGenericFunctions,
                         inferenceContext
                     );
-                    sig = getSignatureInstantiation(
+                    argCheckMode |= inferenceContext.flags & InferenceFlags.SkippedGenericFunction ? CheckMode.SkipGenericFunctions : CheckMode.Normal;
+                    checkCandidate = getSignatureInstantiation(
                         candidate,
                         typeArgumentTypes,
-                        /*isJavascript*/ false,
+                        isInJSFile(candidate.declaration),
                         inferenceContext && inferenceContext.inferredTypeParameters
                     );
                 } else {
-                    sig = candidate;
+                    checkCandidate = candidate;
+                }
+                if (argCheckMode) {
+                    argCheckMode = CheckMode.Normal;
+                    if (inferenceContext) {
+                        const typeArgumentTypes = inferTypeArguments(node, candidate, args, argCheckMode, inferenceContext);
+                        checkCandidate = getSignatureInstantiation(candidate, typeArgumentTypes, isInJSFile(candidate.declaration), inferenceContext && inferenceContext.inferredTypeParameters);
+                    }
                 }
                 const digs = getSignatureApplicabilityError(
                     node,
                     args,
-                    sig,
+                    checkCandidate,
                     assignableRelation,
-                    checkMode || CheckMode.Normal,
+                    argCheckMode,
                     /*reportErrors*/ false,
                     /*containingMessageChain*/ void 0
                 );
                 if (!digs) {
-                    getNodeLinks(nodeForLink).resolvedSignature = sig;
-                    return getReturnTypeOfSignature(sig);
+                    getNodeLinks(nodeForLink).resolvedSignature = checkCandidate;
+                    return getReturnTypeOfSignature(checkCandidate);
                 }
             }
-            if (!sig) {
+            if (!checkCandidate) {
                 return errorType;
             }
             if (addDiagnostic) {
                 getSignatureApplicabilityError(
                     node,
                     args,
-                    sig,
+                    checkCandidate,
                     assignableRelation,
-                    checkMode || CheckMode.Normal,
+                    argCheckMode,
                     /*reportErrors*/ true,
                     /*containingMessageChain*/ void 0
                 )?.forEach((dig) => {
@@ -35809,7 +35820,7 @@ namespace ts {
                     const rightType = getLastResult(state);
                     Debug.assertIsDefined(rightType);
 
-                    result = checkBinaryLikeExpressionWorker(node.left, node.operatorToken, node.right, leftType, rightType, state.checkMode, node);
+                    result = checkBinaryLikeExpressionWorker(node.left, node.operatorToken, node.right, leftType, rightType, node);
                 }
 
                 state.skip = false;
@@ -35880,7 +35891,7 @@ namespace ts {
             }
 
             const rightType = checkExpression(right, checkMode);
-            return checkBinaryLikeExpressionWorker(left, operatorToken, right, leftType, rightType, checkMode, errorNode);
+            return checkBinaryLikeExpressionWorker(left, operatorToken, right, leftType, rightType, errorNode);
         }
 
         function checkBinaryLikeExpressionWorker(
@@ -35889,7 +35900,6 @@ namespace ts {
             right: Expression,
             leftType: Type,
             rightType: Type,
-            checkMode: CheckMode | undefined,
             errorNode?: Node
         ): Type {
             const operator = operatorToken.kind;
@@ -35900,14 +35910,19 @@ namespace ts {
             if (operatorMappingEntry) {
                 const signatures = getOperatorExtensionsForTypes(operatorMappingEntry, [leftType, rightType]);
                 if (signatures.length > 0) {
-                    getNodeLinks(operatorToken).isTsPlusOperatorToken = true;
-                    return checkTsPlusCustomCallMulti(
-                        operatorToken,
-                        signatures,
-                        [left, right],
-                        checkMode || CheckMode.Normal,
-                        (_) => diagnostics.add(_)
-                    );
+                    const links = getNodeLinks(operatorToken.parent);
+                    if (!links.tsPlusResolvedType) {
+                        links.tsPlusResolvedType = checkTsPlusCustomCallMulti(
+                            operatorToken,
+                            signatures,
+                            [left, right],
+                            (_) => diagnostics.add(_)
+                            );
+                            if (!isErrorType(links.tsPlusResolvedType)) {
+                            getNodeLinks(operatorToken).isTsPlusOperatorToken = true;
+                        }
+                    }
+                    return links.tsPlusResolvedType;
                 }
             }
             getNodeLinks(operatorToken).isTsPlusOperatorToken = false;
@@ -36879,16 +36894,18 @@ namespace ts {
                 if (operatorMappingEntry) {
                     const signatures = getOperatorExtensionsForTypes(operatorMappingEntry, [getTypeOfNode(node.left)]);
                     if (signatures.length > 0) {
-                        const resolved = checkTsPlusCustomCallMulti(
-                            node.operatorToken,
-                            signatures,
-                            [node.left, node.right],
-                            checkMode || CheckMode.Normal
-                        );
-                        if (!isErrorType(resolved)) {
-                            getNodeLinks(node.operatorToken).isTsPlusOperatorToken = true;
-                            return resolved;
+                        const links = getNodeLinks(node);
+                        if (!links.tsPlusResolvedType) {
+                            links.tsPlusResolvedType = checkTsPlusCustomCallMulti(
+                                node.operatorToken,
+                                signatures,
+                                [node.left, node.right]
+                            );
+                            if (!isErrorType(links.tsPlusResolvedType)) {
+                                getNodeLinks(node.operatorToken).isTsPlusOperatorToken = true;
+                            }
                         }
+                        return links.tsPlusResolvedType;
                     }
                 }
             }
