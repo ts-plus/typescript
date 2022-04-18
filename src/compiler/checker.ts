@@ -15596,7 +15596,19 @@ namespace ts {
             }
             return candidate;
         }
-
+        function computeUnifiedType(unifier: FunctionDeclaration, union: Type) {
+            for (const signature of getSignaturesOfType(getTypeOfNode(unifier), SignatureKind.Call)) {
+                if (signature.minArgumentCount === 1 && signature.typeParameters) {
+                    const context = createInferenceContext(signature.typeParameters, signature, InferenceFlags.None);
+                    inferTypes(context.inferences, union, getTypeOfSymbol(signature.parameters[0]));
+                    const instantiated = getSignatureInstantiation(signature, getInferredTypes(context), /*isJavascript*/ false)
+                    if (isTypeAssignableTo(union, getTypeOfSymbol(instantiated.parameters[0]))) {
+                        return getReturnTypeOfSignature(instantiated);
+                    }
+                }
+            }
+            return errorType;
+        }
         function getUnionType(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type): Type {
             const unionType = getUnionTypeOriginal(types, unionReduction, aliasSymbol, aliasTypeArguments, origin);
             if (types.length <= 1 || aliasSymbol || unificationInProgress.isRunning) {
@@ -15622,11 +15634,7 @@ namespace ts {
                         const id = identityCache.get(target);
                         if (id) {
                             unificationInProgress.isRunning = true;
-                            const result = checkTsPlusCustomCall(
-                                id,
-                                [factory.createSyntheticExpression(unionType)],
-                                CheckMode.Normal
-                                );
+                            const result = computeUnifiedType(id, unionType);
                             unificationInProgress.isRunning = false;
                             if (!isErrorType(result)) {
                                 if (result.aliasTypeArguments && result.aliasSymbol) {
