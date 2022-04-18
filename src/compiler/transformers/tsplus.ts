@@ -811,11 +811,11 @@ namespace ts {
                     if (isExpressionWithReferencedGlobalImport(visited.expression)) {
                         importer.remove(visited.expression.tsPlusReferencedGlobalImport);
                     }
+                    const originalExpression = node.expression
                     if (fluentExtension.tsPlusPipeable) {
-                        const signature = checker.getResolvedSignature(node);
                         let expression = simplyfy(visited.expression);
-                        if (signature?.thisParameter) {
-                            if (checker.shouldMakeLazy(signature.thisParameter, checker.getTypeAtLocation(expression))) {
+                        if (fluentExtension.thisParameter) {
+                            if (checker.shouldMakeLazy(fluentExtension.thisParameter, checker.getTypeAtLocation(originalExpression))) {
                                 expression = context.factory.createArrowFunction(
                                     void 0,
                                     void 0,
@@ -838,10 +838,9 @@ namespace ts {
                         )
                     }
                     else {
-                        const signature = checker.getResolvedSignature(node);
                         let expression = simplyfy((visited as CallExpression).expression);
-                        if (signature?.thisParameter) {
-                            if (checker.shouldMakeLazy(signature.thisParameter, checker.getTypeAtLocation(expression))) {
+                        if (fluentExtension.thisParameter) {
+                            if (checker.shouldMakeLazy(fluentExtension.thisParameter, checker.getTypeAtLocation(originalExpression))) {
                                 expression = context.factory.createArrowFunction(
                                     void 0,
                                     void 0,
@@ -886,11 +885,11 @@ namespace ts {
                     if (isExpressionWithReferencedGlobalImport(visited.expression)) {
                         importer.remove(visited.expression.tsPlusReferencedGlobalImport);
                     }
+                    const originalExpression = node.expression.expression;
                     if (fluentExtension.tsPlusPipeable) {
-                        const signature = checker.getResolvedSignature(node);
                         let expression = simplyfy((visited.expression as PropertyAccessExpression).expression);
-                        if (signature?.thisParameter) {
-                            if (checker.shouldMakeLazy(signature.thisParameter, checker.getTypeAtLocation(expression))) {
+                        if (fluentExtension.thisParameter) {
+                            if (checker.shouldMakeLazy(fluentExtension.thisParameter, checker.getTypeAtLocation(originalExpression))) {
                                 expression = context.factory.createArrowFunction(
                                     void 0,
                                     void 0,
@@ -913,10 +912,9 @@ namespace ts {
                         )
                     }
                     else {
-                        const signature = checker.getResolvedSignature(node);
                         let expression = simplyfy(((visited as CallExpression).expression as PropertyAccessExpression).expression);
-                        if (signature?.thisParameter) {
-                            if (checker.shouldMakeLazy(signature.thisParameter, checker.getTypeAtLocation(expression))) {
+                        if (fluentExtension.thisParameter) {
+                            if (checker.shouldMakeLazy(fluentExtension.thisParameter, checker.getTypeAtLocation(originalExpression))) {
                                 expression = context.factory.createArrowFunction(
                                     void 0,
                                     void 0,
