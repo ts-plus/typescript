@@ -1030,6 +1030,7 @@ namespace ts {
 
     // TODO(rbuckton): Constraint 'TKind' to 'TokenSyntaxKind'
     export interface Token<TKind extends SyntaxKind> extends Node {
+        __debugGetText?(): string
         readonly kind: TKind;
     }
 
@@ -1188,7 +1189,7 @@ namespace ts {
         | EntityNameExpression;
 
     export interface Declaration extends Node {
-        // __debugGetText?(): string
+        __debugGetText?(): string
         _declarationBrand: any;
     }
 
@@ -1795,6 +1796,7 @@ namespace ts {
     // never actually given values.  At runtime they have zero cost.
 
     export interface Expression extends Node {
+        __debugGetText?(): string
         _expressionBrand: any;
     }
 
