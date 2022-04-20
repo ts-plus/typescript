@@ -15427,6 +15427,7 @@ namespace ts {
             addDiagnostic?: (_: Diagnostic) => void,
         ): Type {
             const expr = factory.createIdentifier("$tsplus_custom_call");
+            setTextRange(expr, nodeForLink);
             const node = factory.createCallExpression(
                 expr,
                 [],

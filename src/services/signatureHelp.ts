@@ -30,6 +30,11 @@ namespace ts.SignatureHelp {
             return undefined;
         }
 
+        const parentBinaryExpression = findAncestor(startingToken, isBinaryExpression);
+        if (parentBinaryExpression) {
+            typeChecker.getTypeAtLocation(parentBinaryExpression);
+        }
+
         // Only need to be careful if the user typed a character and signature help wasn't showing.
         const onlyUseSyntacticOwners = !!triggerReason && triggerReason.kind === "characterTyped";
 
