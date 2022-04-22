@@ -1193,9 +1193,7 @@ namespace ts {
         function isExtensionValidForTarget(extension: Type, targetType: Type): boolean {
             return getSignaturesOfType(extension, SignatureKind.Call).find((candidate) => {
                 if (candidate.thisParameter) {
-                    const _paramType = getTypeOfSymbol(candidate.thisParameter);
-                    const isLazy = isLazyParameterByType(_paramType);
-                    const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
+                    const paramType = unionIfLazy(getTypeOfSymbol(candidate.thisParameter))[0];
                     if (!candidate.typeParameters) {
                         return isTypeAssignableTo(targetType, paramType);
                     } else {
@@ -1211,6 +1209,11 @@ namespace ts {
                 }
                 return false;
             }) !== undefined;
+        }
+        function unionIfLazy(_paramType: Type) {
+            const isLazy = isLazyParameterByType(_paramType);
+            const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
+            return [paramType, isLazy] as const;
         }
         function getFluentExtension(targetType: Type, name: string): Type | undefined {
             const symbols = collectRelevantSymbols(targetType);
@@ -1350,36 +1353,6 @@ namespace ts {
                 }
             }
         }
-        function getOperatorExtensionsForSymbols(name: string, symbols: readonly Symbol[]): Signature[] {
-            const signatures = new Set<Signature>();
-            for (const target of symbols) {
-                if (typeSymbolCache.has(target)) {
-                    for (const tag of typeSymbolCache.get(target)!) {
-                        if (operatorCache.has(tag)) {
-                            const cache = operatorCache.get(tag)
-                            const extensions = cache?.get(name);
-                            if (extensions) {
-                                for (const extension of extensions) {
-                                    for (const signature of getSignaturesOfType(getTypeOfSymbol(extension.patched), SignatureKind.Call)) {
-                                        signatures.add(signature)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return arrayFrom(signatures.values());
-        }
-        function getOperatorExtensionsForTypes(name: string, types: Type[]): Signature[] {
-            const symbols = new Set<Symbol>();
-            for (const type of types) {
-                collectRelevantSymbols(type).forEach((symbol) => {
-                    symbols.add(symbol)
-                })
-            }
-            return getOperatorExtensionsForSymbols(name, arrayFrom(symbols.values()));
-        }
         function isTransformablePipeableExtension(type: Type): boolean {
             if (type.symbol) {
                 if (isTsPlusSymbol(type.symbol)) {
@@ -1501,10 +1474,10 @@ namespace ts {
             }
         }
         function isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K> {
-            if (!isCallExpression(node)) {
+            if (!isCallExpression(node) && !isBinaryExpression(node)) {
                 return false;
             }
-            const links = getNodeLinks(node);
+            const links = getNodeLinks(isCallExpression(node) ? node : node.operatorToken);
             if (
                 links.resolvedSignature &&
                 links.resolvedSignature.declaration &&
@@ -15417,78 +15390,6 @@ namespace ts {
             const result = createOriginType(flags) as UnionOrIntersectionType;
             result.types = types;
             return result;
-        }
-
-        // TSPLUS EXTENSION START
-        function checkTsPlusCustomCallMulti(
-            nodeForLink: Node,
-            signatures: readonly Signature[],
-            args: Expression[],
-            checkMode: CheckMode | undefined,
-            addDiagnostic?: (_: Diagnostic) => void,
-        ): Type {
-            const node = factory.createCallExpression(
-                factory.createIdentifier("$tsplus_custom_call"),
-                [],
-                args
-            );
-            let sig: Signature | undefined = void 0;
-            for (let candidate of signatures) {
-                if (candidate.typeParameters && candidate.declaration) {
-                    setParent(node, candidate.declaration);
-                    const inferenceContext = createInferenceContext(
-                        candidate.typeParameters,
-                        candidate,
-                        InferenceFlags.None
-                    );
-                    const typeArgumentTypes = inferTypeArguments(
-                        node,
-                        candidate,
-                        args,
-                        checkMode || CheckMode.Normal,
-                        inferenceContext
-                    );
-                    sig = getSignatureInstantiation(
-                        candidate,
-                        typeArgumentTypes,
-                        /*isJavascript*/ false,
-                        inferenceContext && inferenceContext.inferredTypeParameters
-                    );
-                } else {
-                    sig = candidate;
-                }
-                const digs = getSignatureApplicabilityError(
-                    node,
-                    args,
-                    sig,
-                    assignableRelation,
-                    checkMode || CheckMode.Normal,
-                    /*reportErrors*/ false,
-                    /*containingMessageChain*/ void 0
-                );
-                if (!digs) {
-                    getNodeLinks(nodeForLink).resolvedSignature = sig;
-                    return getReturnTypeOfSignature(sig);
-                }
-            }
-            if (!sig) {
-                return errorType;
-            }
-            if (addDiagnostic) {
-                getSignatureApplicabilityError(
-                    node,
-                    args,
-                    sig,
-                    assignableRelation,
-                    checkMode || CheckMode.Normal,
-                    /*reportErrors*/ true,
-                    /*containingMessageChain*/ void 0
-                )?.forEach((dig) => {
-                    addDiagnostic(dig);
-                });
-                return errorType;
-            }
-            return errorType;
         }
 
         function checkTsPlusCustomCall(
@@ -31094,8 +30995,7 @@ namespace ts {
             const thisType = getThisTypeOfSignature(signature);
             if (thisType && couldContainTypeVariables(thisType)) {
                 // TSPLUS EXTENTION BEGIN
-                const isLazy = isLazyParameterByType(thisType);
-                const paramType = isLazy ? getUnionType([thisType, (thisType as TypeReference).resolvedTypeArguments![0]]) : thisType;
+                const paramType = unionIfLazy(thisType)[0];
                 const thisArgumentNode = getThisArgumentOfCall(node);
                 inferTypes(context.inferences, getThisArgumentType(thisArgumentNode), paramType);
                 // TSPLUS EXTENTION END
@@ -31105,9 +31005,7 @@ namespace ts {
                 const arg = args[i];
                 if (arg.kind !== SyntaxKind.OmittedExpression && !(checkMode & CheckMode.IsForStringLiteralArgumentCompletions && hasSkipDirectInferenceFlag(arg))) {
                     // TSPLUS EXTENTION BEGIN
-                    const _paramType = getTypeAtPosition(signature, i);
-                    const isLazy = isLazyParameterByType(_paramType);
-                    const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
+                    const paramType = unionIfLazy(getTypeAtPosition(signature, i))[0];
                     // TSPLUS EXTENTION END
                     if (couldContainTypeVariables(paramType)) {
                         const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
@@ -31353,10 +31251,9 @@ namespace ts {
             }
             const thisType = getThisTypeOfSignature(signature);
             if (thisType && thisType !== voidType && node.kind !== SyntaxKind.NewExpression) {
-                 // TSPLUS EXTENTION BEGIN
-                 const isLazy = isLazyParameterByType(thisType);
-                 const paramType = isLazy ? getUnionType([thisType, (thisType as TypeReference).resolvedTypeArguments![0]]) : thisType;
-                  // TSPLUS EXTENTION END
+                // TSPLUS EXTENTION BEGIN
+                const paramType = unionIfLazy(thisType)[0];
+                // TSPLUS EXTENTION END
                 // If the called expression is not of the form `x.f` or `x["f"]`, then sourceType = voidType
                 // If the signature's 'this' type is voidType, then the check is skipped -- anything is compatible.
                 // If the expression is a new expression, then the check is skipped.
@@ -31376,9 +31273,7 @@ namespace ts {
                 const arg = args[i];
                 if (arg.kind !== SyntaxKind.OmittedExpression) {
                     // TSPLUS EXTENTION BEGIN
-                    const _paramType = getTypeAtPosition(signature, i);
-                    const isLazy = isLazyParameterByType(_paramType);
-                    const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
+                    const [paramType, isLazy] = unionIfLazy(getTypeAtPosition(signature, i));
                      // TSPLUS EXTENTION END
                     const argType = checkExpressionWithContextualType(arg, paramType, /*inferenceContext*/ undefined, checkMode);
                     // TSPLUS EXTENTION BEGIN
@@ -35817,7 +35712,7 @@ namespace ts {
                     const rightType = getLastResult(state);
                     Debug.assertIsDefined(rightType);
 
-                    result = checkBinaryLikeExpressionWorker(node.left, node.operatorToken, node.right, leftType, rightType, state.checkMode, node);
+                    result = checkBinaryLikeExpressionWorker(node.left, node.operatorToken, node.right, leftType, rightType, node);
                 }
 
                 state.skip = false;
@@ -35888,7 +35783,7 @@ namespace ts {
             }
 
             const rightType = checkExpression(right, checkMode);
-            return checkBinaryLikeExpressionWorker(left, operatorToken, right, leftType, rightType, checkMode, errorNode);
+            return checkBinaryLikeExpressionWorker(left, operatorToken, right, leftType, rightType, errorNode);
         }
 
         function checkBinaryLikeExpressionWorker(
@@ -35897,29 +35792,15 @@ namespace ts {
             right: Expression,
             leftType: Type,
             rightType: Type,
-            checkMode: CheckMode | undefined,
             errorNode?: Node
         ): Type {
             const operator = operatorToken.kind;
 
-            // TSPLUS EXTENSION START
-            // @ts-expect-error
-            const operatorMappingEntry = invertedBinaryOp[operator] as string | undefined
-            if (operatorMappingEntry) {
-                const signatures = getOperatorExtensionsForTypes(operatorMappingEntry, [leftType, rightType]);
-                if (signatures.length > 0) {
-                    getNodeLinks(operatorToken).isTsPlusOperatorToken = true;
-                    return checkTsPlusCustomCallMulti(
-                        operatorToken,
-                        signatures,
-                        [left, right],
-                        checkMode || CheckMode.Normal,
-                        (_) => diagnostics.add(_)
-                    );
-                }
+            const links = getNodeLinks(operatorToken);
+
+            if (links.isTsPlusOperatorToken) {
+                return links.resolvedSignature ? getReturnTypeOfSignature(links.resolvedSignature) : errorType;
             }
-            getNodeLinks(operatorToken).isTsPlusOperatorToken = false;
-            // TSPLUS EXTENSION END
 
             switch (operator) {
                 case SyntaxKind.AsteriskToken:
@@ -36879,28 +36760,142 @@ namespace ts {
             }
             return checkExpression(node.expression, checkMode);
         }
-
-        function checkExpressionWorker(node: Expression | QualifiedName, checkMode: CheckMode | undefined, forceTuple?: boolean): Type {
-            // TSPLUS EXTENSION START
-            if (isBinaryExpression(node)) {
-                const operatorMappingEntry = invertedBinaryOp[node.operatorToken.kind as keyof typeof invertedBinaryOp] as string | undefined
-                if (operatorMappingEntry) {
-                    const signatures = getOperatorExtensionsForTypes(operatorMappingEntry, [getTypeOfNode(node.left)]);
-                    if (signatures.length > 0) {
-                        const resolved = checkTsPlusCustomCallMulti(
-                            node.operatorToken,
-                            signatures,
-                            [node.left, node.right],
-                            checkMode || CheckMode.Normal
-                        );
-                        if (!isErrorType(resolved)) {
-                            getNodeLinks(node.operatorToken).isTsPlusOperatorToken = true;
-                            return resolved;
+        function getOperatorExtensionsForSymbols(name: string, symbols: readonly Symbol[]): Signature[] {
+            const signatures = new Set<Signature>();
+            for (const target of symbols) {
+                if (typeSymbolCache.has(target)) {
+                    for (const tag of typeSymbolCache.get(target)!) {
+                        if (operatorCache.has(tag)) {
+                            const cache = operatorCache.get(tag)
+                            const extensions = cache?.get(name);
+                            if (extensions) {
+                                for (const extension of extensions) {
+                                    for (const signature of getSignaturesOfType(getTypeOfSymbol(extension.patched), SignatureKind.Call)) {
+                                        signatures.add(signature)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
-            // TSPLUS EXTENSION END
+            return arrayFrom(signatures.values());
+        }
+        function getOperatorExtensionsForTypes(name: string, types: Type[]): Signature[] {
+            const symbols = new Set<Symbol>();
+            for (const type of types) {
+                collectRelevantSymbols(type).forEach((symbol) => {
+                    symbols.add(symbol)
+                })
+            }
+            return getOperatorExtensionsForSymbols(name, arrayFrom(symbols.values()));
+        }
+
+        function checkTsPlusOperator(left: Expression, right: Expression): Type | undefined {
+            // potentially captured by resolution
+            let lastSignature: Signature | undefined;
+            const resolutionDiagnostics = new Map<Signature, Diagnostic>();
+            // not captured
+            const parent = right.parent as BinaryExpression;
+            const links = getNodeLinks(parent.operatorToken);
+            const alreadyResolved = links.resolvedSignature;
+            if (alreadyResolved && alreadyResolved === resolvingSignature) {
+                return; // in resolution
+            }
+            if (alreadyResolved) {
+                return getTypeAtPosition(alreadyResolved, 1);
+            }
+            if (links.isTsPlusOperatorToken === false) {
+                return; // already checked and not a custom operator
+            }
+            links.resolvedSignature = resolvingSignature;
+            const operator = invertedBinaryOp[parent.operatorToken.kind as keyof typeof invertedBinaryOp] as string | undefined;
+            if (operator) {
+                let resolved: Signature | undefined;
+                const leftType = getTypeOfNode(parent.left);
+                const leftOperators = getOperatorExtensionsForTypes(operator, [leftType]);
+                resolved = resolveTsPlusOperator(left, right, leftOperators);
+                if (!resolved) {
+                    const rightType = checkExpression(right, CheckMode.Normal);
+                    const rightOperators = getOperatorExtensionsForTypes(operator, [rightType]);
+                    resolved = resolveTsPlusOperator(left, right, rightOperators);
+                }
+                if (resolved) {
+                    links.resolvedSignature = resolved;
+                    links.isTsPlusOperatorToken = true;
+                    return getTypeAtPosition(resolved, 1);
+                }
+                else {
+                    if (lastSignature) {
+                        links.resolvedSignature = lastSignature;
+                        links.isTsPlusOperatorToken = true;
+                        const diagnostic = resolutionDiagnostics.get(lastSignature);
+                        if (diagnostic) {
+                            diagnostics.add(diagnostic);
+                        }
+                        return errorType;
+                    }
+                }
+            }
+            links.isTsPlusOperatorToken = false;
+            return;
+            function resolveTsPlusOperator(left: Expression, right: Expression, signatures: Signature[]) {
+                for (let signature of signatures) {
+                    if (resolutionDiagnostics.has(signature)) {
+                        continue;
+                    }
+                    lastSignature = signature;
+                    if (signature.typeParameters) {
+                        const context = createInferenceContext(signature.typeParameters, signature, InferenceFlags.None)
+                        const leftParam = unionIfLazy(getTypeAtPosition(signature, 0))[0];
+                        const leftType = checkExpressionWithContextualType(left, leftParam, context, CheckMode.Normal);
+                        inferTypes(context.inferences, leftType, leftParam);
+                        const rightParam = unionIfLazy(getTypeAtPosition(signature, 1))[0];
+                        const rightType = checkExpressionWithContextualType(right, rightParam, context, CheckMode.Normal);
+                        inferTypes(context.inferences, rightType, rightParam);
+                        const instantiated = getSignatureInstantiation(signature, getInferredTypes(context), /** isJavascript */ false);
+                        const leftInstantiated = unionIfLazy(getTypeAtPosition(instantiated, 0))[0];
+                        const rightInstantiated = unionIfLazy(getTypeAtPosition(instantiated, 1))[0];
+                        if (isTypeAssignableTo(leftType, leftInstantiated)) {
+                            if (isTypeAssignableTo(rightType, rightInstantiated)) {
+                                return instantiated;
+                            }
+                            else {
+                                resolutionDiagnostics.set(signature, createError(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightInstantiated)));
+                            }
+                        }
+                        else {
+                            resolutionDiagnostics.set(signature, createError(left, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(leftType), typeToString(leftInstantiated)));
+                        }
+                    }
+                    else {
+                        const leftParam = unionIfLazy(getTypeAtPosition(signature, 0))[0];
+                        const leftType = checkExpressionWithContextualType(left, leftParam, void 0, CheckMode.Normal);
+                        if (isTypeAssignableTo(leftType, leftParam)) {
+                            const rightParam = unionIfLazy(getTypeAtPosition(signature, 1))[0];
+                            const rightType = checkExpressionWithContextualType(right, rightParam, void 0, CheckMode.Normal);
+                            if (isTypeAssignableTo(rightType, rightParam)) {
+                                return signature;
+                            }
+                            else {
+                                resolutionDiagnostics.set(signature, createError(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightParam)));
+                            }
+                        }
+                        else {
+                            resolutionDiagnostics.set(signature, createError(left, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(leftType), typeToString(leftParam)));
+                        }
+                    }
+                }
+            }
+        }
+        
+        function checkExpressionWorker(node: Expression | QualifiedName, checkMode: CheckMode | undefined, forceTuple?: boolean): Type {
+            if (node.kind !== SyntaxKind.QualifiedName && node.parent && node.parent.kind === SyntaxKind.BinaryExpression && (node.parent as BinaryExpression).right === node) {
+                const result = checkTsPlusOperator((node.parent as BinaryExpression).left, node as Expression);
+                if (result) {
+                    return result;
+                }
+            }
             const kind = node.kind;
             if (cancellationToken) {
                 // Only bother checking on a few construct kinds.  We don't want to be excessively

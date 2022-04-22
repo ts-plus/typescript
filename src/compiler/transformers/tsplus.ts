@@ -265,11 +265,21 @@ namespace ts {
                     const call = operatorLinks.resolvedSignature;
                     const declaration = call.declaration!;
                     const exportName = isFunctionDeclaration(declaration) ? declaration.symbol.escapedName as string : declaration.parent.symbol.escapedName as string;
-                    const lastTrace = call.parameters.length > 0 ? call.parameters[call.parameters.length - 1].escapedName === "___tsplusTrace" : false
-                    const params = [visitNode(node.left, visitor(source, traceInScope)), visitNode(node.right, visitor(source, traceInScope))]
+                    const params = [visitNode(node.left, visitor(source, traceInScope)), visitNode(node.right, visitor(source, traceInScope))];
+                    if (checker.shouldMakeLazy(call.parameters[0], checker.getTypeAtLocation(node.left))) {
+                        params[0] = context.factory.createArrowFunction(void 0, void 0, [], void 0, void 0, params[0]);
+                    }
                     if (checker.shouldMakeLazy(call.parameters[1], checker.getTypeAtLocation(node.right))) {
                         params[1] = context.factory.createArrowFunction(void 0, void 0, [], void 0, void 0, params[1]);
                     }
+                    if (checker.isTsPlusMacroCall(node, "pipe")) {
+                        return optimizePipe(
+                            context.factory.createNodeArray(params, false),
+                            context.factory,
+                            source
+                        );
+                    }
+                    const lastTrace = call.parameters.length > 0 ? call.parameters[call.parameters.length - 1].escapedName === "___tsplusTrace" : false;
                     if (lastTrace) {
                         params.push(traceInScope ? traceInScope : getTrace(source, node.operatorToken))
                     }

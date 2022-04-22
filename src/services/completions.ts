@@ -2155,7 +2155,15 @@ namespace ts.Completions {
         const getModuleSpecifierResolutionHost = memoizeOne((isFromPackageJson: boolean) => {
             return createModuleSpecifierResolutionHost(isFromPackageJson ? host.getPackageJsonAutoImportProvider!()! : program, host);
         });
-
+        let currentBinaryAnchestor: BinaryExpression | undefined = findAncestor(node, isBinaryExpression);
+        let binaryExpressionParent = currentBinaryAnchestor;
+        while (currentBinaryAnchestor) {
+            binaryExpressionParent = currentBinaryAnchestor;
+            currentBinaryAnchestor = findAncestor(currentBinaryAnchestor.parent, isBinaryExpression);
+        }
+        if (binaryExpressionParent) {
+            typeChecker.getTypeAtLocation(binaryExpressionParent);
+        }
         if (isRightOfDot || isRightOfQuestionDot) {
             getTypeScriptMemberSymbols();
         }
