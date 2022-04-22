@@ -2253,6 +2253,10 @@ namespace ts.Completions {
                 || (isImportType && !(node as ImportTypeNode).isTypeOf)
                 || isPartOfTypeNode(node.parent)
                 || isPossiblyTypeArgumentPosition(contextToken, sourceFile, typeChecker);
+            const binaryExpressionParent = findAncestor(node, isBinaryExpression)
+            if (binaryExpressionParent) {
+                typeChecker.getTypeAtLocation(binaryExpressionParent);
+            }
             const isRhsOfImportDeclaration = isInRightSideOfInternalImportEqualsDeclaration(node);
             if (isEntityName(node) || isImportType || isPropertyAccessExpression(node)) {
                 const isNamespaceName = isModuleDeclaration(node.parent);

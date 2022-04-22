@@ -450,7 +450,6 @@ namespace ts {
         const freshObjectLiteralFlag = compilerOptions.suppressExcessPropertyErrors ? 0 : ObjectFlags.FreshLiteral;
         const exactOptionalPropertyTypes = compilerOptions.exactOptionalPropertyTypes;
 
-        const checkBinaryExpression = createCheckBinaryExpression();
         const emitResolver = createResolver();
         const nodeBuilder = createNodeBuilder();
 
@@ -15420,77 +15419,101 @@ namespace ts {
         }
 
         // TSPLUS EXTENSION START
-        function checkTsPlusCustomCallMulti(
+        function checkTsPlusCallForOperator(
             nodeForLink: Node,
-            signatures: readonly Signature[],
+            candidates: readonly Signature[],
             args: Expression[],
-            checkMode: CheckMode | undefined,
+            parent: Node,
             addDiagnostic?: (_: Diagnostic) => void,
         ): Type {
+            const expr = factory.createIdentifier("$tsplus_custom_call");
+            setTextRange(expr, nodeForLink);
             const node = factory.createCallExpression(
-                factory.createIdentifier("$tsplus_custom_call"),
+                expr,
                 [],
                 args
             );
-            let sig: Signature | undefined = void 0;
-            for (let candidate of signatures) {
+            const save = map(args, (arg) => arg.parent);
+            setParent(node, parent);
+            setParent(expr, node);
+            forEach(args, (arg) => setParent(arg, node));
+            function restore() {
+                forEach(args, (arg, i) => setParent(arg, save[i]));
+            }
+            let checkCandidate: Signature | undefined = void 0;
+            const isSingleNonGenericCandidate = candidates.length === 1 && !candidates[0].typeParameters;
+            let argCheckMode = !isSingleNonGenericCandidate && some(args, isContextSensitive) ? CheckMode.SkipContextSensitive : CheckMode.Normal;
+            for (let candidate of candidates) {
+                let inferenceContext: InferenceContext | undefined;
+                let typeArgumentTypes: Type[] | undefined;
                 if (candidate.typeParameters && candidate.declaration) {
                     setParent(node, candidate.declaration);
-                    const inferenceContext = createInferenceContext(
+                    inferenceContext = createInferenceContext(
                         candidate.typeParameters,
                         candidate,
                         InferenceFlags.None
                     );
-                    const typeArgumentTypes = inferTypeArguments(
+                    typeArgumentTypes = inferTypeArguments(
                         node,
                         candidate,
                         args,
-                        checkMode || CheckMode.Normal,
+                        argCheckMode | CheckMode.SkipGenericFunctions,
                         inferenceContext
                     );
-                    sig = getSignatureInstantiation(
+                    argCheckMode |= inferenceContext.flags & InferenceFlags.SkippedGenericFunction ? CheckMode.SkipGenericFunctions : CheckMode.Normal;
+                    checkCandidate = getSignatureInstantiation(
                         candidate,
                         typeArgumentTypes,
-                        /*isJavascript*/ false,
+                        isInJSFile(candidate.declaration),
                         inferenceContext && inferenceContext.inferredTypeParameters
                     );
                 } else {
-                    sig = candidate;
+                    checkCandidate = candidate;
+                }
+                if (argCheckMode) {
+                    argCheckMode = CheckMode.Normal;
+                    if (inferenceContext) {
+                        const typeArgumentTypes = inferTypeArguments(node, candidate, args, argCheckMode, inferenceContext);
+                        checkCandidate = getSignatureInstantiation(candidate, typeArgumentTypes, isInJSFile(candidate.declaration), inferenceContext && inferenceContext.inferredTypeParameters);
+                    }
                 }
                 const digs = getSignatureApplicabilityError(
                     node,
                     args,
-                    sig,
+                    checkCandidate,
                     assignableRelation,
-                    checkMode || CheckMode.Normal,
+                    argCheckMode,
                     /*reportErrors*/ false,
                     /*containingMessageChain*/ void 0
                 );
                 if (!digs) {
-                    getNodeLinks(nodeForLink).resolvedSignature = sig;
-                    return getReturnTypeOfSignature(sig);
+                    getNodeLinks(nodeForLink).resolvedSignature = checkCandidate;
+                    restore();
+                    return getReturnTypeOfSignature(checkCandidate);
                 }
             }
-            if (!sig) {
+            if (!checkCandidate) {
+                restore();
                 return errorType;
             }
             if (addDiagnostic) {
                 getSignatureApplicabilityError(
                     node,
                     args,
-                    sig,
+                    checkCandidate,
                     assignableRelation,
-                    checkMode || CheckMode.Normal,
+                    argCheckMode,
                     /*reportErrors*/ true,
                     /*containingMessageChain*/ void 0
                 )?.forEach((dig) => {
                     addDiagnostic(dig);
                 });
+                restore();
                 return errorType;
             }
+            restore();
             return errorType;
         }
-
         function checkTsPlusCustomCall(
             declaration: Declaration,
             args: Expression[],
@@ -35721,145 +35744,6 @@ namespace ts {
             return (target.flags & TypeFlags.Nullable) !== 0 || isTypeComparableTo(source, target);
         }
 
-        function createCheckBinaryExpression() {
-            interface WorkArea {
-                readonly checkMode: CheckMode | undefined;
-                skip: boolean;
-                stackIndex: number;
-                /**
-                 * Holds the types from the left-side of an expression from [0..stackIndex].
-                 * Holds the type of the result at stackIndex+1. This allows us to reuse existing stack entries
-                 * and avoid storing an extra property on the object (i.e., `lastResult`).
-                 */
-                typeStack: (Type | undefined)[];
-            }
-
-            const trampoline = createBinaryExpressionTrampoline(onEnter, onLeft, onOperator, onRight, onExit, foldState);
-
-            return (node: BinaryExpression, checkMode: CheckMode | undefined) => {
-                const result = trampoline(node, checkMode);
-                Debug.assertIsDefined(result);
-                return result;
-            };
-
-            function onEnter(node: BinaryExpression, state: WorkArea | undefined, checkMode: CheckMode | undefined) {
-                if (state) {
-                    state.stackIndex++;
-                    state.skip = false;
-                    setLeftType(state, /*type*/ undefined);
-                    setLastResult(state, /*type*/ undefined);
-                }
-                else {
-                    state = {
-                        checkMode,
-                        skip: false,
-                        stackIndex: 0,
-                        typeStack: [undefined, undefined],
-                    };
-                }
-
-                if (isInJSFile(node) && getAssignedExpandoInitializer(node)) {
-                    state.skip = true;
-                    setLastResult(state, checkExpression(node.right, checkMode));
-                    return state;
-                }
-
-                checkGrammarNullishCoalesceWithLogicalExpression(node);
-
-                const operator = node.operatorToken.kind;
-                if (operator === SyntaxKind.EqualsToken && (node.left.kind === SyntaxKind.ObjectLiteralExpression || node.left.kind === SyntaxKind.ArrayLiteralExpression)) {
-                    state.skip = true;
-                    setLastResult(state, checkDestructuringAssignment(node.left, checkExpression(node.right, checkMode), checkMode, node.right.kind === SyntaxKind.ThisKeyword));
-                    return state;
-                }
-
-                return state;
-            }
-
-            function onLeft(left: Expression, state: WorkArea, _node: BinaryExpression) {
-                if (!state.skip) {
-                    return maybeCheckExpression(state, left);
-                }
-            }
-
-            function onOperator(operatorToken: BinaryOperatorToken, state: WorkArea, node: BinaryExpression) {
-                if (!state.skip) {
-                    const leftType = getLastResult(state);
-                    Debug.assertIsDefined(leftType);
-                    setLeftType(state, leftType);
-                    setLastResult(state, /*type*/ undefined);
-                    const operator = operatorToken.kind;
-                    if (operator === SyntaxKind.AmpersandAmpersandToken || operator === SyntaxKind.BarBarToken || operator === SyntaxKind.QuestionQuestionToken) {
-                        if (operator === SyntaxKind.AmpersandAmpersandToken) {
-                            const parent = walkUpParenthesizedExpressions(node.parent);
-                            checkTestingKnownTruthyCallableOrAwaitableType(node.left, isIfStatement(parent) ? parent.thenStatement : undefined);
-                        }
-                        checkTruthinessOfType(leftType, node.left);
-                    }
-                }
-            }
-
-            function onRight(right: Expression, state: WorkArea, _node: BinaryExpression) {
-                if (!state.skip) {
-                    return maybeCheckExpression(state, right);
-                }
-            }
-
-            function onExit(node: BinaryExpression, state: WorkArea): Type | undefined {
-                let result: Type | undefined;
-                if (state.skip) {
-                    result = getLastResult(state);
-                }
-                else {
-                    const leftType = getLeftType(state);
-                    Debug.assertIsDefined(leftType);
-
-                    const rightType = getLastResult(state);
-                    Debug.assertIsDefined(rightType);
-
-                    result = checkBinaryLikeExpressionWorker(node.left, node.operatorToken, node.right, leftType, rightType, state.checkMode, node);
-                }
-
-                state.skip = false;
-                setLeftType(state, /*type*/ undefined);
-                setLastResult(state, /*type*/ undefined);
-                state.stackIndex--;
-                return result;
-            }
-
-            function foldState(state: WorkArea, result: Type | undefined, _side: "left" | "right") {
-                setLastResult(state, result);
-                return state;
-            }
-
-            function maybeCheckExpression(state: WorkArea, node: Expression): BinaryExpression | undefined {
-                if (isBinaryExpression(node)) {
-                    return node;
-                }
-                setLastResult(state, checkExpression(node, state.checkMode));
-            }
-
-            function getLeftType(state: WorkArea) {
-                return state.typeStack[state.stackIndex];
-            }
-
-            function setLeftType(state: WorkArea, type: Type | undefined) {
-                state.typeStack[state.stackIndex] = type;
-            }
-
-            function getLastResult(state: WorkArea) {
-                return state.typeStack[state.stackIndex + 1];
-            }
-
-            function setLastResult(state: WorkArea, type: Type | undefined) {
-                // To reduce overhead, reuse the next stack entry to store the
-                // last result. This avoids the overhead of an additional property
-                // on `WorkArea` and reuses empty stack entries as we walk back up
-                // the stack.
-                state.typeStack[state.stackIndex + 1] = type;
-            }
-        }
-
         function checkGrammarNullishCoalesceWithLogicalExpression(node: BinaryExpression) {
             const { left, operatorToken, right } = node;
             if (operatorToken.kind === SyntaxKind.QuestionQuestionToken) {
@@ -35870,6 +35754,16 @@ namespace ts {
                     grammarErrorOnNode(right, Diagnostics._0_and_1_operations_cannot_be_mixed_without_parentheses, tokenToString(right.operatorToken.kind), tokenToString(operatorToken.kind));
                 }
             }
+        }
+
+        function checkBinaryExpression(node: BinaryExpression, checkMode: CheckMode | undefined) {
+            checkGrammarNullishCoalesceWithLogicalExpression(node);
+
+            const custom = checkTsPlusOperator(node.left, node.right, node.operatorToken);
+            if (custom) {
+                return custom;
+            }
+            return checkBinaryLikeExpression(node.left, node.operatorToken, node.right, checkMode);
         }
 
         // Note that this and `checkBinaryExpression` above should behave mostly the same, except this elides some
@@ -35888,38 +35782,46 @@ namespace ts {
             }
 
             const rightType = checkExpression(right, checkMode);
-            return checkBinaryLikeExpressionWorker(left, operatorToken, right, leftType, rightType, checkMode, errorNode);
+            return checkBinaryLikeExpressionWorker(left, operatorToken, right, leftType, rightType, errorNode);
         }
-
+        function checkTsPlusOperator(
+            left: Expression,
+            right: Expression,
+            operatorToken: Node
+        ) {
+            const operator = operatorToken.kind;
+            // @ts-expect-error
+            const operatorMappingEntry = invertedBinaryOp[operator] as string | undefined
+            if (operatorMappingEntry) {
+                const signatures = getOperatorExtensionsForTypes(operatorMappingEntry, [getTypeOfNode(left)]);
+                if (signatures.length > 0) {
+                    const links = getNodeLinks(operatorToken.parent);
+                    if (!links.tsPlusResolvedType) {
+                        links.tsPlusResolvedType = checkTsPlusCallForOperator(
+                            operatorToken,
+                            signatures,
+                            [left, right],
+                            operatorToken.parent.parent,
+                            (_) => diagnostics.add(_)
+                        );
+                        if (!isErrorType(links.tsPlusResolvedType)) {
+                            getNodeLinks(operatorToken).isTsPlusOperatorToken = true;
+                        }
+                    }
+                    return links.tsPlusResolvedType;
+                }
+            }
+            getNodeLinks(operatorToken).isTsPlusOperatorToken = false;
+        }
         function checkBinaryLikeExpressionWorker(
             left: Expression,
             operatorToken: Node,
             right: Expression,
             leftType: Type,
             rightType: Type,
-            checkMode: CheckMode | undefined,
             errorNode?: Node
         ): Type {
             const operator = operatorToken.kind;
-
-            // TSPLUS EXTENSION START
-            // @ts-expect-error
-            const operatorMappingEntry = invertedBinaryOp[operator] as string | undefined
-            if (operatorMappingEntry) {
-                const signatures = getOperatorExtensionsForTypes(operatorMappingEntry, [leftType, rightType]);
-                if (signatures.length > 0) {
-                    getNodeLinks(operatorToken).isTsPlusOperatorToken = true;
-                    return checkTsPlusCustomCallMulti(
-                        operatorToken,
-                        signatures,
-                        [left, right],
-                        checkMode || CheckMode.Normal,
-                        (_) => diagnostics.add(_)
-                    );
-                }
-            }
-            getNodeLinks(operatorToken).isTsPlusOperatorToken = false;
-            // TSPLUS EXTENSION END
 
             switch (operator) {
                 case SyntaxKind.AsteriskToken:
@@ -36881,26 +36783,6 @@ namespace ts {
         }
 
         function checkExpressionWorker(node: Expression | QualifiedName, checkMode: CheckMode | undefined, forceTuple?: boolean): Type {
-            // TSPLUS EXTENSION START
-            if (isBinaryExpression(node)) {
-                const operatorMappingEntry = invertedBinaryOp[node.operatorToken.kind as keyof typeof invertedBinaryOp] as string | undefined
-                if (operatorMappingEntry) {
-                    const signatures = getOperatorExtensionsForTypes(operatorMappingEntry, [getTypeOfNode(node.left)]);
-                    if (signatures.length > 0) {
-                        const resolved = checkTsPlusCustomCallMulti(
-                            node.operatorToken,
-                            signatures,
-                            [node.left, node.right],
-                            checkMode || CheckMode.Normal
-                        );
-                        if (!isErrorType(resolved)) {
-                            getNodeLinks(node.operatorToken).isTsPlusOperatorToken = true;
-                            return resolved;
-                        }
-                    }
-                }
-            }
-            // TSPLUS EXTENSION END
             const kind = node.kind;
             if (cancellationToken) {
                 // Only bother checking on a few construct kinds.  We don't want to be excessively
