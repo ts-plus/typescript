@@ -36803,7 +36803,7 @@ namespace ts {
             return getOperatorExtensionsForSymbols(name, arrayFrom(symbols.values()));
         }
 
-        function checkTsPlusOperator(left: Expression, right: Expression): Type | undefined {
+        function checkTsPlusOperator(left: Expression, right: Expression): readonly [Type, Type] | undefined {
             // potentially captured by resolution
             let lastSignature: Signature | undefined;
             const resolutionDiagnostics = new Map<Signature, Diagnostic>();
@@ -36815,7 +36815,7 @@ namespace ts {
                 return; // in resolution
             }
             if (alreadyResolved) {
-                return getTypeAtPosition(alreadyResolved, 1);
+                return [getTypeAtPosition(alreadyResolved, 0), getTypeAtPosition(alreadyResolved, 1)];
             }
             if (links.isTsPlusOperatorToken === false) {
                 return; // already checked and not a custom operator
@@ -36835,7 +36835,7 @@ namespace ts {
                 if (resolved) {
                     links.resolvedSignature = resolved;
                     links.isTsPlusOperatorToken = true;
-                    return getTypeAtPosition(resolved, 1);
+                    return [getTypeAtPosition(resolved, 0), getTypeAtPosition(resolved, 1)] as const;
                 }
                 else {
                     if (lastSignature) {
@@ -36845,7 +36845,7 @@ namespace ts {
                         if (diagnostic) {
                             diagnostics.add(diagnostic);
                         }
-                        return errorType;
+                        return [errorType, errorType] as const;
                     }
                 }
             }
@@ -36910,10 +36910,10 @@ namespace ts {
         }
         
         function checkExpressionWorker(node: Expression | QualifiedName, checkMode: CheckMode | undefined, forceTuple?: boolean): Type {
-            if (node.kind !== SyntaxKind.QualifiedName && node.parent && node.parent.kind === SyntaxKind.BinaryExpression && (node.parent as BinaryExpression).right === node) {
-                const result = checkTsPlusOperator((node.parent as BinaryExpression).left, node as Expression);
+            if (node.kind !== SyntaxKind.QualifiedName && node.parent && node.parent.kind === SyntaxKind.BinaryExpression) {
+                const result = checkTsPlusOperator((node.parent as BinaryExpression).left, (node.parent as BinaryExpression).right);
                 if (result) {
-                    return result;
+                    return node === (node.parent as BinaryExpression).right ? result[1] : result[0];
                 }
             }
             const kind = node.kind;
