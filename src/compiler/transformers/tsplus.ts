@@ -266,10 +266,10 @@ namespace ts {
                     const declaration = call.declaration!;
                     const exportName = isFunctionDeclaration(declaration) ? declaration.symbol.escapedName as string : declaration.parent.symbol.escapedName as string;
                     const params = [visitNode(node.left, visitor(source, traceInScope)), visitNode(node.right, visitor(source, traceInScope))];
-                    if (checker.shouldMakeLazy(call.parameters[0], checker.getTypeAtLocation(node.left))) {
+                    if (checker.getNodeLinks(node.left).tsPlusLazy) {
                         params[0] = context.factory.createArrowFunction(void 0, void 0, [], void 0, void 0, params[0]);
                     }
-                    if (checker.shouldMakeLazy(call.parameters[1], checker.getTypeAtLocation(node.right))) {
+                    if (checker.getNodeLinks(node.right).tsPlusLazy) {
                         params[1] = context.factory.createArrowFunction(void 0, void 0, [], void 0, void 0, params[1]);
                     }
                     if (checker.isTsPlusMacroCall(node, "pipe")) {

@@ -36866,10 +36866,18 @@ namespace ts {
                         const rightType = checkExpressionWithContextualType(right, rightParam, context, CheckMode.Normal);
                         inferTypes(context.inferences, rightType, rightParam);
                         const instantiated = getSignatureInstantiation(signature, getInferredTypes(context), /** isJavascript */ false);
-                        const leftInstantiated = unionIfLazy(getTypeAtPosition(instantiated, 0))[0];
+                        const leftInstantiatedNotLazy = getTypeAtPosition(instantiated, 0);
+                        const leftInstantiated = unionIfLazy(leftInstantiatedNotLazy)[0];
+                        const rightInstantiatedNotLazy = getTypeAtPosition(instantiated, 1);
                         const rightInstantiated = unionIfLazy(getTypeAtPosition(instantiated, 1))[0];
                         if (isTypeAssignableTo(leftType, leftInstantiated)) {
                             if (isTypeAssignableTo(rightType, rightInstantiated)) {
+                                if (!isTypeAssignableTo(leftType, leftInstantiatedNotLazy)) {
+                                    getNodeLinks(left).tsPlusLazy = true;
+                                }
+                                if (!isTypeAssignableTo(rightType, rightInstantiatedNotLazy)) {
+                                    getNodeLinks(right).tsPlusLazy = true;
+                                }
                                 return instantiated;
                             }
                             else {

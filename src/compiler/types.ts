@@ -5505,7 +5505,8 @@ namespace ts {
         tsPlusDoFunctions?: {
             map: TsPlusSignature
             flatMap: TsPlusSignature
-        }
+        };
+        tsPlusLazy?: boolean;
         // TSPLUS EXTENSION END
     }
 
