@@ -36916,6 +36916,13 @@ namespace ts {
                     return node === (node.parent as BinaryExpression).right ? result[1] : result[0];
                 }
             }
+            if (node.kind === SyntaxKind.BinaryExpression) {
+                checkTsPlusOperator((node as BinaryExpression).left, (node as BinaryExpression).right);
+                const links = getNodeLinks((node as BinaryExpression).operatorToken);
+                if (links.isTsPlusOperatorToken) {
+                    return links.resolvedSignature ? getReturnTypeOfSignature(links.resolvedSignature) : errorType;
+                }
+            }
             const kind = node.kind;
             if (cancellationToken) {
                 // Only bother checking on a few construct kinds.  We don't want to be excessively
