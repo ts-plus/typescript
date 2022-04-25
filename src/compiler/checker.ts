@@ -302,7 +302,8 @@ namespace ts {
         [SyntaxKind.CaretToken]: "^" as __String,
         [SyntaxKind.AmpersandAmpersandToken]: "&&" as __String,
         [SyntaxKind.BarBarToken]: "||" as __String,
-        [SyntaxKind.QuestionQuestionToken]: "??" as __String
+        [SyntaxKind.QuestionQuestionToken]: "??" as __String,
+        [SyntaxKind.BarGreaterThanToken]: "|>" as __String,
     } as const;
     // TSPLUS EXTENSION END
 

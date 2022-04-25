@@ -104,6 +104,7 @@ namespace ts {
         AmpersandEqualsToken,
         BarEqualsToken,
         BarBarEqualsToken,
+        BarGreaterThanToken,
         AmpersandAmpersandEqualsToken,
         QuestionQuestionEqualsToken,
         CaretEqualsToken,
@@ -544,6 +545,7 @@ namespace ts {
         | SyntaxKind.AmpersandEqualsToken
         | SyntaxKind.BarEqualsToken
         | SyntaxKind.CaretEqualsToken
+        | SyntaxKind.BarGreaterThanToken
         ;
 
     export type KeywordSyntaxKind =

@@ -3,7 +3,7 @@ export function id<A>(a: A): A {
 }
 
 /**
- * @tsplus operator Either /
+ * @tsplus operator Either |>
  * @tsplus macro pipe
  */
 export function pipe<A, B>(self: A, f: (a: A) => B): B {

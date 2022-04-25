@@ -3881,6 +3881,8 @@ namespace ts {
                 return OperatorPrecedence.Multiplicative;
             case SyntaxKind.AsteriskAsteriskToken:
                 return OperatorPrecedence.Exponentiation;
+            case SyntaxKind.BarGreaterThanToken:
+                return OperatorPrecedence.BitwiseOR;
         }
 
         // -1 is lower than all other precedences.  Returning it will cause binary expression
