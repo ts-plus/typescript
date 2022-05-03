@@ -16,6 +16,7 @@ namespace ts {
                 return [{ fileName: sourceFile.fileName, highlightSpans }];
             }
 
+            program.getTypeChecker().findAndCheckDoAncestor(node)
             let currentBinaryAnchestor: BinaryExpression | undefined = findAncestor(node, isBinaryExpression);
             let binaryExpressionParent = currentBinaryAnchestor;
             while (currentBinaryAnchestor) {

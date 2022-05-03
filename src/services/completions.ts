@@ -2187,15 +2187,18 @@ namespace ts.Completions {
         const getModuleSpecifierResolutionHost = memoizeOne((isFromPackageJson: boolean) => {
             return createModuleSpecifierResolutionHost(isFromPackageJson ? host.getPackageJsonAutoImportProvider!()! : program, host);
         });
-        let currentBinaryAnchestor: BinaryExpression | undefined = findAncestor(node, isBinaryExpression);
-        let binaryExpressionParent = currentBinaryAnchestor;
-        while (currentBinaryAnchestor) {
-            binaryExpressionParent = currentBinaryAnchestor;
-            currentBinaryAnchestor = findAncestor(currentBinaryAnchestor.parent, isBinaryExpression);
+        // TSPLUS EXTENSION START
+        typeChecker.findAndCheckDoAncestor(node);
+        let currentBinaryAncestor: BinaryExpression | undefined = findAncestor(node, isBinaryExpression);
+        let binaryExpressionParent = currentBinaryAncestor;
+        while (currentBinaryAncestor) {
+            binaryExpressionParent = currentBinaryAncestor;
+            currentBinaryAncestor = findAncestor(currentBinaryAncestor.parent, isBinaryExpression);
         }
         if (binaryExpressionParent) {
             typeChecker.getTypeAtLocation(binaryExpressionParent);
         }
+        // TSPLUS EXTENSION END
         if (isRightOfDot || isRightOfQuestionDot) {
             getTypeScriptMemberSymbols();
         }

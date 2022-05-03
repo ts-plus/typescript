@@ -4773,6 +4773,7 @@ namespace ts {
         collectTsPlusMacroTags(statement: Declaration): readonly string[]
         getTsPlusGlobals(): Symbol[];
         getTsPlusGlobal(name: string): TsPlusGlobalImport | undefined;
+        findAndCheckDoAncestor(node: Node): void;
     }
 
     /* @internal */

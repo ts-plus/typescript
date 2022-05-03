@@ -855,6 +855,22 @@ namespace ts {
             },
             getTsPlusGlobal: (name) => {
                 return globalSymbolsCache.get(name);
+            },
+            findAndCheckDoAncestor: (node) => {
+                const doCall = findAncestor(node, (node): node is CallExpression => {
+                    if (isCallExpression(node) && isIdentifier(node.expression)) {
+                        const symbol = checker.getSymbolAtLocation(node.expression)
+                        if (symbol && symbol.declarations) {
+                            for (const declaration of symbol.declarations) {
+                                return collectTsPlusMacroTags(declaration).indexOf("Do") !== -1;
+                            }
+                        }
+                    }
+                    return false;
+                })
+                if (doCall) {
+                    checker.getTypeAtLocation(doCall);
+                }
             }
             // TSPLUS EXTENSION END
         };

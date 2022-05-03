@@ -39,6 +39,11 @@ namespace ts.SignatureHelp {
         }
 
         const isManuallyInvoked = !!triggerReason && triggerReason.kind === "invoked";
+
+        // TSPLUS EXTENSION START
+        typeChecker.findAndCheckDoAncestor(startingToken);
+        // TSPLUS EXTENSION END
+
         const argumentInfo = getContainingArgumentInfo(startingToken, position, sourceFile, typeChecker, isManuallyInvoked);
         if (!argumentInfo) return undefined;
 
