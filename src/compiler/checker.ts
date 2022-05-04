@@ -15541,9 +15541,9 @@ namespace ts {
             }
             return errorType;
         }
-        function getUnionType(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type): Type {
+        function getUnionType(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type, forInference?: boolean): Type {
             const unionType = getUnionTypeOriginal(types, unionReduction, aliasSymbol, aliasTypeArguments, origin);
-            if (types.length <= 1 || aliasSymbol || unificationInProgress.isRunning) {
+            if (types.length <= 1 || aliasSymbol || unificationInProgress.isRunning || forInference) {
                 return unionType;
             }
             const seen = new Set<string | Symbol>()
@@ -23238,7 +23238,7 @@ namespace ts {
                     if (targets.length === 0) {
                         return;
                     }
-                    target = getUnionType(targets);
+                    target = getUnionType(targets, void 0, void 0, void 0, void 0, true);
                     if (sources.length === 0) {
                         // All source constituents have been matched and there is nothing further to infer from.
                         // However, simply making no inferences is undesirable because it could ultimately mean
@@ -23248,7 +23248,7 @@ namespace ts {
                         inferWithPriority(source, target, InferencePriority.NakedTypeVariable);
                         return;
                     }
-                    source = getUnionType(sources);
+                    source = getUnionType(sources, void 0, void 0, void 0, void 0, true);
                 }
                 else if (target.flags & TypeFlags.Intersection && some((target as IntersectionType).types,
                     t => !!getInferenceInfoForType(t) || (isGenericMappedType(t) && !!getInferenceInfoForType(getHomomorphicTypeVariable(t) || neverType)))) {
