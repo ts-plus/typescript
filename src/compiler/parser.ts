@@ -3437,6 +3437,11 @@ namespace ts {
                 hasJSDoc
             );
             topLevel = savedTopLevel;
+
+            if (node.jsDoc && find(node.jsDoc, (doc) => !!doc.tags && !!find(doc.tags, (tag) => tag.tagName.escapedText === "tsplus" && tag.comment === "auto"))) {
+                node.isAuto = true;
+            }
+
             return node;
         }
 

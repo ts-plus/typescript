@@ -31057,6 +31057,16 @@ namespace ts {
                 }
             }
 
+            // TSPLUS EXTENTION BEGIN
+            for (let i = argCount; i < signature.parameters.length; i++) {
+                const param = signature.parameters[i]
+                if (param.valueDeclaration && (param.valueDeclaration as ParameterDeclaration).isAuto) {
+                    const paramType = getTypeAtPosition(getSignatureInstantiation(signature, getInferredTypes(context), /* isJavascript */false), i);
+                    deriveParameter(node, paramType, i);
+                }
+            }
+            // TSPLUS EXTENTION END
+
             if (restType && couldContainTypeVariables(restType)) {
                 const spreadType = getSpreadArgumentType(args, argCount, args.length, restType, context, checkMode);
                 inferTypes(context.inferences, spreadType, restType);
@@ -31868,6 +31878,15 @@ namespace ts {
                         candidatesForArgumentError = [candidate];
                         return undefined;
                     }
+                    // TSPLUS EXTENTION BEGIN
+                    for (let i = args.length; i < candidate.parameters.length; i++) {
+                        const param = candidate.parameters[i]
+                        if (param.valueDeclaration && (param.valueDeclaration as ParameterDeclaration).isAuto) {
+                            const paramType = getTypeAtPosition(candidate, i);
+                            deriveParameter(node, paramType, i);
+                        }
+                    }
+                    // TSPLUS EXTENTION END
                     return candidate;
                 }
 
@@ -33014,6 +33033,24 @@ namespace ts {
                 path = getImportLocation(fileMap.map, getSourceFileOfNode(declaration).fileName);
             }
             return path;
+        }
+        function deriveParameter(deriveCallNode: CallLikeExpression, type: Type, parameterIndex: number): Type {
+            const nodeLinks = getNodeLinks(deriveCallNode);
+            if (!nodeLinks.tsPlusParameterDerivations) {
+                nodeLinks.tsPlusParameterDerivations = new Map();
+            }
+            if (!nodeLinks.tsPlusParameterDerivations!.has(parameterIndex)) {
+                const derivationDiagnostics: Diagnostic[] = [];
+                const derivation = deriveTypeWorker(deriveCallNode, type, type, derivationDiagnostics, [], [], []);
+                nodeLinks.tsPlusParameterDerivations!.set(parameterIndex, derivation);
+                if (isErrorType(derivation.type)) {
+                    derivationDiagnostics.forEach((diagnostic) => {
+                        diagnostics.add(diagnostic);
+                    })
+                    return errorType;
+                }
+            }
+            return nodeLinks.tsPlusParameterDerivations.get(parameterIndex)!.type;
         }
         function deriveType(deriveCallNode: CallExpression, type: Type): Type {
             const nodeLinks = getNodeLinks(deriveCallNode);
@@ -34313,6 +34350,12 @@ namespace ts {
                         return 0;
                     }
                     minArgumentCount = signature.minArgumentCount;
+                }
+                for (let i = 0; i < signature.parameters.length; i++) {
+                    if (signature.parameters[i].valueDeclaration && (signature.parameters[i].valueDeclaration as ParameterDeclaration).isAuto) {
+                        minArgumentCount = signature.parameters.length - (signature.parameters.length - i);
+                        break;
+                    }
                 }
                 if (voidIsNonOptional) {
                     return minArgumentCount;

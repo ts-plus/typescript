@@ -1336,6 +1336,7 @@ namespace ts {
         readonly questionToken?: QuestionToken;      // Present on optional parameter
         readonly type?: TypeNode;                    // Optional type annotation
         readonly initializer?: Expression;           // Optional initializer
+        isAuto?: boolean
     }
 
     export interface BindingElement extends NamedDeclaration {
@@ -5491,6 +5492,7 @@ namespace ts {
         tsPlusResolvedType?: Type;
         isTsPlusGlobalIdentifier?: boolean;
         tsPlusDerivation?: Derivation;
+        tsPlusParameterDerivations?: ESMap<number, Derivation>;
         tsPlusTags?: string[];
         isFluent?: true;
         isFluentCall?: true;

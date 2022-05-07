@@ -966,6 +966,11 @@ namespace ts {
                                     visitNode(node.arguments[i], visitor)
                                 );
                             }
+                        } else {
+                            const param = params[i];
+                            if (param.valueDeclaration && (param.valueDeclaration as ParameterDeclaration).isAuto) {
+                                newArgs.push(produceDerivation(checker.getNodeLinks(node).tsPlusParameterDerivations!.get(i)!, context, importer, source, sourceFileUniqueNames))
+                            }
                         }
                     }
                     if (newArgs.length === params.length - 1) {
