@@ -3499,6 +3499,19 @@ namespace ts {
             setYieldContext(savedYieldContext);
             setAwaitContext(savedAwaitContext);
 
+            if (parameters) {
+                let seenAutoParameter = false
+                for (let i = 0; i < parameters.length; i++) {
+                    const param = parameters[i];
+                    if (param.isAuto) {
+                        seenAutoParameter = true;
+                    }
+                    if (!param.isAuto && seenAutoParameter) {
+                        parseErrorAt(param.pos, param.end, Diagnostics.A_non_derived_parameter_cannot_follow_a_derived_parameter);
+                    }
+                }
+            }
+
             return parameters;
         }
 

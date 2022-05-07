@@ -7459,5 +7459,9 @@
     "Deriving type '{0}' {1}.": {
         "category": "Error",
         "code": 60004
+    },
+    "A non-derived parameter cannot follow a derived parameter.": {
+        "category": "Error",
+        "code": 60005
     }
 }
