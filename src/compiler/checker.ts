@@ -15425,6 +15425,7 @@ namespace ts {
 
         function checkTsPlusCustomCall(
             declaration: Declaration,
+            errorNode: Node,
             args: Expression[],
             checkMode: CheckMode | undefined,
             addDiagnostic?: (_: Diagnostic) => void,
@@ -15437,6 +15438,7 @@ namespace ts {
                 [],
                 args
             );
+            setTextRange(node, errorNode)
             setParent(node, declaration.parent);
             if (candidate.typeParameters) {
                 const inferenceContext = createInferenceContext(
@@ -30719,6 +30721,7 @@ namespace ts {
             if (indexer) {
                 const res = checkTsPlusCustomCall(
                     indexer.declaration,
+                    node,
                     [node.expression, indexExpression],
                     checkMode
                 )
@@ -45747,6 +45750,7 @@ namespace ts {
             return (selfNode: Expression) => {
                 const res = checkTsPlusCustomCall(
                     _dataFirst,
+                    selfNode,
                     [selfNode],
                     CheckMode.Normal
                 );
@@ -45760,6 +45764,7 @@ namespace ts {
             return (selfNode: Expression) => {
                 const res = checkTsPlusCustomCall(
                     declaration,
+                    selfNode,
                     [selfNode],
                     CheckMode.Normal
                 );
