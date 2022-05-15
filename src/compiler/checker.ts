@@ -33128,7 +33128,7 @@ namespace ts {
                 if (container.locals) {
                     container.locals.forEach((local) => {
                         if (local.valueDeclaration &&
-                            isLocalImplicit(local.valueDeclaration) &&
+                            (isParameterDeclaration(local.valueDeclaration as VariableLikeDeclaration) || isLocalImplicit(local.valueDeclaration)) &&
                             isNamedDeclaration(local.valueDeclaration) &&
                             isIdentifier(local.valueDeclaration.name)) {
                             blockScopedImplicits.push({

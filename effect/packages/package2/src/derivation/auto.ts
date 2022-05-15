@@ -1,11 +1,11 @@
-// import { Show } from "./show";
+import { Show } from "./show";
 
-// function print<A>(a: A, /** @tsplus auto */ show: Show<A>): void {
-//   console.log(show.show(a));
-// }
+function print<A>(a: A, /** @tsplus auto */ show: Show<A>): void {
+  console.log(show.show(a));
+}
 
-// print("Hi");
-// print({ a: 1, b: "hello", c: new Date() });
+print("Hi");
+print({ a: 1, b: "hello", c: new Date() });
 
 // function err(a: string, /** @tsplus auto */ b: number, c: boolean): void {}
 
@@ -80,15 +80,12 @@ export interface Traversable<F extends HKT> extends HKT.Typeclass<F> {
 /**
  * @tsplus fluent fncts.Kind traverse
  */
-// @ts-expect-error
-export function traverse<_F extends HKT, G extends HKT, A, B>(
+export declare function traverse<_F extends HKT, G extends HKT, A, B>(
   self: HKT.Kind<_F, A>,
   f: (a: A) => HKT.Kind<G, B>,
-  /** @tsplus auto @tsplus implicit local */ F: Traversable<_F>,
-  /** @tsplus auto @tsplus implicit local */ G: Applicative<G>
-): HKT.Kind<G, HKT.Kind<_F, A>> {
-  return self.traverse(f)
-}
+  /** @tsplus auto */ F: Traversable<_F>,
+  /** @tsplus auto */ G: Applicative<G>
+): HKT.Kind<G, HKT.Kind<_F, A>>
 
 
 export interface HF extends H<any> {}
