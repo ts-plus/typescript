@@ -31060,19 +31060,6 @@ namespace ts {
                 }
             }
 
-            // TSPLUS EXTENTION BEGIN
-            // Only derive parameters once all type parameters are inferred
-            if (!(checkMode & CheckMode.SkipGenericFunctions)) {
-                for (let i = argCount; i < signature.parameters.length; i++) {
-                    const param = signature.parameters[i]
-                    if (param.valueDeclaration && (param.valueDeclaration as ParameterDeclaration).isAuto) {
-                        const paramType = getTypeAtPosition(getSignatureInstantiation(signature, getInferredTypes(context), /* isJavascript */false), i);
-                        deriveParameter(node, paramType, i);
-                    }
-                }
-            }
-            // TSPLUS EXTENTION END
-
             if (restType && couldContainTypeVariables(restType)) {
                 const spreadType = getSpreadArgumentType(args, argCount, args.length, restType, context, checkMode);
                 inferTypes(context.inferences, spreadType, restType);
@@ -31956,6 +31943,18 @@ namespace ts {
                             continue;
                         }
                     }
+                    // TSPLUS EXTENTION BEGIN
+                    // Only derive parameters once all type parameters are inferred
+                    if (inferenceContext) {
+                        for (let i = args.length; i < candidate.parameters.length; i++) {
+                            const param = candidate.parameters[i]
+                            if (param.valueDeclaration && (param.valueDeclaration as ParameterDeclaration).isAuto) {
+                                const paramType = getTypeAtPosition(getSignatureInstantiation(candidate, getInferredTypes(inferenceContext), /* isJavascript */false), i);
+                                deriveParameter(node, paramType, i);
+                            }
+                        }
+                    }
+                    // TSPLUS EXTENSION END
                     candidates[candidateIndex] = checkCandidate;
                     return checkCandidate;
                 }
