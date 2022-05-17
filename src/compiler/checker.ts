@@ -31945,13 +31945,16 @@ namespace ts {
                     }
                     // TSPLUS EXTENTION BEGIN
                     // Only derive parameters once all type parameters are inferred
-                    if (inferenceContext) {
-                        for (let i = args.length; i < candidate.parameters.length; i++) {
-                            const param = candidate.parameters[i]
-                            if (param.valueDeclaration && (param.valueDeclaration as ParameterDeclaration).isAuto) {
-                                const paramType = getTypeAtPosition(getSignatureInstantiation(candidate, getInferredTypes(inferenceContext), /* isJavascript */false), i);
-                                deriveParameter(node, paramType, i);
+                    for (let i = args.length; i < candidate.parameters.length; i++) {
+                        const param = candidate.parameters[i];
+                        if (param.valueDeclaration && (param.valueDeclaration as ParameterDeclaration).isAuto) {
+                            let paramType: Type;
+                            if (inferenceContext) {
+                                paramType = getTypeAtPosition(getSignatureInstantiation(candidate, getInferredTypes(inferenceContext), /* isJavascript */false), i);
+                            } else {
+                                paramType = getTypeAtPosition(candidate, i);
                             }
+                            deriveParameter(node, paramType, i);
                         }
                     }
                     // TSPLUS EXTENSION END

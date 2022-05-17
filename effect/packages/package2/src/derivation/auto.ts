@@ -23,10 +23,24 @@ export const implicit: T<string> = {
   a: ""
 };
 
-// Non-generic
+/**
+ * @tsplus implicit
+ */
+export const implicit2: T<number> = {
+  a: 0
+};
+
+// single Non-generic
 declare function f(a: string, /** @tsplus auto */ b: T<string>): void;
 
-// f("1");
+f("1");
+
+// non-single non-generic
+declare function f1(x: number, y: string, /** @tsplus auto */z: T<string>): void
+declare function f1(x: number, y: number, /** @tsplus auto */z: T<number>): void
+
+f1(1, "")
+f1(1, 1)
 
 export declare namespace HKT {
   const F: unique symbol;
