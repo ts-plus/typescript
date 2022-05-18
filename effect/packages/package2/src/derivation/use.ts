@@ -46,3 +46,10 @@ export interface User {
  * @tsplus implicit
  */
 export const showUser: Show<User> = Derive()
+
+export interface WeirdPropertyNames {
+    readonly ["."]: number
+    readonly ["2"]: string
+}
+
+export const showWeirdPropertyNames: Show<WeirdPropertyNames> = Derive()
