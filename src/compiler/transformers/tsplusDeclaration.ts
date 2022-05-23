@@ -62,11 +62,25 @@ namespace ts {
                     !!nodeLinks.isTsPlusOperatorToken ||
                     !!nodeLinks.isFluent
             }
+            function findLeftmostQualifiedName(node: QualifiedName) {
+                while (true) {
+                    const { left } = node;
+                    if (isQualifiedName(left)) {
+                        node = left;
+                    } else {
+                        return left;
+                    }
+                }
+            }
             function importVisitor(node: Node): VisitResult<Node> {
                 if (node.kind === SyntaxKind.Identifier) {
-                    if (!isTransformable(node)) {
-                        const links = checker.getNodeLinks(node);
-                        const name = (node as Identifier).escapedText as string;
+                    let baseName = node as Identifier
+                    if (isQualifiedName(node.parent) && node.parent.right === node) {
+                        baseName = findLeftmostQualifiedName(node.parent);
+                    }
+                    if (!isTransformable(baseName)) {
+                        const links = checker.getNodeLinks(baseName);
+                        const name = baseName.escapedText as string;
                         const globalImport = checker.getTsPlusGlobal(name);
                         if (links.isTsPlusGlobalIdentifier && globalImport && !importer.has(globalImport.moduleSpecifier.text, name)) {
                             if (isPartOfTypeNode(node) || isPartOfTypeQuery(node)) {
