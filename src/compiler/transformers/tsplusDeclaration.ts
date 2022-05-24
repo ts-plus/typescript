@@ -74,7 +74,7 @@ namespace ts {
             }
             function importVisitor(node: Node): VisitResult<Node> {
                 if (node.kind === SyntaxKind.Identifier) {
-                    let baseName = node as Identifier
+                    let baseName = node as Identifier;
                     if (isQualifiedName(node.parent) && node.parent.right === node) {
                         baseName = findLeftmostQualifiedName(node.parent);
                     }
@@ -83,7 +83,7 @@ namespace ts {
                         const name = baseName.escapedText as string;
                         const globalImport = checker.getTsPlusGlobal(name);
                         if (links.isTsPlusGlobalIdentifier && globalImport && !importer.has(globalImport.moduleSpecifier.text, name)) {
-                            if (isPartOfTypeNode(node) || isPartOfTypeQuery(node)) {
+                            if (isPartOfTypeNode(node) || isPartOfTypeQuery(node) || findAncestor(node, or(isClassDeclaration, isInterfaceDeclaration, isTypeAliasDeclaration))) {
                                 importer.add(globalImport.moduleSpecifier.text, name);
                             }
                         }
