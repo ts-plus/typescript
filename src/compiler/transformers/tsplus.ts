@@ -313,7 +313,7 @@ namespace ts {
                 }
                 if (nodeLinks.tsPlusGetterExtension) {
                     if (checker.isTsPlusMacroGetter(node, "identity")) {
-                        return visitEachChild(node.expression, visitor, context);
+                        return visitNode(node.expression, visitor);
                     }
                     return factory.createCallExpression(
                         getPathOfExtension(context, importer, nodeLinks.tsPlusGetterExtension, source, sourceFileUniqueNames),
