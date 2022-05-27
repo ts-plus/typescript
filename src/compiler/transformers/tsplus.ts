@@ -312,6 +312,9 @@ namespace ts {
                     return getPathOfExtension(context, importer, nodeLinks.tsPlusStaticExtension, source, sourceFileUniqueNames)
                 }
                 if (nodeLinks.tsPlusGetterExtension) {
+                    if (checker.isTsPlusMacroGetter(node, "identity")) {
+                        return visitEachChild(node.expression, visitor, context);
+                    }
                     return factory.createCallExpression(
                         getPathOfExtension(context, importer, nodeLinks.tsPlusGetterExtension, source, sourceFileUniqueNames),
                         void 0,

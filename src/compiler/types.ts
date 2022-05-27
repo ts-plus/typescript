@@ -4771,6 +4771,7 @@ namespace ts {
         getInstantiatedTsPlusSignature(declaration: Declaration, args: Expression[], checkMode: CheckMode | undefined): Signature
         getIndexAccessExpressionCache(): ESMap<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
+        isTsPlusMacroGetter(node: Node, macro: string): boolean
         isClassCompanionReference(node: Expression): boolean
         collectTsPlusFluentTags(statement: Declaration): readonly TsPlusPrioritizedExtensionTag[]
         hasExportedPlusTags(statement: Declaration): boolean;
