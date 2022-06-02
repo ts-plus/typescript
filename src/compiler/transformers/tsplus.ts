@@ -826,20 +826,18 @@ namespace ts {
                     if (isExpressionWithReferencedGlobalImport(visited.expression)) {
                         importer.remove(visited.expression.tsPlusReferencedGlobalImport);
                     }
-                    const originalExpression = node.expression
+                    const shouldMakeLazy = checker.getNodeLinks(node.expression).tsPlusLazy === true;
                     if (fluentExtension.tsPlusPipeable) {
                         let expression = simplyfy(visited.expression);
-                        if (fluentExtension.thisParameter) {
-                            if (checker.shouldMakeLazy(fluentExtension.thisParameter, checker.getTypeAtLocation(originalExpression))) {
-                                expression = context.factory.createArrowFunction(
-                                    void 0,
-                                    void 0,
-                                    [],
-                                    void 0,
-                                    void 0,
-                                    expression
-                                )
-                            }
+                        if (shouldMakeLazy) {
+                            expression = context.factory.createArrowFunction(
+                                void 0,
+                                void 0,
+                                [],
+                                void 0,
+                                void 0,
+                                expression
+                            )
                         }
                         return factory.updateCallExpression(
                             visited,
@@ -854,17 +852,15 @@ namespace ts {
                     }
                     else {
                         let expression = simplyfy((visited as CallExpression).expression);
-                        if (fluentExtension.thisParameter) {
-                            if (checker.shouldMakeLazy(fluentExtension.thisParameter, checker.getTypeAtLocation(originalExpression))) {
-                                expression = context.factory.createArrowFunction(
-                                    void 0,
-                                    void 0,
-                                    [],
-                                    void 0,
-                                    void 0,
-                                    expression
-                                )
-                            }
+                        if (shouldMakeLazy) {
+                            expression = context.factory.createArrowFunction(
+                                void 0,
+                                void 0,
+                                [],
+                                void 0,
+                                void 0,
+                                expression
+                            )
                         }
                         return factory.updateCallExpression(
                             visited as CallExpression,
@@ -900,20 +896,18 @@ namespace ts {
                     if (isExpressionWithReferencedGlobalImport(visited.expression)) {
                         importer.remove(visited.expression.tsPlusReferencedGlobalImport);
                     }
-                    const originalExpression = node.expression.expression;
+                    const shouldMakeLazy = checker.getNodeLinks(node.expression.expression).tsPlusLazy === true;
                     if (fluentExtension.tsPlusPipeable) {
                         let expression = simplyfy((visited.expression as PropertyAccessExpression).expression);
-                        if (fluentExtension.thisParameter) {
-                            if (checker.shouldMakeLazy(fluentExtension.thisParameter, checker.getTypeAtLocation(originalExpression))) {
-                                expression = context.factory.createArrowFunction(
-                                    void 0,
-                                    void 0,
-                                    [],
-                                    void 0,
-                                    void 0,
-                                    expression
-                                )
-                            }
+                        if (shouldMakeLazy) {
+                            expression = context.factory.createArrowFunction(
+                                void 0,
+                                void 0,
+                                [],
+                                void 0,
+                                void 0,
+                                expression
+                            )
                         }
                         return factory.updateCallExpression(
                             visited,
@@ -928,17 +922,15 @@ namespace ts {
                     }
                     else {
                         let expression = simplyfy(((visited as CallExpression).expression as PropertyAccessExpression).expression);
-                        if (fluentExtension.thisParameter) {
-                            if (checker.shouldMakeLazy(fluentExtension.thisParameter, checker.getTypeAtLocation(originalExpression))) {
-                                expression = context.factory.createArrowFunction(
-                                    void 0,
-                                    void 0,
-                                    [],
-                                    void 0,
-                                    void 0,
-                                    expression
-                                )
-                            }
+                        if (shouldMakeLazy) {
+                            expression = context.factory.createArrowFunction(
+                                void 0,
+                                void 0,
+                                [],
+                                void 0,
+                                void 0,
+                                expression
+                            )
                         }
                         return factory.updateCallExpression(
                             visited as CallExpression,
@@ -957,7 +949,7 @@ namespace ts {
                     const newArgs: Expression[] = [];
                     for (let i = 0; i < Math.max(params.length, node.arguments.length); i++) {
                         if (i < node.arguments.length) {
-                            if (i < params.length && checker.shouldMakeLazy(params[i], checker.getTypeAtLocation(node.arguments[i]))) {
+                            if (i < params.length && checker.getNodeLinks(node.arguments[i]).tsPlusLazy === true) {
                                 newArgs.push(
                                     context.factory.createArrowFunction(
                                         void 0,

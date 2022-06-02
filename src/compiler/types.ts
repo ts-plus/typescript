@@ -4762,7 +4762,6 @@ namespace ts {
         getGetterCompanionExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
         getStaticExtension(target: Type, name: string): TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined
         getStaticCompanionExtension(target: Type, name: string): TsPlusStaticFunctionExtension | TsPlusStaticValueExtension | undefined
-        shouldMakeLazy(signatureParam: Symbol, callArg: Type): boolean
         isPipeCall(node: CallExpression): boolean
         getCallExtension(node: Node): TsPlusStaticFunctionExtension | undefined
         isTailRec(node: Node): boolean

@@ -814,7 +814,6 @@ namespace ts {
             getStaticCompanionExtension,
             getGetterCompanionExtension,
             getCallExtension,
-            shouldMakeLazy,
             isPipeCall: (node) => {
                 const type = getTypeOfNode(node.expression);
                 if (type.symbol && type.symbol.declarations) {
@@ -932,13 +931,6 @@ namespace ts {
                 links.isTsPlusTailRec = false;
             }
             return links.isTsPlusTailRec;
-        }
-        function shouldMakeLazy(signatureParam: Symbol, callArg: Type) {
-            const type = getTypeOfParameter(signatureParam);
-            if (isLazyParameterByType(type)) {
-                return !isTypeAssignableTo(callArg, type);
-            }
-            return false;
         }
         function getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol) {
             const extension = fluentCache.get(symbol.tsPlusTypeName)?.get(symbol.tsPlusName)?.();
@@ -1210,7 +1202,7 @@ namespace ts {
         function isExtensionValidForTarget(extension: Type, targetType: Type): boolean {
             return getSignaturesOfType(extension, SignatureKind.Call).find((candidate) => {
                 if (candidate.thisParameter) {
-                    const paramType = unionIfLazy(getTypeOfSymbol(candidate.thisParameter))[0];
+                    const paramType = unionIfLazy(getTypeOfSymbol(candidate.thisParameter));
                     if (!candidate.typeParameters) {
                         return isTypeAssignableTo(targetType, paramType);
                     } else {
@@ -1230,7 +1222,7 @@ namespace ts {
         function unionIfLazy(_paramType: Type) {
             const isLazy = isLazyParameterByType(_paramType);
             const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]]) : _paramType;
-            return [paramType, isLazy] as const;
+            return paramType
         }
         function getFluentExtension(targetType: Type, name: string): Type | undefined {
             const symbols = collectRelevantSymbols(targetType);
@@ -31103,7 +31095,7 @@ namespace ts {
             const thisType = getThisTypeOfSignature(signature);
             if (thisType && couldContainTypeVariables(thisType)) {
                 // TSPLUS EXTENTION BEGIN
-                const paramType = unionIfLazy(thisType)[0];
+                const paramType = unionIfLazy(thisType);
                 const thisArgumentNode = getThisArgumentOfCall(node);
                 inferTypes(context.inferences, getThisArgumentType(thisArgumentNode), paramType);
                 // TSPLUS EXTENTION END
@@ -31113,7 +31105,7 @@ namespace ts {
                 const arg = args[i];
                 if (arg.kind !== SyntaxKind.OmittedExpression && !(checkMode & CheckMode.IsForStringLiteralArgumentCompletions && hasSkipDirectInferenceFlag(arg))) {
                     // TSPLUS EXTENTION BEGIN
-                    const paramType = unionIfLazy(getTypeAtPosition(signature, i))[0];
+                    const paramType = unionIfLazy(getTypeAtPosition(signature, i));
                     // TSPLUS EXTENTION END
                     if (couldContainTypeVariables(paramType)) {
                         const argType = checkExpressionWithContextualType(arg, paramType, context, checkMode);
@@ -31340,7 +31332,7 @@ namespace ts {
         }
 
         function getSignatureApplicabilityError(
-            node: CallLikeExpression,
+            node: CallLikeExpression | undefined,
             args: readonly Expression[],
             signature: Signature,
             relation: ESMap<string, RelationComparisonResult>,
@@ -31350,7 +31342,7 @@ namespace ts {
         ): readonly Diagnostic[] | undefined {
 
             const errorOutputContainer: { errors?: Diagnostic[], skipLogging?: boolean } = { errors: undefined, skipLogging: true };
-            if (isJsxOpeningLikeElement(node)) {
+            if (node && isJsxOpeningLikeElement(node)) {
                 if (!checkApplicableSignatureForJsxOpeningLikeElement(node, signature, relation, checkMode, reportErrors, containingMessageChain, errorOutputContainer)) {
                     Debug.assert(!reportErrors || !!errorOutputContainer.errors, "jsx should have errors when reporting errors");
                     return errorOutputContainer.errors || emptyArray;
@@ -31358,15 +31350,34 @@ namespace ts {
                 return undefined;
             }
             const thisType = getThisTypeOfSignature(signature);
-            if (thisType && thisType !== voidType && node.kind !== SyntaxKind.NewExpression) {
-                // TSPLUS EXTENTION BEGIN
-                const paramType = unionIfLazy(thisType)[0];
-                // TSPLUS EXTENTION END
+            if (thisType && thisType !== voidType && node && node.kind !== SyntaxKind.NewExpression) {
                 // If the called expression is not of the form `x.f` or `x["f"]`, then sourceType = voidType
                 // If the signature's 'this' type is voidType, then the check is skipped -- anything is compatible.
                 // If the expression is a new expression, then the check is skipped.
                 const thisArgumentNode = getThisArgumentOfCall(node);
                 const thisArgumentType = getThisArgumentType(thisArgumentNode);
+
+                // TSPLUS EXTENTION START
+                const originalParamType = thisType;
+                let paramType = originalParamType;
+                if (isLazyParameterByType(originalParamType) && thisArgumentNode) {
+                    const contextFreeArgType = thisArgumentType;
+                    if (isTypeIdenticalTo(contextFreeArgType, anyType)) {
+                        return [createDiagnosticForNode(
+                            thisArgumentNode,
+                            Diagnostics.Values_of_type_any_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
+                        )]
+                    }
+                    const args = getTypeArguments(originalParamType);
+                    const genericLazy = cloneTypeReference(originalParamType);
+                    genericLazy.resolvedTypeArguments = [anyType];
+                    if (!isTypeRelatedTo(genericLazy, contextFreeArgType, relation)) {
+                        paramType = args[0];
+                        getNodeLinks(thisArgumentNode).tsPlusLazy = true;
+                    }
+                }
+                // TSPLUS EXTENTION END
+
                 const errorNode = reportErrors ? (thisArgumentNode || node) : undefined;
                 const headMessage = Diagnostics.The_this_context_of_type_0_is_not_assignable_to_method_s_this_of_type_1;
                 if (!checkTypeRelatedTo(thisArgumentType, paramType, relation, errorNode, headMessage, containingMessageChain, errorOutputContainer)) {
@@ -31380,18 +31391,28 @@ namespace ts {
             for (let i = 0; i < argCount; i++) {
                 const arg = args[i];
                 if (arg.kind !== SyntaxKind.OmittedExpression) {
-                    // TSPLUS EXTENTION BEGIN
-                    const [paramType, isLazy] = unionIfLazy(getTypeAtPosition(signature, i));
-                     // TSPLUS EXTENTION END
-                    const argType = checkExpressionWithContextualType(arg, paramType, /*inferenceContext*/ undefined, checkMode);
-                    // TSPLUS EXTENTION BEGIN
-                    if (isLazy && isTypeIdenticalTo(argType, anyType)) {
-                        return [createDiagnosticForNode(
-                            arg,
-                            Diagnostics.Values_of_type_any_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
-                        )]
+                    // TSPLUS EXTENTION START
+                    const originalParamType = getTypeAtPosition(signature, i);
+                    let paramType = originalParamType;
+                    if (isLazyParameterByType(originalParamType)) {
+                        const contextFreeArgType = getTypeOfNode(arg);
+                        if (isTypeIdenticalTo(contextFreeArgType, anyType)) {
+                            return [createDiagnosticForNode(
+                                arg,
+                                Diagnostics.Values_of_type_any_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
+                            )]
+                        }
+                        const args = getTypeArguments(originalParamType);
+                        const genericLazy = cloneTypeReference(originalParamType);
+                        genericLazy.resolvedTypeArguments = [anyType];
+                        if (!isTypeRelatedTo(genericLazy, contextFreeArgType, relation)) {
+                            paramType = args[0];
+                            getNodeLinks(arg).tsPlusLazy = true;
+                        }
                     }
+                    const argType = checkExpressionWithContextualType(arg, paramType, /*inferenceContext*/ undefined, checkMode);
                     // TSPLUS EXTENTION END
+
                     // If one or more arguments are still excluded (as indicated by CheckMode.SkipContextSensitive),
                     // we obtain the regular type of any object literal arguments because we may not have inferred complete
                     // parameter types yet and therefore excess property checks may yield false positives (see #17041).
@@ -31403,7 +31424,7 @@ namespace ts {
                     }
                 }
             }
-            if (restType) {
+            if (restType && node) {
                 const spreadType = getSpreadArgumentType(args, argCount, args.length, restType, /*context*/ undefined, checkMode);
                 const restArgCount = args.length - argCount;
                 const errorNode = !reportErrors ? undefined :
@@ -36982,7 +37003,7 @@ namespace ts {
         function checkTsPlusOperator(left: Expression, right: Expression): readonly [Type, Type] | undefined {
             // potentially captured by resolution
             let lastSignature: Signature | undefined;
-            const resolutionDiagnostics = new Map<Signature, Diagnostic>();
+            const resolutionDiagnostics = new Map<Signature, () => readonly Diagnostic[]>();
             // not captured
             const parent = right.parent as BinaryExpression;
             const links = getNodeLinks(parent.operatorToken);
@@ -37017,9 +37038,10 @@ namespace ts {
                     if (lastSignature) {
                         links.resolvedSignature = lastSignature;
                         links.isTsPlusOperatorToken = true;
-                        const diagnostic = resolutionDiagnostics.get(lastSignature);
-                        if (diagnostic) {
-                            diagnostics.add(diagnostic);
+                        const diagnosticsForSignature = resolutionDiagnostics.get(lastSignature);
+                        if (diagnosticsForSignature) {
+                            links.resolvedSignature = undefined;
+                            diagnosticsForSignature().forEach((diagnostic) => diagnostics.add(diagnostic));
                         }
                         return [errorType, errorType] as const;
                     }
@@ -37035,50 +37057,70 @@ namespace ts {
                     lastSignature = signature;
                     if (signature.typeParameters) {
                         const context = createInferenceContext(signature.typeParameters, signature, InferenceFlags.None)
-                        const leftParam = unionIfLazy(getTypeAtPosition(signature, 0))[0];
+                        const leftParam = unionIfLazy(getTypeAtPosition(signature, 0));
                         const leftType = checkExpressionWithContextualType(left, leftParam, context, CheckMode.Normal);
                         inferTypes(context.inferences, leftType, leftParam);
-                        const rightParam = unionIfLazy(getTypeAtPosition(signature, 1))[0];
+                        const rightParam = unionIfLazy(getTypeAtPosition(signature, 1));
                         const rightType = checkExpressionWithContextualType(right, rightParam, context, CheckMode.Normal);
                         inferTypes(context.inferences, rightType, rightParam);
                         const instantiated = getSignatureInstantiation(signature, getInferredTypes(context), /** isJavascript */ false);
-                        const leftInstantiatedNotLazy = getTypeAtPosition(instantiated, 0);
-                        const leftInstantiated = unionIfLazy(leftInstantiatedNotLazy)[0];
-                        const rightInstantiatedNotLazy = getTypeAtPosition(instantiated, 1);
-                        const rightInstantiated = unionIfLazy(getTypeAtPosition(instantiated, 1))[0];
-                        if (isTypeAssignableTo(leftType, leftInstantiated)) {
-                            if (isTypeAssignableTo(rightType, rightInstantiated)) {
-                                if (!isTypeAssignableTo(leftType, leftInstantiatedNotLazy)) {
-                                    getNodeLinks(left).tsPlusLazy = true;
+                        const diagnostics = getSignatureApplicabilityError(
+                            undefined,
+                            [left, right],
+                            instantiated,
+                            assignableRelation,
+                            CheckMode.Normal,
+                            false,
+                            undefined
+                        );
+                        if (diagnostics) {
+                            resolutionDiagnostics.set(signature, () => {
+                                const diags = getSignatureApplicabilityError(
+                                    undefined,
+                                    [left, right],
+                                    instantiated,
+                                    assignableRelation,
+                                    CheckMode.Normal,
+                                    true,
+                                    undefined
+                                );
+                                if (diags) {
+                                    return diags;
                                 }
-                                if (!isTypeAssignableTo(rightType, rightInstantiatedNotLazy)) {
-                                    getNodeLinks(right).tsPlusLazy = true;
-                                }
-                                return instantiated;
-                            }
-                            else {
-                                resolutionDiagnostics.set(signature, createError(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightInstantiated)));
-                            }
-                        }
-                        else {
-                            resolutionDiagnostics.set(signature, createError(left, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(leftType), typeToString(leftInstantiated)));
+                                Debug.fail("Diagnostics not found")
+                            });
+                        } else {
+                            return instantiated;
                         }
                     }
                     else {
-                        const leftParam = unionIfLazy(getTypeAtPosition(signature, 0))[0];
-                        const leftType = checkExpressionWithContextualType(left, leftParam, void 0, CheckMode.Normal);
-                        if (isTypeAssignableTo(leftType, leftParam)) {
-                            const rightParam = unionIfLazy(getTypeAtPosition(signature, 1))[0];
-                            const rightType = checkExpressionWithContextualType(right, rightParam, void 0, CheckMode.Normal);
-                            if (isTypeAssignableTo(rightType, rightParam)) {
-                                return signature;
-                            }
-                            else {
-                                resolutionDiagnostics.set(signature, createError(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightParam)));
-                            }
-                        }
-                        else {
-                            resolutionDiagnostics.set(signature, createError(left, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(leftType), typeToString(leftParam)));
+                        const diagnostics = getSignatureApplicabilityError(
+                            undefined,
+                            [left, right],
+                            signature,
+                            assignableRelation,
+                            CheckMode.Normal,
+                            false,
+                            undefined
+                        );
+                        if (diagnostics) {
+                            resolutionDiagnostics.set(signature, () => {
+                                const diags = getSignatureApplicabilityError(
+                                    undefined,
+                                    [left, right],
+                                    signature,
+                                    assignableRelation,
+                                    CheckMode.Normal,
+                                    true,
+                                    undefined
+                                );
+                                if (diags) {
+                                    return diags;
+                                }
+                                Debug.fail("Diagnostics not found")
+                            });
+                        } else {
+                            return signature;
                         }
                     }
                 }
@@ -48960,11 +49002,6 @@ namespace ts {
             }
         }
         return anon;
-    }
-
-    export function isLazyParameter(parameter: Symbol & { valueDeclaration: ParameterDeclaration }): boolean {
-        return isIdentifier(parameter.valueDeclaration) &&
-            getAllJSDocTags(parameter.valueDeclaration, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string" && startsWith(tag.comment, "tsplus/LazyArgument"))[0] !== undefined;
     }
 
     export function isSymbolParameterDeclaration(symbol: Symbol): symbol is Symbol & { valueDeclaration: ParameterDeclaration } {
