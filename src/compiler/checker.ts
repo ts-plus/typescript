@@ -31371,7 +31371,7 @@ namespace ts {
                     const args = getTypeArguments(originalParamType);
                     const genericLazy = cloneTypeReference(originalParamType);
                     genericLazy.resolvedTypeArguments = [anyType];
-                    if (!isTypeRelatedTo(genericLazy, contextFreeArgType, relation)) {
+                    if (!isTypeRelatedTo(contextFreeArgType, genericLazy, relation)) {
                         paramType = args[0];
                         getNodeLinks(thisArgumentNode).tsPlusLazy = true;
                     }
@@ -31393,10 +31393,10 @@ namespace ts {
                 if (arg.kind !== SyntaxKind.OmittedExpression) {
                     // TSPLUS EXTENTION START
                     const originalParamType = getTypeAtPosition(signature, i);
+                    const argType = checkExpressionWithContextualType(arg, unionIfLazy(originalParamType), /*inferenceContext*/ undefined, checkMode);
                     let paramType = originalParamType;
                     if (isLazyParameterByType(originalParamType)) {
-                        const contextFreeArgType = getTypeOfNode(arg);
-                        if (isTypeIdenticalTo(contextFreeArgType, anyType)) {
+                        if (isTypeIdenticalTo(argType, anyType)) {
                             return [createDiagnosticForNode(
                                 arg,
                                 Diagnostics.Values_of_type_any_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
@@ -31405,12 +31405,11 @@ namespace ts {
                         const args = getTypeArguments(originalParamType);
                         const genericLazy = cloneTypeReference(originalParamType);
                         genericLazy.resolvedTypeArguments = [anyType];
-                        if (!isTypeRelatedTo(genericLazy, contextFreeArgType, relation)) {
+                        if (!isTypeRelatedTo(argType, genericLazy, relation)) {
                             paramType = args[0];
                             getNodeLinks(arg).tsPlusLazy = true;
                         }
                     }
-                    const argType = checkExpressionWithContextualType(arg, paramType, /*inferenceContext*/ undefined, checkMode);
                     // TSPLUS EXTENTION END
 
                     // If one or more arguments are still excluded (as indicated by CheckMode.SkipContextSensitive),
