@@ -373,10 +373,10 @@ namespace ts {
             map: getFileMap(host.getCompilerOptions(), host)
         };
         const tsPlusWorldScope: {
-            implicits: [Type, Declaration][];
+            implicits: ESMap<string, [Type, Declaration][]>;
             rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Declaration, Set<string>][] }>;
         } = {
-            implicits: [],
+            implicits: new Map(),
             rules: new Map()
         };
         const unresolvedFluentCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
@@ -33310,8 +33310,8 @@ namespace ts {
         function isLocalImplicit(node: Node): boolean {
             return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === 'string' && tag.comment === 'implicit local').length > 0;
         }
-        function getAllBlockScopedDeclarations(location: Node): { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] {
-            const blockScopedImplicits: { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] = [];
+        function getAllBlockScopedDeclarations(location: Node) {
+            const scope = new Map<string, [type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node][]>();
             forEachEnclosingBlockScopeContainer(location, (container) => {
                 if (container.locals) {
                     container.locals.forEach((local) => {
@@ -33319,16 +33319,12 @@ namespace ts {
                             (isParameterDeclaration(local.valueDeclaration as VariableLikeDeclaration) || isLocalImplicit(local.valueDeclaration)) &&
                             isNamedDeclaration(local.valueDeclaration) &&
                             isIdentifier(local.valueDeclaration.name)) {
-                            blockScopedImplicits.push({
-                                type: getTypeOfSymbol(local),
-                                valueDeclaration: local.valueDeclaration as NamedDeclaration & { name: Identifier },
-                                enclosingBlockScope: container
-                            })
+                                indexInScope(scope, [getTypeOfSymbol(local), local.valueDeclaration as NamedDeclaration & { name: Identifier }, container]);
                         }
                     })
                 }
             })
-            return blockScopedImplicits;
+            return scope;
         }
         function tsPlusFlattenTags(toFlat: string[][]): readonly string[] {
             let strings: readonly string[] = toFlat[0];
@@ -33370,6 +33366,63 @@ namespace ts {
                 }
             }
         }
+
+        function getImplicitTags(type: Type): readonly string[] {
+            if ((type.flags & TypeFlags.Intrinsic)) {
+                return [typeToString(type)];
+            }
+            if ((type.flags & TypeFlags.Intersection)) {
+                return flatMap((type as IntersectionType).types, getImplicitTags);
+            }
+            if (type.symbol) {
+                let tags: readonly string[] = [`${type.symbol.escapedName.toString()}<`];
+                if ((type.flags & TypeFlags.Object) && (getObjectFlags(type) & ObjectFlags.Reference)) {
+                    for (const arg of getTypeArguments(type as TypeReference)) {
+                        const tagsOfArg = getImplicitTags(arg);
+                        tags = flatMap(tags, (tag) => map(tagsOfArg, (argTag) => `${tag},${argTag}`));
+                    }
+                }
+                return map(tags, (tag) => `${tag}>`);
+            }
+            if ((type.flags && TypeFlags.UnionOrIntersection)) {
+                return flatMap((type as IntersectionType | UnionType).types, getImplicitTags);
+            }
+            return ["__"];
+        }
+
+        function indexInScope<Scope extends [Type, ...any[]]>(scope: ESMap<string, Scope[]>, entry: Scope) {
+            const tags = getImplicitTags(entry[0]);
+            for (const tag of tags) {
+                let index = scope.get(tag);
+                if (!index) {
+                    index = [];
+                    scope.set(tag, index);
+                }
+                index.push(entry);
+            }
+        }
+
+        function lookupInScope<Scope extends [Type, any, ...any[]]>(scope: ESMap<string, Scope[]>, type: Type, filter: (d: Scope) => boolean) {
+            const tags = getImplicitTags(type);
+            const negatives = new Set<Scope[1]>();
+            for (const tag of tags) {
+                const index = scope.get(tag);
+                if (index) {
+                    for (const entry of index) {
+                        if (negatives.has(entry[1]) || !filter(entry)) {
+                            continue;
+                        }
+                        else if (isTypeAssignableTo(entry[0], type)) {
+                            return entry;
+                        }
+                        else {
+                            negatives.add(entry[1]);
+                        }
+                    }
+                }
+            }
+        }
+
         function deriveTypeWorker(
             location: Node,
             originalType: Type,
@@ -33386,34 +33439,40 @@ namespace ts {
                 };
             }
             const blockScopedImplicits = getAllBlockScopedDeclarations(location);
-            if (blockScopedImplicits.length > 0) {
-                for (const implicit of blockScopedImplicits) {
-                    if (isTypeAssignableTo(implicit.type, type) && isBlockScopedNameDeclaredBeforeUse(implicit.valueDeclaration, location)) {
-                        implicit.valueDeclaration.symbol.isReferenced = SymbolFlags.Value;
-                        const blockLinks = getNodeLinks(implicit.enclosingBlockScope);
-                        if (!blockLinks.uniqueNames) {
-                            blockLinks.uniqueNames = new Set()
-                        }
-                        blockLinks.uniqueNames.add(implicit.valueDeclaration);
-                        const implicitLinks = getNodeLinks(implicit.valueDeclaration);
-                        implicitLinks.needsUniqueNameInSope = true;
-                        return {
-                            _tag: "FromBlockScope",
-                            type,
-                            implicit: implicit.valueDeclaration,
-                        };
-                    }
+            const inBlockdScope = lookupInScope(
+                blockScopedImplicits,
+                type,
+                ([, declaration]) => isBlockScopedNameDeclaredBeforeUse(declaration, location)
+            );
+            
+            if (inBlockdScope) {
+                const [, valueDeclaration, enclosingBlockScope] = inBlockdScope;
+                valueDeclaration.symbol.isReferenced = SymbolFlags.Value;
+                const blockLinks = getNodeLinks(enclosingBlockScope);
+                if (!blockLinks.uniqueNames) {
+                    blockLinks.uniqueNames = new Set()
                 }
+                blockLinks.uniqueNames.add(valueDeclaration);
+                const implicitLinks = getNodeLinks(valueDeclaration);
+                implicitLinks.needsUniqueNameInSope = true;
+                return {
+                    _tag: "FromBlockScope",
+                    type,
+                    implicit: valueDeclaration,
+                };
             }
             const selfExport = getSelfExportStatement(location);
-            for (const [implicitType, declaration] of tsPlusWorldScope.implicits) {
-                if (isTypeAssignableTo(implicitType, type) && isBlockScopedNameDeclaredBeforeUse(declaration, location) && getSelfExportStatement(declaration) !== selfExport) {
-                    return {
-                        _tag: "FromImplicitScope",
-                        type,
-                        implicit: declaration
-                    };
-                }
+            const inWorldScope = lookupInScope(
+                tsPlusWorldScope.implicits,
+                type,
+                ([, declaration]) => isBlockScopedNameDeclaredBeforeUse(declaration, location) && getSelfExportStatement(declaration) !== selfExport
+            )
+            if (inWorldScope) {
+                return {
+                    _tag: "FromImplicitScope",
+                    type,
+                    implicit: inWorldScope[1]
+                };
             }
             for (const derivedType of derivationScope) {
                 if (isTypeAssignableTo(derivedType.type, type)) {
@@ -46808,7 +46867,7 @@ namespace ts {
                         forEach(exportSymbol.declarations, (declaration) => {
                             if (isTsPlusImplicit(declaration)) {
                                 const typeOfNode = declaration.type ? getTypeFromTypeNode(declaration.type) : getTypeOfNode(declaration);
-                                indexedImplicits.push([typeOfNode, declaration]);
+                                indexInScope(indexedImplicits, [typeOfNode, declaration]);
                             }
                             else if((isFunctionDeclaration(declaration) || isVariableDeclaration(declaration)) && declaration.tsPlusDeriveTags) {
                                 for (const tag of declaration.tsPlusDeriveTags) {
@@ -46865,7 +46924,7 @@ namespace ts {
             indexAccessExpressionCache.clear();
             pipeableCache.clear();
             inheritanceSymbolCache.clear();
-            tsPlusWorldScope.implicits = [];
+            tsPlusWorldScope.implicits.clear();
             tsPlusWorldScope.rules.clear();
             unificationInProgress.isRunning = false;
             tsPlusDebug && console.timeEnd("initTsPlusTypeChecker caches")
