@@ -1,11 +1,15 @@
 import { Show } from "./show";
 
-export function f<A>(/** @tsplus implicit local */_show: Show<A>): Show<Maybe<A>> {
+export interface Info<A> {
+  readonly info: (a: A) => string
+}
+
+export function f<A>(show: Show<A> & Info<A>): Show<Maybe<A>> {
     const ok: Show<Maybe<A>> = Derive()
     return ok;
 }
 
-export function g<A>(/** @tsplus implicit local */_show: Show<A>): Show<Maybe<A>> {
+export function g<A>(show: Show<A>): Show<Maybe<A>> {
     const go = () => {
         const _show = 0;
         _show;
@@ -15,27 +19,25 @@ export function g<A>(/** @tsplus implicit local */_show: Show<A>): Show<Maybe<A>
     return go();
 }
 
-interface Aliased {
+interface Target {
   x: number;
 }
 
 /**
  * @tsplus implicit local
  */
-const _showSourceScoped: Show<Aliased> = Derive()
+const _showSourceScoped: Show<Target> = Derive()
 
 export function h() {
   // uses _showSourceScoped
-  const ok: Show<{ x: number }> = Derive()
+  const ok: Show<Target> = Derive()
   return ok;
 }
 
 export function i() {
-  /**
-   * @tsplus implicit local
-   */
-  const _showBlockScoped: Show<{ x: number }> = Derive();
-  const ok: Show<{ x: number }> = Derive();
+  /** @tsplus implicit local */
+  const _showBlockScoped: Show<Target> = Derive();
+  const ok: Show<Target> = Derive();
   return ok;
 }
 
@@ -44,8 +46,8 @@ const id = <A>(a: () => A) => a()
 export function j() {
   return id(() => {
     /** @tsplus implicit local */
-    const _showBlockScoped: Show<{ x: number }> = Derive();
-    const ok: Show<{ x: number }> = Derive()
+    const _showBlockScoped: Show<Target> = Derive();
+    const ok: Show<Target> = Derive()
     if (Math.random() > 0 && ok) {
       return 0
     }

@@ -140,3 +140,10 @@ declare const h: H<string>
 declare function mkG<A>(a: A): G<A>
 
 export const res = h.traverse((s) => mkG(s.length))
+
+
+// @ts-expect-error
+function z([a, b]: [number, number]) {
+  // @ts-expect-error
+  h.traverse(() => x1)
+}

@@ -362,7 +362,7 @@ namespace ts {
             map: getFileMap(host.getCompilerOptions(), host)
         };
         const tsPlusWorldScope: {
-            implicits: ESMap<number, [Type, Declaration][]>;
+            implicits: ESMap<string, Set<Symbol>>;
             rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Declaration, Set<string>][] }>;
         } = {
             implicits: new Map(),
@@ -33334,63 +33334,8 @@ namespace ts {
                 return current;
             }
         }
-        function hashType(type: Type) {
-            if (!typeHashCache.has(type)) {
-                typeHashCache.set(type, hashTypeWorker(type));
-            }
-            return typeHashCache.get(type)!;
-        }
-        function hashTypeWorker(type: Type) {
-            if ((type.flags & TypeFlags.Object) && ((type as ObjectType).objectFlags & ObjectFlags.Reference) && !isTupleType(type) && type.symbol && type.symbol.declarations) {
-                const hasTags = !!find(type.symbol.declarations, (e) => collectTsPlusTypeTags(e).length > 0);
-                if (hasTags) {
-                    const argumentsHash = hashing.hashArray(map(getTypeArguments(type as TypeReference), hashType))
-                    const hash = hashing.hashPlainObject({
-                        type: type.symbol.escapedName,
-                        arguments: argumentsHash
-                    })
-                    return hash;
-                }
-            }
-            if (type.flags & TypeFlags.Intrinsic) {
-                return hashing.hashString(typeToString(type));
-            }
-            if (type.flags & TypeFlags.StringLiteral) {
-                return hashing.hashString((type as StringLiteralType).value);
-            }
-            if (type.flags & TypeFlags.NumberLiteral) {
-                return hashing.hashNumber((type as NumberLiteralType).value);
-            }
-            if (type.flags & TypeFlags.Union) {
-                return hashing.hashArray(map((type as UnionType).types, hashType));
-            }
-            return hashing.hashArray(map(getPropertiesOfType(type), (x) => x.escapedName).sort());
-        }
-        function isIdenticalInDerivation(self: Type, that: Type) {
-            return hashType(self) === hashType(that) && isTypeIdenticalTo(self, that)
-        }
         function isLocalImplicit(node: Node): boolean {
             return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === 'string' && tag.comment === 'implicit local').length > 0;
-        }
-        function getAllBlockScopedDeclarations(location: Node): { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] {
-            const blockScopedImplicits: { type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node }[] = [];
-            forEachEnclosingBlockScopeContainer(location, (container) => {
-                if (container.locals) {
-                    container.locals.forEach((local) => {
-                        if (local.valueDeclaration &&
-                            (isParameterDeclaration(local.valueDeclaration as VariableLikeDeclaration) || isLocalImplicit(local.valueDeclaration)) &&
-                            isNamedDeclaration(local.valueDeclaration) &&
-                            isIdentifier(local.valueDeclaration.name)) {
-                            blockScopedImplicits.push({
-                                type: getTypeOfSymbol(local),
-                                valueDeclaration: local.valueDeclaration as NamedDeclaration & { name: Identifier },
-                                enclosingBlockScope: container
-                            })
-                        }
-                    })
-                }
-            })
-            return blockScopedImplicits;
         }
         function tsPlusFlattenTags(toFlat: string[][]): readonly string[] {
             let strings: readonly string[] = toFlat[0];
@@ -33432,6 +33377,119 @@ namespace ts {
                 }
             }
         }
+
+        function getImplicitTags(type: Type): readonly string[] {
+            if ((type.flags & TypeFlags.Intrinsic)) {
+                return [typeToString(type)];
+            }
+            if ((type.flags & TypeFlags.Intersection)) {
+                return flatMap((type as IntersectionType).types, getImplicitTags);
+            }
+            if (type.symbol) {
+                let tags: readonly string[] = [`${type.symbol.escapedName.toString()}<`];
+                if ((type.flags & TypeFlags.Object) && (getObjectFlags(type) & ObjectFlags.Reference)) {
+                    for (const arg of getTypeArguments(type as TypeReference)) {
+                        const tagsOfArg = getImplicitTags(arg);
+                        tags = flatMap(tags, (tag) => map(tagsOfArg, (argTag) => `${tag},${argTag}`));
+                    }
+                }
+                return map(tags, (tag) => `${tag}>`);
+            }
+            if ((type.flags && TypeFlags.UnionOrIntersection)) {
+                return flatMap((type as IntersectionType | UnionType).types, getImplicitTags);
+            }
+            return ["__"];
+        }
+
+        function getTypeAndImplicitTags(symbol: Symbol) {
+            const links = getSymbolLinks(symbol);
+            if (!links.tsPlusTypeAndImplicitTags) {
+                const type = getTypeOfSymbol(symbol);
+                const tags = getImplicitTags(type);
+                links.tsPlusTypeAndImplicitTags = {
+                    type,
+                    tags,
+                    tagSet: new Set(tags)
+                }
+            }
+            return links.tsPlusTypeAndImplicitTags;
+        }
+
+        function indexInScope(entry: Symbol) {
+            const { tags } = getTypeAndImplicitTags(entry);
+            for (const tag of tags) {
+                let index = tsPlusWorldScope.implicits.get(tag);
+                if (!index) {
+                    index = new Set();
+                    tsPlusWorldScope.implicits.set(tag, index);
+                }
+                index.add(entry);
+            }
+        }
+
+        function lookupInGlobalScope(location: Node, type: Type, selfExport: Node | undefined, tags: readonly string[]): Derivation | undefined {
+            const [head, ...rest] = tags;
+            const candidatesIterator = tsPlusWorldScope.implicits.get(head)?.values();
+            if (!candidatesIterator) {
+                return
+            }
+            let current = candidatesIterator.next();
+            while (!current.done) {
+                const candidate = current.value;
+                if (rest.every((tag) => tsPlusWorldScope.implicits.get(tag)?.has(candidate) === true)) {
+                    if (getSelfExportStatement(candidate.valueDeclaration!) !== selfExport &&
+                        isBlockScopedNameDeclaredBeforeUse(candidate.valueDeclaration!, location)) {
+                        const { type: implicitType } = getTypeAndImplicitTags(candidate);
+                        if (isTypeAssignableTo(implicitType, type)) {
+                            return {
+                                _tag: "FromImplicitScope",
+                                type,
+                                implicit: candidate.valueDeclaration!
+                            };
+                        }
+                    }
+                }
+                current = candidatesIterator.next();
+            }
+        }
+
+        function lookupInBlockScope(location: Node, type: Type, tags: readonly string[]): Derivation | undefined {
+            let container = getEnclosingBlockScopeContainer(location);
+            while (container) {
+                if (container.locals) {
+                    for (const local of arrayFrom(container.locals.values())) {
+                        if (local.valueDeclaration &&
+                            (isParameterDeclaration(local.valueDeclaration as VariableLikeDeclaration) || isLocalImplicit(local.valueDeclaration)) &&
+                            isNamedDeclaration(local.valueDeclaration) &&
+                            isIdentifier(local.valueDeclaration.name) && 
+                            isBlockScopedNameDeclaredBeforeUse(local.valueDeclaration.name, location)
+                            ) {
+                                const { tagSet: implicitTags, type: implicitType } = getTypeAndImplicitTags(local);
+                                if (tags.every((tag) => implicitTags.has(tag))) {
+                                    if (isTypeAssignableTo(implicitType, type)) {
+                                        local.valueDeclaration.symbol.isReferenced = SymbolFlags.Value;
+                                        const blockLinks = getNodeLinks(container);
+                                        if (!blockLinks.uniqueNames) {
+                                            blockLinks.uniqueNames = new Set()
+                                        }
+                                        const declaration = local.valueDeclaration as NamedDeclaration & { name: Identifier };
+                                        blockLinks.uniqueNames.add(declaration);
+                                        const implicitLinks = getNodeLinks(local.valueDeclaration);
+                                        implicitLinks.needsUniqueNameInSope = true;
+                                        return {
+                                            _tag: "FromBlockScope",
+                                            type,
+                                            implicit: declaration
+                                        };
+                                    }
+                                }
+                        }
+                    }
+                }
+                container = getEnclosingBlockScopeContainer(container);
+            }
+        }
+
         function deriveTypeWorker(
             location: Node,
             originalType: Type,
@@ -33447,42 +33505,8 @@ namespace ts {
                     type
                 };
             }
-            const blockScopedImplicits = getAllBlockScopedDeclarations(location);
-            if (blockScopedImplicits.length > 0) {
-                for (const implicit of blockScopedImplicits) {
-                    if (isIdenticalInDerivation(type, implicit.type) && isBlockScopedNameDeclaredBeforeUse(implicit.valueDeclaration, location)) {
-                        implicit.valueDeclaration.symbol.isReferenced = SymbolFlags.Value;
-                        const blockLinks = getNodeLinks(implicit.enclosingBlockScope);
-                        if (!blockLinks.uniqueNames) {
-                            blockLinks.uniqueNames = new Set()
-                        }
-                        blockLinks.uniqueNames.add(implicit.valueDeclaration);
-                        const implicitLinks = getNodeLinks(implicit.valueDeclaration);
-                        implicitLinks.needsUniqueNameInSope = true;
-                        return {
-                            _tag: "FromBlockScope",
-                            type,
-                            implicit: implicit.valueDeclaration,
-                        };
-                    }
-                }
-            }
-            const selfExport = getSelfExportStatement(location);
-            const typeHash = hashType(type);
-            const implicits = tsPlusWorldScope.implicits.get(typeHash);
-            if (implicits) {
-                for (const [implicitType, declaration] of implicits) {
-                    if (isIdenticalInDerivation(type, implicitType) && isBlockScopedNameDeclaredBeforeUse(declaration, location) && getSelfExportStatement(declaration) !== selfExport) {
-                        return {
-                            _tag: "FromImplicitScope",
-                            type,
-                            implicit: declaration
-                        };
-                    }
-                }
-            }
             for (const derivedType of derivationScope) {
-                if (isIdenticalInDerivation(type, derivedType.type)) {
+                if (isTypeAssignableTo(derivedType.type, type)) {
                     const rule: FromPriorDerivation = {
                         _tag: "FromPriorDerivation",
                         derivation: derivedType,
@@ -33492,9 +33516,19 @@ namespace ts {
                     return rule;
                 }
             }
+            const tagsForLookup = getImplicitTags(type);
+            const inBlockdScope = lookupInBlockScope(location, type, tagsForLookup);
+            if (inBlockdScope) {
+                return inBlockdScope;
+            }
+            const selfExport = getSelfExportStatement(location);
+            const inWorldScope = lookupInGlobalScope(location, type, selfExport, tagsForLookup);
+            if (inWorldScope) {
+                return inWorldScope;
+            }
             const newCurrentDerivation = [...currentDerivation, type];
             for (const prohibitedType of prohibited) {
-                if (isIdenticalInDerivation(type, prohibitedType)) {
+                if (isTypeIdenticalTo(prohibitedType, type)) {
                     if (diagnostics.length === 0) {
                         const digs: Diagnostic[] = [];
                         for (let i = 1; i < newCurrentDerivation.length - 1; i++) {
@@ -33703,7 +33737,7 @@ namespace ts {
                 };
             }
             if (diagnostics.length === 0) {
-                if (isIdenticalInDerivation(originalType, type)) {
+                if (isTypeIdenticalTo(originalType, type)) {
                     diagnostics.push(createError(location, Diagnostics.Cannot_derive_type_0_and_no_derivation_rules_are_found, typeToString(originalType)));
                 } else {
                     const digs: Diagnostic[] = [];
@@ -46907,20 +46941,15 @@ namespace ts {
             }
         }
         function fillTsPlusLocalScope(file: SourceFile) {
-            const indexedImplicits = tsPlusWorldScope.implicits;
             const derivationRules = tsPlusWorldScope.rules;
             if (file.symbol) {
                 const exports = file.symbol.exports;
                 if (exports) {
                     exports.forEach((exportSymbol) => {
-                        forEach(exportSymbol.declarations, (declaration) => {
+                        if (exportSymbol.valueDeclaration) {
+                            const declaration = exportSymbol.valueDeclaration;
                             if (isTsPlusImplicit(declaration)) {
-                                const typeOfNode = declaration.type ? getTypeFromTypeNode(declaration.type) : getTypeOfNode(declaration);
-                                const hash = hashType(typeOfNode);
-                                if (!indexedImplicits.has(hash)) {
-                                    indexedImplicits.set(hash, []);
-                                }
-                                indexedImplicits.get(hash)!.push([typeOfNode, declaration]);
+                                indexInScope(exportSymbol);
                             }
                             else if((isFunctionDeclaration(declaration) || isVariableDeclaration(declaration)) && declaration.tsPlusDeriveTags) {
                                 for (const tag of declaration.tsPlusDeriveTags) {
@@ -46949,7 +46978,7 @@ namespace ts {
                                     }
                                 }
                             }
-                        });
+                        }
                     });
                 }
             }
