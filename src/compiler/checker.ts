@@ -33466,16 +33466,6 @@ namespace ts {
                     type
                 };
             }
-            const tagsForLookup = getImplicitTags(type);
-            const inBlockdScope = lookupInBlockScope(location, type, tagsForLookup);
-            if (inBlockdScope) {
-                return inBlockdScope;
-            }
-            const selfExport = getSelfExportStatement(location);
-            const inWorldScope = lookupInGlobalScope(location, type, selfExport, tagsForLookup);
-            if (inWorldScope) {
-                return inWorldScope;
-            }
             for (const derivedType of derivationScope) {
                 if (isTypeAssignableTo(derivedType.type, type)) {
                     const rule: FromPriorDerivation = {
@@ -33486,6 +33476,16 @@ namespace ts {
                     derivedType.usedBy.push(rule);
                     return rule;
                 }
+            }
+            const tagsForLookup = getImplicitTags(type);
+            const inBlockdScope = lookupInBlockScope(location, type, tagsForLookup);
+            if (inBlockdScope) {
+                return inBlockdScope;
+            }
+            const selfExport = getSelfExportStatement(location);
+            const inWorldScope = lookupInGlobalScope(location, type, selfExport, tagsForLookup);
+            if (inWorldScope) {
+                return inWorldScope;
             }
             const newCurrentDerivation = [...currentDerivation, type];
             for (const prohibitedType of prohibited) {
