@@ -373,7 +373,7 @@ namespace ts {
             map: getFileMap(host.getCompilerOptions(), host)
         };
         const tsPlusWorldScope: {
-            implicits: ESMap<string, Declaration[]>;
+            implicits: ESMap<string, Symbol[]>;
             rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Declaration, Set<string>][] }>;
         } = {
             implicits: new Map(),
@@ -33374,10 +33374,10 @@ namespace ts {
             return ["__"];
         }
 
-        function getTypeAndImplicitTags(node: Node) {
-            const links = getNodeLinks(node);
+        function getTypeAndImplicitTags(symbol: Symbol) {
+            const links = getSymbolLinks(symbol);
             if (!links.tsPlusTypeAndImplicitTags) {
-                const type = getTypeOfNode(node);
+                const type = getTypeOfSymbol(symbol);
                 const tags = getImplicitTags(type);
                 links.tsPlusTypeAndImplicitTags = {
                     type,
@@ -33388,7 +33388,7 @@ namespace ts {
             return links.tsPlusTypeAndImplicitTags;
         }
 
-        function indexInScope(entry: Declaration) {
+        function indexInScope(entry: Symbol) {
             const { tags } = getTypeAndImplicitTags(entry);
             for (const tag of tags) {
                 let index = tsPlusWorldScope.implicits.get(tag);
@@ -33401,24 +33401,26 @@ namespace ts {
         }
 
         function lookupInGlobalScope(location: Node, type: Type, selfExport: Node | undefined, tags: readonly string[]): Derivation | undefined {
-            const negatives = new Set<Declaration>();
+            const negatives = new Set<Symbol>();
             for (const tag of tags) {
                 const index = tsPlusWorldScope.implicits.get(tag);
                 if (index) {
-                    for (const implicitDeclaration of index) {
-                        if (negatives.has(implicitDeclaration) || !isBlockScopedNameDeclaredBeforeUse(implicitDeclaration, location) || getSelfExportStatement(implicitDeclaration) === selfExport) {
+                    for (const implicit of index) {
+                        if (negatives.has(implicit) ||
+                            !isBlockScopedNameDeclaredBeforeUse(implicit.valueDeclaration!, location) ||
+                            getSelfExportStatement(implicit.valueDeclaration!) === selfExport) {
                             continue;
                         }
-                        const { type: implicitType } = getTypeAndImplicitTags(implicitDeclaration);
+                        const { type: implicitType } = getTypeAndImplicitTags(implicit);
                         if (isTypeAssignableTo(implicitType, type)) {
                             return {
                                 _tag: "FromImplicitScope",
                                 type,
-                                implicit: implicitDeclaration
+                                implicit: implicit.valueDeclaration!
                             };
                         }
                         else {
-                            negatives.add(implicitDeclaration);
+                            negatives.add(implicit);
                         }
                     }
                 }
@@ -33436,7 +33438,7 @@ namespace ts {
                             isIdentifier(local.valueDeclaration.name) && 
                             isBlockScopedNameDeclaredBeforeUse(local.valueDeclaration, location)
                             ) {
-                                const { tagSet: implicitTags, type: implicitType } = getTypeAndImplicitTags(local.valueDeclaration);
+                                const { tagSet: implicitTags, type: implicitType } = getTypeAndImplicitTags(local);
                                 for (const tag of tags) {
                                     if (implicitTags.has(tag)) {
                                         if (isTypeAssignableTo(implicitType, type)) {
@@ -46879,9 +46881,10 @@ namespace ts {
                 const exports = file.symbol.exports;
                 if (exports) {
                     exports.forEach((exportSymbol) => {
-                        forEach(exportSymbol.declarations, (declaration) => {
+                        if (exportSymbol.valueDeclaration) {
+                            const declaration = exportSymbol.valueDeclaration;
                             if (isTsPlusImplicit(declaration)) {
-                                indexInScope(declaration);
+                                indexInScope(exportSymbol);
                             }
                             else if((isFunctionDeclaration(declaration) || isVariableDeclaration(declaration)) && declaration.tsPlusDeriveTags) {
                                 for (const tag of declaration.tsPlusDeriveTags) {
@@ -46910,7 +46913,7 @@ namespace ts {
                                     }
                                 }
                             }
-                        });
+                        }
                     });
                 }
             }

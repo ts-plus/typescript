@@ -5333,6 +5333,13 @@ namespace ts {
         isConstructorDeclaredProperty?: boolean;    // Property declared through 'this.x = ...' assignment in constructor
         tupleLabelDeclaration?: NamedTupleMember | ParameterDeclaration; // Declaration associated with the tuple's label
         accessibleChainCache?: ESMap<string, Symbol[] | undefined>;
+        // TSPLUS START
+        tsPlusTypeAndImplicitTags?: {
+            type: Type,
+            tags: readonly string[],
+            tagSet: Set<string>
+        }
+        // TSPLUS END
     }
 
     /* @internal */
@@ -5525,11 +5532,6 @@ namespace ts {
             flatMap: TsPlusSignature
         };
         tsPlusLazy?: boolean;
-        tsPlusTypeAndImplicitTags?: {
-            type: Type,
-            tags: readonly string[],
-            tagSet: Set<string>
-        }
         // TSPLUS EXTENSION END
     }
 
