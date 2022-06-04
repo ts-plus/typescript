@@ -33310,22 +33310,6 @@ namespace ts {
         function isLocalImplicit(node: Node): boolean {
             return getAllJSDocTags(node, (tag): tag is JSDocTag => tag.tagName.escapedText === "tsplus" && typeof tag.comment === 'string' && tag.comment === 'implicit local').length > 0;
         }
-        function getAllBlockScopedDeclarations(location: Node) {
-            const scope = new Map<string, [type: Type, valueDeclaration: NamedDeclaration & { name: Identifier }, enclosingBlockScope: Node][]>();
-            forEachEnclosingBlockScopeContainer(location, (container) => {
-                if (container.locals) {
-                    container.locals.forEach((local) => {
-                        if (local.valueDeclaration &&
-                            (isParameterDeclaration(local.valueDeclaration as VariableLikeDeclaration) || isLocalImplicit(local.valueDeclaration)) &&
-                            isNamedDeclaration(local.valueDeclaration) &&
-                            isIdentifier(local.valueDeclaration.name)) {
-                                indexInScope(scope, [getTypeOfSymbol(local), local.valueDeclaration as NamedDeclaration & { name: Identifier }, container]);
-                        }
-                    })
-                }
-            })
-            return scope;
-        }
         function tsPlusFlattenTags(toFlat: string[][]): readonly string[] {
             let strings: readonly string[] = toFlat[0];
             for (let i = 1; i < toFlat.length; i++) {
@@ -33402,24 +33386,68 @@ namespace ts {
             }
         }
 
-        function lookupInScope<Scope extends [Type, any, ...any[]]>(scope: ESMap<string, Scope[]>, type: Type, filter: (d: Scope) => boolean) {
-            const tags = getImplicitTags(type);
-            const negatives = new Set<Scope[1]>();
+        function lookupInGlobalScope(location: Node, type: Type, selfExport: Node | undefined, tags: readonly string[]): Derivation | undefined {
+            const negatives = new Set<Declaration>();
             for (const tag of tags) {
-                const index = scope.get(tag);
+                const index = tsPlusWorldScope.implicits.get(tag);
                 if (index) {
-                    for (const entry of index) {
-                        if (negatives.has(entry[1]) || !filter(entry)) {
+                    for (const [implicitType, implicitDeclaration] of index) {
+                        if (negatives.has(implicitDeclaration) || !isBlockScopedNameDeclaredBeforeUse(implicitDeclaration, location) || getSelfExportStatement(implicitDeclaration) === selfExport) {
                             continue;
                         }
-                        else if (isTypeAssignableTo(entry[0], type)) {
-                            return entry;
+                        else if (isTypeAssignableTo(implicitType, type)) {
+                            return {
+                                _tag: "FromImplicitScope",
+                                type,
+                                implicit: implicitDeclaration
+                            };
                         }
                         else {
-                            negatives.add(entry[1]);
+                            negatives.add(implicitDeclaration);
                         }
                     }
                 }
+            }
+        }
+
+        function lookupInBlockScope(location: Node, type: Type, tags: readonly string[]): Derivation | undefined {
+            let container = getEnclosingBlockScopeContainer(location);
+            while (container) {
+                if (container.locals) {
+                    for (const local of arrayFrom(container.locals.values())) {
+                        if (local.valueDeclaration &&
+                            (isParameterDeclaration(local.valueDeclaration as VariableLikeDeclaration) || isLocalImplicit(local.valueDeclaration)) &&
+                            isNamedDeclaration(local.valueDeclaration) &&
+                            isIdentifier(local.valueDeclaration.name) && 
+                            isBlockScopedNameDeclaredBeforeUse(local.valueDeclaration, location)
+                            ) {
+                                const implicitType = getTypeOfSymbol(local);
+                                const implicitTags = new Set(getImplicitTags(implicitType));
+                                for (const tag of tags) {
+                                    if (implicitTags.has(tag)) {
+                                        if (isTypeAssignableTo(implicitType, type)) {
+                                            local.valueDeclaration.symbol.isReferenced = SymbolFlags.Value;
+                                            const blockLinks = getNodeLinks(container);
+                                            if (!blockLinks.uniqueNames) {
+                                                blockLinks.uniqueNames = new Set()
+                                            }
+                                            const declaration = local.valueDeclaration as NamedDeclaration & { name: Identifier };
+                                            blockLinks.uniqueNames.add(declaration);
+                                            const implicitLinks = getNodeLinks(local.valueDeclaration);
+                                            implicitLinks.needsUniqueNameInSope = true;
+                                            return {
+                                                _tag: "FromBlockScope",
+                                                type,
+                                                implicit: declaration
+                                            };
+                                        }
+                                        break
+                                    }
+                                }
+                        }
+                    }
+                }
+                container = getEnclosingBlockScopeContainer(container);
             }
         }
 
@@ -33438,41 +33466,15 @@ namespace ts {
                     type
                 };
             }
-            const blockScopedImplicits = getAllBlockScopedDeclarations(location);
-            const inBlockdScope = lookupInScope(
-                blockScopedImplicits,
-                type,
-                ([, declaration]) => isBlockScopedNameDeclaredBeforeUse(declaration, location)
-            );
-            
+            const tagsForLookup = getImplicitTags(type);
+            const inBlockdScope = lookupInBlockScope(location, type, tagsForLookup);
             if (inBlockdScope) {
-                const [, valueDeclaration, enclosingBlockScope] = inBlockdScope;
-                valueDeclaration.symbol.isReferenced = SymbolFlags.Value;
-                const blockLinks = getNodeLinks(enclosingBlockScope);
-                if (!blockLinks.uniqueNames) {
-                    blockLinks.uniqueNames = new Set()
-                }
-                blockLinks.uniqueNames.add(valueDeclaration);
-                const implicitLinks = getNodeLinks(valueDeclaration);
-                implicitLinks.needsUniqueNameInSope = true;
-                return {
-                    _tag: "FromBlockScope",
-                    type,
-                    implicit: valueDeclaration,
-                };
+                return inBlockdScope;
             }
             const selfExport = getSelfExportStatement(location);
-            const inWorldScope = lookupInScope(
-                tsPlusWorldScope.implicits,
-                type,
-                ([, declaration]) => isBlockScopedNameDeclaredBeforeUse(declaration, location) && getSelfExportStatement(declaration) !== selfExport
-            )
+            const inWorldScope = lookupInGlobalScope(location, type, selfExport, tagsForLookup);
             if (inWorldScope) {
-                return {
-                    _tag: "FromImplicitScope",
-                    type,
-                    implicit: inWorldScope[1]
-                };
+                return inWorldScope;
             }
             for (const derivedType of derivationScope) {
                 if (isTypeAssignableTo(derivedType.type, type)) {
