@@ -5525,6 +5525,11 @@ namespace ts {
             flatMap: TsPlusSignature
         };
         tsPlusLazy?: boolean;
+        tsPlusTypeAndImplicitTags?: {
+            type: Type,
+            tags: readonly string[],
+            tagSet: Set<string>
+        }
         // TSPLUS EXTENSION END
     }
 

@@ -373,7 +373,7 @@ namespace ts {
             map: getFileMap(host.getCompilerOptions(), host)
         };
         const tsPlusWorldScope: {
-            implicits: ESMap<string, [Type, Declaration][]>;
+            implicits: ESMap<string, Declaration[]>;
             rules: ESMap<string, { lazyRule: Declaration | undefined, rules: [Rule, number, Declaration, Set<string>][] }>;
         } = {
             implicits: new Map(),
@@ -33374,13 +33374,27 @@ namespace ts {
             return ["__"];
         }
 
-        function indexInScope<Scope extends [Type, ...any[]]>(scope: ESMap<string, Scope[]>, entry: Scope) {
-            const tags = getImplicitTags(entry[0]);
+        function getTypeAndImplicitTags(node: Node) {
+            const links = getNodeLinks(node);
+            if (!links.tsPlusTypeAndImplicitTags) {
+                const type = getTypeOfNode(node);
+                const tags = getImplicitTags(type);
+                links.tsPlusTypeAndImplicitTags = {
+                    type,
+                    tags,
+                    tagSet: new Set(tags)
+                }
+            }
+            return links.tsPlusTypeAndImplicitTags;
+        }
+
+        function indexInScope(entry: Declaration) {
+            const { tags } = getTypeAndImplicitTags(entry);
             for (const tag of tags) {
-                let index = scope.get(tag);
+                let index = tsPlusWorldScope.implicits.get(tag);
                 if (!index) {
                     index = [];
-                    scope.set(tag, index);
+                    tsPlusWorldScope.implicits.set(tag, index);
                 }
                 index.push(entry);
             }
@@ -33391,11 +33405,12 @@ namespace ts {
             for (const tag of tags) {
                 const index = tsPlusWorldScope.implicits.get(tag);
                 if (index) {
-                    for (const [implicitType, implicitDeclaration] of index) {
+                    for (const implicitDeclaration of index) {
                         if (negatives.has(implicitDeclaration) || !isBlockScopedNameDeclaredBeforeUse(implicitDeclaration, location) || getSelfExportStatement(implicitDeclaration) === selfExport) {
                             continue;
                         }
-                        else if (isTypeAssignableTo(implicitType, type)) {
+                        const { type: implicitType } = getTypeAndImplicitTags(implicitDeclaration);
+                        if (isTypeAssignableTo(implicitType, type)) {
                             return {
                                 _tag: "FromImplicitScope",
                                 type,
@@ -33421,8 +33436,7 @@ namespace ts {
                             isIdentifier(local.valueDeclaration.name) && 
                             isBlockScopedNameDeclaredBeforeUse(local.valueDeclaration, location)
                             ) {
-                                const implicitType = getTypeOfSymbol(local);
-                                const implicitTags = new Set(getImplicitTags(implicitType));
+                                const { tagSet: implicitTags, type: implicitType } = getTypeAndImplicitTags(local.valueDeclaration);
                                 for (const tag of tags) {
                                     if (implicitTags.has(tag)) {
                                         if (isTypeAssignableTo(implicitType, type)) {
@@ -46860,7 +46874,6 @@ namespace ts {
             }
         }
         function fillTsPlusLocalScope(file: SourceFile) {
-            const indexedImplicits = tsPlusWorldScope.implicits;
             const derivationRules = tsPlusWorldScope.rules;
             if (file.symbol) {
                 const exports = file.symbol.exports;
@@ -46868,8 +46881,7 @@ namespace ts {
                     exports.forEach((exportSymbol) => {
                         forEach(exportSymbol.declarations, (declaration) => {
                             if (isTsPlusImplicit(declaration)) {
-                                const typeOfNode = declaration.type ? getTypeFromTypeNode(declaration.type) : getTypeOfNode(declaration);
-                                indexInScope(indexedImplicits, [typeOfNode, declaration]);
+                                indexInScope(declaration);
                             }
                             else if((isFunctionDeclaration(declaration) || isVariableDeclaration(declaration)) && declaration.tsPlusDeriveTags) {
                                 for (const tag of declaration.tsPlusDeriveTags) {
