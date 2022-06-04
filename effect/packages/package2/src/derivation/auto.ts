@@ -47,22 +47,32 @@ export declare namespace HKT {
   type F = typeof F;
   const A: unique symbol;
   type A = typeof A;
+  const E: unique symbol;
+  type E = typeof E;
+  const R: unique symbol;
+  type R = typeof R;
   const T: unique symbol;
   type T = typeof T;
 
   type _A<X extends HKT> = X extends { [A]?: () => infer A } ? A : never;
+  type _E<X extends HKT> = X extends { [E]?: () => infer E } ? E : never;
+  type _R<X extends HKT> = X extends { [R]?: (_: infer R) => void } ? R : never;
 
   /**
    * @tsplus type fncts.Kind
    */
-  type Kind<F extends HKT, A> = F & {
+  type Kind<F extends HKT, R, E, A> = F & {
     [F]?: F;
     [A]?: () => A;
+    [E]?: () => E;
+    [R]?: (_: R) => void
   } extends { [T]?: infer X }
     ? X
     : {
         [F]?: F;
+        [E]?: () => E;
         [A]?: () => A;
+        [R]?: (_: R) => void
       };
 
   export interface Typeclass<F extends HKT> {
@@ -73,33 +83,35 @@ export declare namespace HKT {
 export interface HKT {
   [HKT.F]?: HKT;
   [HKT.A]?: () => unknown;
+  [HKT.E]?: () => unknown
+  [HKT.R]?: (_: never) => void
   [HKT.T]?: unknown;
 }
 
 export interface Applicative<F extends HKT> extends HKT.Typeclass<F> {
-  zipWith<A, B, C>(
-    fa: HKT.Kind<F, A>,
-    fb: HKT.Kind<F, B>,
+  zipWith<R, E, A, R1, E1, B, C>(
+    fa: HKT.Kind<F, R, E, A>,
+    fb: HKT.Kind<F, R1, E1, B>,
     f: (a: A, b: B) => C
-  ): HKT.Kind<F, C>;
+  ): HKT.Kind<F, R & R1, E | E1, C>;
 }
 
 export interface Traversable<F extends HKT> extends HKT.Typeclass<F> {
-  traverse<G extends HKT, A, B>(
-    ta: HKT.Kind<F, A>,
-    f: (a: A) => HKT.Kind<G, B>
-  ): HKT.Kind<G, HKT.Kind<F, A>>;
+  traverse<G extends HKT, R, E, A, R1, E1, B>(
+    ta: HKT.Kind<F, R, E, A>,
+    f: (a: A) => HKT.Kind<G, R1, E1, B>
+  ): HKT.Kind<G, R1, E1, HKT.Kind<F, R, E, B>>;
 }
 
 /**
  * @tsplus fluent fncts.Kind traverse
  */
-export declare function traverse<_F extends HKT, G extends HKT, A, B>(
-  self: HKT.Kind<_F, A>,
-  f: (a: A) => HKT.Kind<G, B>,
+export declare function traverse<_F extends HKT, G extends HKT, R, E, A, R1, E1, B>(
+  self: HKT.Kind<_F, R, E, A>,
+  f: (a: A) => HKT.Kind<G, R1, E1, B>,
   /** @tsplus auto */ F: Traversable<_F>,
   /** @tsplus auto */ G: Applicative<G>
-): HKT.Kind<G, HKT.Kind<_F, A>>
+): HKT.Kind<G, R1, E1, HKT.Kind<_F, R, E, A>>
 
 
 export interface HF extends H<any> {}
@@ -135,8 +147,8 @@ export declare const TraversableT: Traversable<HF>;
  */
 export declare const ApplicativeG: Applicative<GF>;
 
-declare const h: H<string>
+export declare const h: H<string>
 
-declare function mkG<A>(a: A): G<A>
+export declare function mkG<A>(a: A): G<A>
 
 export const res = h.traverse((s) => mkG(s.length))
