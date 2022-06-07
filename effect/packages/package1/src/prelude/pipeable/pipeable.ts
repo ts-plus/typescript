@@ -41,3 +41,15 @@ export const chainPipeable = <A, R1, E1, B>(f: (a: A) => Effect<R1, E1, B>) => <
 const x = Effect(1).chainPipeable(n => Effect(2));
 
 ok.unsafeRunPromise().then(x => console.log(x));
+
+
+/**
+ * @tsplus pipeable ets/Effect zipWithAll
+ */
+export declare const zipWithAll: <As extends unknown[]>(...args: As) => <
+  R,
+  E,
+  A
+>(
+  effect: Effect<R, E, A>
+) => Effect<R, E, [A, ...As]> 

@@ -46132,6 +46132,9 @@ namespace ts {
                 (identifierType.symbol as TsPlusPipeableIdentifierSymbol).getTsPlusDataFirstType = dataFirstType;
             }
         }
+        function isPipeableSelfARestParameter(signature: Signature): boolean {
+            return getSignaturesOfType(getReturnTypeOfSignature(signature), SignatureKind.Call).find(isSelfARestParameter) != null;
+        }
         function getTsPlusFluentSignatureForPipeableFunction(file: SourceFile, exportName: string, name: string, pipeable: FunctionDeclaration): [Type, TsPlusSignature[]] | undefined {
             function reportDiagnostic(diagnostic: DiagnosticMessage) {
                 error(pipeable, diagnostic);
@@ -46145,7 +46148,7 @@ namespace ts {
                 if (returnStatement && returnStatement.expression.parameters.length === 1) {
                     const type = getTypeOfNode(pipeable);
                     const signatures = getSignaturesOfType(type, SignatureKind.Call);
-                    if (signatures.find(isSelfARestParameter)) {
+                    if (signatures.find(isPipeableSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
@@ -46192,7 +46195,7 @@ namespace ts {
                 const tsPlusSignatures = flatMap(signatures, (sig) => {
                     const returnType = getReturnTypeOfSignature(sig);
                     const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
-                    if (signatures.find(isSelfARestParameter)) {
+                    if (signatures.find(isPipeableSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
@@ -46265,7 +46268,7 @@ namespace ts {
                 if (returnFn && returnFn.parameters.length === 1) {
                     const type = getTypeOfNode(pipeable);
                     const signatures = getSignaturesOfType(type, SignatureKind.Call);
-                    if (signatures.find(isSelfARestParameter)) {
+                    if (signatures.find(isPipeableSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
@@ -46323,7 +46326,7 @@ namespace ts {
                 if (isFunctionTypeNode(returnFn) && returnFn.parameters.length === 1) {
                     const type = getTypeOfNode(pipeable);
                     const signatures = getSignaturesOfType(type, SignatureKind.Call);
-                    if (signatures.find(isSelfARestParameter)) {
+                    if (signatures.find(isPipeableSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
                     }
