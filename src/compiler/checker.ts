@@ -1383,35 +1383,53 @@ namespace ts {
             }
             return false;
         }
-        function isParamUsed(param: TypeParameterDeclaration, node: Node): boolean {
-            let used = false;
-            const bt = getTypeOfNode(param);
+        function markUsedParams(params: readonly TypeParameterDeclaration[], types: readonly Type[], cache: Set<TypeParameterDeclaration>, node: Node) {
             function visitor(node: Node): Node {
                 const t = getTypeOfNode(node);
-                if (isTypeIdenticalTo(bt, t)) {
-                    used = true;
+                for (let i = 0; i < params.length; i++) {
+                    const type = types[i];
+                    if (isTypeIdenticalTo(type, t)) {
+                        cache.add(params[i]);
+                    }
                 }
                 return visitEachChild(node, visitor, nullTransformationContext);
             }
             visitNode(node, visitor);
-            return used;
         }
         function partitionTypeParametersForPipeable(dataFirst: FunctionDeclaration | ArrowFunction | FunctionExpression): [TypeParameterDeclaration[] | undefined, TypeParameterDeclaration[] | undefined] {
             if (!dataFirst.typeParameters) {
                 return [undefined, undefined];
             }
+            const typeParams = dataFirst.typeParameters;
+            const types = map(typeParams, getTypeOfNode);
+            const cache = new Set<TypeParameterDeclaration>()
+            for (let i = 1; i < dataFirst.parameters.length; i++) {
+                const param = dataFirst.parameters[i];
+                markUsedParams(typeParams, types, cache, param);
+            }
+            let loop = true;
+            const processed = new Set<TypeParameterDeclaration>();
+            while (loop) {
+                const pre = cache.size;
+                cache.forEach((typeParam) => {
+                    if (!processed.has(typeParam)) {
+                        processed.add(typeParam);
+                        if (typeParam.constraint) {
+                            markUsedParams(typeParams, types, cache, typeParam.constraint);
+                        }
+                        if (typeParam.default) {
+                            markUsedParams(typeParams, types, cache, typeParam.default);
+                        }
+                    }
+                })
+                if (cache.size === pre) {
+                    loop = false;
+                }
+            }
             const left: TypeParameterDeclaration[] = [];
             const right: TypeParameterDeclaration[] = [];
             forEach(dataFirst.typeParameters, (param) => {
-                let used = false;
-                forEach(dataFirst.parameters, (p, i) => {
-                    if (i !== 0) {
-                        if (p.type && isParamUsed(param, p.type)) {
-                            used = true;
-                        }
-                    }
-                });
-                if (used) {
+                if (cache.has(param)) {
                     left.push(param);
                 }
                 else {
