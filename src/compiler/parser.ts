@@ -6906,7 +6906,7 @@ namespace ts {
             return finished;
         }
 
-        function parseTsPlusExtensionTag(typeName: string | undefined, functionName: string | undefined, priority: string | undefined): TsPlusPrioritizedExtensionTag | undefined {
+        function parseTsPlusExtensionTag(tagType: string, typeName: string | undefined, functionName: string | undefined, priority: string | undefined): TsPlusPrioritizedExtensionTag | undefined {
             if (!typeName || !functionName) {
                 return undefined;
             }
@@ -6921,7 +6921,7 @@ namespace ts {
                 }
             }
             parsedPriority ||= 0;
-            return { target: typeName, name: functionName, priority: parsedPriority };
+            return { tagType, target: typeName, name: functionName, priority: parsedPriority };
         }
 
         function undefinedIfZeroLength<A>(as: A[]): A[] | undefined {
@@ -6953,7 +6953,7 @@ namespace ts {
                                     break;
                                 }
                                 case "fluent": {
-                                    const parsedTag = parseTsPlusExtensionTag(target, name, priority);
+                                    const parsedTag = parseTsPlusExtensionTag(tagType, target, name, priority);
                                     if (!parsedTag) {
                                         parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_fluent_extension_must_have_the_form_tsplus_fluent_typename_name_priority);
                                         break;
@@ -6966,7 +6966,7 @@ namespace ts {
                                         parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
                                         break;
                                     }
-                                    staticTags.push({ target, name });
+                                    staticTags.push({ tagType, target, name });
                                     break;
                                 }
                                 case "pipeable": {
@@ -6974,7 +6974,7 @@ namespace ts {
                                         parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
                                         break;
                                     }
-                                    pipeableTags.push({ target, name });
+                                    pipeableTags.push({ tagType, target, name });
                                     break;
                                 }
                                 case "getter": {
@@ -6982,11 +6982,11 @@ namespace ts {
                                         parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_getter_extension_must_have_the_form_tsplus_getter_typename_name);
                                         break;
                                     }
-                                    getterTags.push({ target, name });
+                                    getterTags.push({ tagType, target, name });
                                     break;
                                 }
                                 case "operator": {
-                                    const parsedTag = parseTsPlusExtensionTag(target, name, priority);
+                                    const parsedTag = parseTsPlusExtensionTag(tagType, target, name, priority);
                                     if (!parsedTag) {
                                         parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
                                         break;

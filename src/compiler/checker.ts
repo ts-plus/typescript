@@ -876,6 +876,59 @@ namespace ts {
                 if (doCall) {
                     checker.getTypeAtLocation(doCall);
                 }
+            },
+            getTsPlusSymbolAtLocation: (node) => {
+                const type = checker.getTypeAtLocation(node);
+                let symbol: TsPlusSymbol | undefined;
+                if (isTsPlusType(type)) {
+                    symbol = type.tsPlusSymbol;
+                }
+                if (type.symbol && isTsPlusSymbol(type.symbol)) {
+                    symbol = type.symbol;
+                }
+                if (type.aliasSymbol && isTsPlusSymbol(type.aliasSymbol)) {
+                    symbol = type.aliasSymbol;
+                }
+                return symbol;
+            },
+            getTsPlusExtensionsAtLocation: (node) => {
+                const type = checker.getTypeAtLocation(node);
+                let symbol: TsPlusSymbol | undefined;
+                if (isTsPlusType(type)) {
+                    symbol = type.tsPlusSymbol;
+                }
+                if (type.symbol && isTsPlusSymbol(type.symbol)) {
+                    symbol = type.symbol;
+                }
+                if (type.aliasSymbol && isTsPlusSymbol(type.aliasSymbol)) {
+                    symbol = type.aliasSymbol;
+                }
+                if (symbol) {
+                    switch (symbol.tsPlusTag) {
+                        case TsPlusSymbolTag.Fluent: {
+                            const signature = symbol.tsPlusResolvedSignatures[0];
+                            if (signature && signature.tsPlusDeclaration) {
+                                return checker.getExtensionsForDeclaration(signature.tsPlusDeclaration);
+                            }
+                            break;
+                        }
+                        case TsPlusSymbolTag.Getter:
+                        case TsPlusSymbolTag.GetterVariable:
+                        case TsPlusSymbolTag.StaticValue:
+                        case TsPlusSymbolTag.StaticFunction: {
+                            return checker.getExtensionsForDeclaration(symbol.tsPlusDeclaration);
+                        }
+                    }
+                }
+                return [];
+            },
+            getExtensionsForDeclaration: (node) => {
+                const symbols = [
+                    ...collectTsPlusFluentTags(node),
+                    ...collectTsPlusStaticTags(node),
+                    ...collectTsPlusGetterTags(node)
+                ]
+                return symbols;
             }
             // TSPLUS EXTENSION END
         };

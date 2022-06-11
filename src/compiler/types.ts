@@ -3362,6 +3362,7 @@ namespace ts {
     }
 
     export interface TsPlusExtensionTag {
+        readonly tagType: string;
         readonly target: string;
         readonly name: string;
     }
@@ -4782,6 +4783,9 @@ namespace ts {
         getTsPlusGlobals(): Symbol[];
         getTsPlusGlobal(name: string): TsPlusGlobalImport | undefined;
         findAndCheckDoAncestor(node: Node): void;
+        getTsPlusExtensionsAtLocation(node: Node): TsPlusExtensionTag[];
+        getTsPlusSymbolAtLocation(node: Node): Symbol | undefined;
+        getExtensionsForDeclaration(node: Declaration): TsPlusExtensionTag[]
     }
 
     /* @internal */
