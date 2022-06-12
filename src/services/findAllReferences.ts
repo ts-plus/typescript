@@ -669,6 +669,8 @@ namespace ts.FindAllReferences {
 
             const checker = program.getTypeChecker();
 
+            // TSPLUS EXTENSION BEGIN
+
             const tsPlusSymbol = checker.getTsPlusSymbolAtLocation(node);
             const tsPlusExtensions = checker.getTsPlusExtensionsAtLocation(node);
 
@@ -694,6 +696,8 @@ namespace ts.FindAllReferences {
                     );
                 }
             }
+
+            // TSPLUS EXTENSION END
 
             // constructors should use the class symbol, detected by name, if present
             const symbol = checker.getSymbolAtLocation(isConstructorDeclaration(node) && node.parent.name || node);
@@ -730,6 +734,8 @@ namespace ts.FindAllReferences {
                 return moduleReferences;
             }
 
+            // TSPLUS EXTENSION BEGIN
+
             let tsPlusDeclarationReferences: SymbolAndEntries[] = []
             if (symbol.valueDeclaration) {
                 for (const extension of checker.getExtensionsForDeclaration(symbol.valueDeclaration)) {
@@ -740,12 +746,14 @@ namespace ts.FindAllReferences {
                 }
             }
 
+            // TSPLUS EXTENSION END
+
             const aliasedSymbol = getMergedAliasedSymbolOfNamespaceExportDeclaration(node, symbol, checker);
             const moduleReferencesOfExportTarget = aliasedSymbol &&
                 getReferencedSymbolsForModuleIfDeclaredBySourceFile(aliasedSymbol, program, sourceFiles, cancellationToken, options, sourceFilesSet);
 
             const references = getReferencedSymbolsForSymbol(symbol, node, sourceFiles, sourceFilesSet, checker, cancellationToken, options);
-            return mergeReferences(program, moduleReferences, references, moduleReferencesOfExportTarget, tsPlusReferences, tsPlusDeclarationReferences);
+            return mergeReferences(program, moduleReferences, references, moduleReferencesOfExportTarget /* TSPLUS EXTENSION BEGIN */, tsPlusReferences, tsPlusDeclarationReferences /* TSPLUS EXTENSION END */);
         }
 
         export function getAdjustedNode(node: Node, options: Options) {
@@ -1010,6 +1018,8 @@ namespace ts.FindAllReferences {
             return result;
         }
 
+        // TSPLUS EXTENSION BEGIN
+
         function getReferencedExtensionsForOperator(node: Node, extension: TsPlusExtensionTag, sourceFiles: readonly SourceFile[], checker: TypeChecker, cancellationToken: CancellationToken): SymbolAndEntries[] {
             const references: SymbolAndEntries[] = []
             for (const sourceFile of sourceFiles) {
@@ -1071,6 +1081,8 @@ namespace ts.FindAllReferences {
             }
             return references;
         }
+
+        // TSPLUS EXTENSION END
 
         function getReferencesInContainerOrFiles(symbol: Symbol, state: State, search: Search): void {
             // Try to get the smallest valid scope that we can limit our search to;
@@ -1145,7 +1157,7 @@ namespace ts.FindAllReferences {
              */
             includes(symbol: Symbol): boolean;
 
-            // TSPLUS EXTENSION START
+            // TSPLUS EXTENSION BEGIN
             includesExtension(extension: TsPlusExtensionTag): boolean;
             // TSPLUS EXTENSION END
         }
@@ -1226,7 +1238,9 @@ namespace ts.FindAllReferences {
                 } = searchOptions;
                 const escapedText = escapeLeadingUnderscores(text);
                 const parents = this.options.implementations && location ? getParentSymbolsOfPropertyAccess(location, symbol, this.checker) : undefined;
+                // TSPLUS EXTENSION BEGIN
                 const allSearchExtensions = flatMap(allSearchSymbols, (symbol) => symbol.valueDeclaration ? this.checker.getExtensionsForDeclaration(symbol.valueDeclaration) : [])
+                // TSPLUS EXTENSION END
                 return {
                     symbol,
                     comingFrom,
@@ -1235,7 +1249,9 @@ namespace ts.FindAllReferences {
                     parents,
                     allSearchSymbols,
                     includes: sym => contains(allSearchSymbols, sym),
+                    // TSPLUS EXTENSION BEGIN
                     includesExtension: extension => contains(allSearchExtensions, extension)
+                    // TSPLUS EXTENSION END
                 };
             }
 
