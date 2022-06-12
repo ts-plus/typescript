@@ -673,6 +673,19 @@ namespace ts.FindAllReferences {
             const tsPlusExtensions = checker.getTsPlusExtensionsAtLocation(node);
 
             let tsPlusReferences: SymbolAndEntries[] = []
+
+            if (isBinaryOperatorToken(node) && isBinaryExpression(node.parent)) {
+                const signature = checker.getResolvedOperator(node.parent);
+                if (signature && signature.declaration) {
+                    for (const extension of checker.getExtensionsForDeclaration(signature.declaration)) {
+                        tsPlusReferences = concatenate(
+                            tsPlusReferences,
+                            getReferencedExtensionsForOperator(node, extension, sourceFiles, checker, cancellationToken)
+                        )
+                    }
+                }
+            }
+
             if (tsPlusSymbol) {
                 for (const extension of tsPlusExtensions) {
                     tsPlusReferences = concatenate(
@@ -995,6 +1008,37 @@ namespace ts.FindAllReferences {
             }
 
             return result;
+        }
+
+        function getReferencedExtensionsForOperator(node: Node, extension: TsPlusExtensionTag, sourceFiles: readonly SourceFile[], checker: TypeChecker, cancellationToken: CancellationToken): SymbolAndEntries[] {
+            const references: SymbolAndEntries[] = []
+            for (const sourceFile of sourceFiles) {
+                cancellationToken.throwIfCancellationRequested()
+                for (const position of getPossibleOperatorReferencePositions(checker, sourceFile, extension.name)) {
+                    const referenceNode = getTokenAtPosition(sourceFile, position);
+                    if (isBinaryOperatorToken(referenceNode) && isBinaryExpression(referenceNode.parent)) {
+                        const signature = checker.getResolvedOperator(referenceNode.parent);
+                        if (signature && signature.declaration) {
+                            const extensions = checker.getExtensionsForDeclaration(signature.declaration);
+                            for (const referencedExtension of extensions) {
+                                if (referencedExtension === extension) {
+                                    references.push({
+                                        definition: {
+                                            type: DefinitionKind.Keyword,
+                                            node
+                                        },
+                                        references: [{
+                                            kind: EntryKind.Node,
+                                            node: referenceNode
+                                        }]
+                                    })
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return references;
         }
 
         function getReferencedExtensionsForSymbol(referenceSymbol: Symbol, extension: TsPlusExtensionTag, _node: Node | undefined, sourceFiles: readonly SourceFile[], _sourceFilesSet: ReadonlySet<string>, checker: TypeChecker, cancellationToken: CancellationToken, _options: Options): SymbolAndEntries[] {
@@ -1490,6 +1534,31 @@ namespace ts.FindAllReferences {
 
         function getPossibleSymbolReferenceNodes(sourceFile: SourceFile, symbolName: string, container: Node = sourceFile): readonly Node[] {
             return getPossibleSymbolReferencePositions(sourceFile, symbolName, container).map(pos => getTouchingPropertyName(sourceFile, pos));
+        }
+
+        function getPossibleOperatorReferencePositions(checker: TypeChecker, sourceFile: SourceFile, operatorName: string, container: Node = sourceFile): readonly number[] {
+            const positions: number[] = [];
+
+            if (!symbolName || !symbolName.length) {
+                return positions;
+            }
+
+            const text = sourceFile.text;
+            const operatorNameLength = operatorName.length;
+
+            let position = text.indexOf(operatorName, container.pos);
+            while (position >= 0) {
+                if (position > container.end) break;
+
+                const node = getTokenAtPosition(sourceFile, position);
+
+                if (isBinaryOperatorToken(node) && isBinaryExpression(node.parent) && checker.getResolvedOperator(node.parent)) {
+                    positions.push(position);
+                }
+                position = text.indexOf(operatorName, position + operatorNameLength + 1);
+            }
+
+            return positions;
         }
 
         function getPossibleSymbolReferencePositions(sourceFile: SourceFile, symbolName: string, container: Node = sourceFile): readonly number[] {

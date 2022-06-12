@@ -923,12 +923,10 @@ namespace ts {
                 return [];
             },
             getExtensionsForDeclaration: (node) => {
-                const symbols = [
-                    ...collectTsPlusFluentTags(node),
-                    ...collectTsPlusStaticTags(node),
-                    ...collectTsPlusGetterTags(node)
-                ]
-                return symbols;
+                return collectTsPlusStaticTags(node)
+                    .concat(collectTsPlusFluentTags(node))
+                    .concat(collectTsPlusGetterTags(node))
+                    .concat(collectTsPlusOperatorTags(node))
             }
             // TSPLUS EXTENSION END
         };
