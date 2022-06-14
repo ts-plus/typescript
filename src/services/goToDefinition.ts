@@ -80,7 +80,7 @@ namespace ts.GoToDefinition {
                 }
             }
         }
-        else if (isToken(node) && isBinaryExpression(parent)) {
+        else if (isBinaryOperatorToken(node) && isBinaryExpression(parent)) {
             const extension = typeChecker.getResolvedOperator(parent);
             if (extension && extension.declaration) {
                 symbol = extension.declaration.symbol;
