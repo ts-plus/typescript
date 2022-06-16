@@ -31535,10 +31535,10 @@ namespace ts {
                 let paramType = originalParamType;
                 if (isLazyParameterByType(originalParamType) && thisArgumentNode) {
                     const contextFreeArgType = thisArgumentType;
-                    if (isTypeIdenticalTo(contextFreeArgType, anyType)) {
+                    if (isTypeIdenticalTo(contextFreeArgType, anyType) || isTypeIdenticalTo(contextFreeArgType, neverType)) {
                         return [createDiagnosticForNode(
                             thisArgumentNode,
-                            Diagnostics.Values_of_type_any_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
+                            Diagnostics.Values_of_type_any_or_never_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
                         )]
                     }
                     const args = getTypeArguments(originalParamType);
@@ -31569,10 +31569,10 @@ namespace ts {
                     const argType = checkExpressionWithContextualType(arg, unionIfLazy(originalParamType), /*inferenceContext*/ undefined, checkMode);
                     let paramType = originalParamType;
                     if (isLazyParameterByType(originalParamType)) {
-                        if (isTypeIdenticalTo(argType, anyType)) {
+                        if (isTypeIdenticalTo(argType, anyType) || isTypeIdenticalTo(argType, neverType)) {
                             return [createDiagnosticForNode(
                                 arg,
-                                Diagnostics.Values_of_type_any_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
+                                Diagnostics.Values_of_type_any_or_never_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function
                             )]
                         }
                         const args = getTypeArguments(originalParamType);
