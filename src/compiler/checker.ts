@@ -369,7 +369,7 @@ namespace ts {
             rules: new Map()
         };
         const unresolvedFluentCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
-        const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => Symbol | undefined, definition: SourceFile, exportName: string }>>();
+        const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => TsPlusSymbol | undefined, definition: SourceFile, exportName: string }>>();
         const operatorCache = new Map<string, ESMap<string, TsPlusOperatorExtension[]>>();
         const staticFunctionCache = new Map<string, ESMap<string, TsPlusStaticFunctionExtension>>()
         const staticValueCache = new Map<string, ESMap<string, TsPlusStaticValueExtension>>();
@@ -878,20 +878,13 @@ namespace ts {
                 if (type.aliasSymbol && isTsPlusSymbol(type.aliasSymbol)) {
                     symbol = type.aliasSymbol;
                 }
+                if (!symbol) {
+                    symbol = getNodeLinks(node.parent).tsPlusSymbol;
+                }
                 return symbol;
             },
             getTsPlusExtensionsAtLocation: (node) => {
-                const type = checker.getTypeAtLocation(node);
-                let symbol: TsPlusSymbol | undefined;
-                if (isTsPlusType(type)) {
-                    symbol = type.tsPlusSymbol;
-                }
-                if (type.symbol && isTsPlusSymbol(type.symbol)) {
-                    symbol = type.symbol;
-                }
-                if (type.aliasSymbol && isTsPlusSymbol(type.aliasSymbol)) {
-                    symbol = type.aliasSymbol;
-                }
+                const symbol = checker.getTsPlusSymbolAtLocation(node);
                 if (symbol) {
                     switch (symbol.tsPlusTag) {
                         case TsPlusSymbolTag.Fluent: {
@@ -30168,10 +30161,9 @@ namespace ts {
                             markAliasReferenced(getResolvedSymbol(_left), _left);
                         }
                         const type = getTypeOfSymbol(symbol);
-                        // @ts-expect-error
-                        type.tsPlusSymbol = symbol; // TsPlusGetterSymbol | TsPlusGetterVariableSymbol
                         nodeLinks.tsPlusGetterExtension = getterExt;
                         nodeLinks.tsPlusResolvedType = type;
+                        nodeLinks.tsPlusSymbol = symbol;
                         return type;
                     }
                 }

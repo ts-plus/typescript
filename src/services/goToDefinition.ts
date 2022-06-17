@@ -79,6 +79,10 @@ namespace ts.GoToDefinition {
                     }
                 }
             }
+
+            if (!symbol) {
+                symbol = typeChecker.getNodeLinks(node.parent).tsPlusSymbol
+            }
         }
         else if (isBinaryOperatorToken(node) && isBinaryExpression(parent)) {
             const extension = typeChecker.getResolvedOperator(parent);
@@ -421,7 +425,12 @@ namespace ts.GoToDefinition {
     }
 
     function getDefinitionFromSymbol(typeChecker: TypeChecker, symbol: Symbol, node: Node, failedAliasResolution?: boolean, excludeDeclaration?: Node): DefinitionInfo[] | undefined {
-        const filteredDeclarations = filter(symbol.declarations, d => d !== excludeDeclaration);
+        let filteredDeclarations: Declaration[] | undefined
+        if (isTsPlusSymbol(symbol) && (symbol.tsPlusTag === TsPlusSymbolTag.Getter || symbol.tsPlusTag === TsPlusSymbolTag.GetterVariable)) {
+            filteredDeclarations = [symbol.tsPlusDeclaration]
+        } else {
+            filteredDeclarations = filter(symbol.declarations, d => d !== excludeDeclaration);
+        }
         const withoutExpandos = filter(filteredDeclarations, d => !isExpandoDeclaration(d));
         const results = some(withoutExpandos) ? withoutExpandos : filteredDeclarations;
         return getConstructSignatureDefinition() || getCallSignatureDefinition() || map(results, declaration => createDefinitionInfo(declaration, typeChecker, symbol, node, /*unverified*/ false, failedAliasResolution));

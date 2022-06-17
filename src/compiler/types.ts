@@ -4957,7 +4957,7 @@ namespace ts {
         getTsPlusGlobal(name: string): TsPlusGlobalImport | undefined;
         findAndCheckDoAncestor(node: Node): void;
         getTsPlusExtensionsAtLocation(node: Node): TsPlusExtensionTag[];
-        getTsPlusSymbolAtLocation(node: Node): Symbol | undefined;
+        getTsPlusSymbolAtLocation(node: Node): TsPlusSymbol | undefined;
         getExtensionsForDeclaration(node: Declaration): TsPlusExtensionTag[]
     }
 
@@ -5702,6 +5702,7 @@ namespace ts {
             flatMap: TsPlusSignature
         };
         tsPlusLazy?: boolean;
+        tsPlusSymbol?: TsPlusSymbol;
         // TSPLUS EXTENSION END
     }
 
