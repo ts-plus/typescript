@@ -1772,6 +1772,9 @@ namespace ts {
                     else if (type && isTsPlusType(type)) {
                         tsPlusSymbol = type.tsPlusSymbol;
                     }
+                    else {
+                        tsPlusSymbol = typeChecker.getNodeLinks(nodeForQuickInfo.parent).tsPlusSymbol;
+                    }
                     if(tsPlusSymbol) {
                         let thisTypeName = getThisTypeNameForTsPlusSymbol(typeChecker, tsPlusSymbol)
                         if (nodeForQuickInfo.parent && nodeForQuickInfo.parent.parent) {
