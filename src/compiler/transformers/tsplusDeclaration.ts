@@ -49,6 +49,12 @@ namespace ts {
                     );
                 });
 
+                for (const statement of node.statements) {
+                    if (isImportDeclaration(statement) && statement.isTsPlusGlobal) {
+                        imports.push(statement);
+                    }
+                }
+
                 node.tsPlusGlobalImports = imports;
                 return node;
             }

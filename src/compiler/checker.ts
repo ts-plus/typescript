@@ -381,7 +381,7 @@ namespace ts {
         const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
-        const globalSymbolsCache = new Map<string, TsPlusGlobalImport>()
+        const tsPlusGlobalImportCache = new Map<string, TsPlusGlobalImport>()
         const unificationInProgress = {
             isRunning: false
         };
@@ -845,10 +845,10 @@ namespace ts {
             getNodeLinks,
             collectTsPlusMacroTags,
             getTsPlusGlobals: () => {
-                return arrayFrom(mapIterator(globalSymbolsCache.values(), ({ importSpecifier }) => getSymbolAtLocation(importSpecifier.name)!));
+                return arrayFrom(mapIterator(tsPlusGlobalImportCache.values(), ({ importSpecifier }) => getSymbolAtLocation(importSpecifier.name)!));
             },
             getTsPlusGlobal: (name) => {
-                return globalSymbolsCache.get(name);
+                return tsPlusGlobalImportCache.get(name);
             },
             findAndCheckDoAncestor: (node) => {
                 const doCall = findAncestor(node, (node): node is CallExpression => {
@@ -2957,7 +2957,7 @@ namespace ts {
 
             // TSPLUS EXTENSION START
             if (!result && originalLocation && checkTsPlusGlobals) {
-                const globalImport = globalSymbolsCache.get(name as string);
+                const globalImport = tsPlusGlobalImportCache.get(name as string);
                 if (globalImport) {
                     const targetSymbol = getTargetOfImportSpecifier(globalImport.importSpecifier, false);
                     if (targetSymbol && targetSymbol.flags & meaning) {
@@ -39939,8 +39939,11 @@ namespace ts {
                             continue;
                         }
 
-                        if (isImportedDeclaration(declaration)) {
-                            addToGroup(unusedImports, importClauseFromImported(declaration), declaration, getNodeId);
+                        if (isImportedDeclaration(declaration) && getNodeLinks(declaration)) {
+                            const importClause = importClauseFromImported(declaration);
+                            if (!importClause.parent.isTsPlusGlobal) {
+                                addToGroup(unusedImports, importClause, declaration, getNodeId);
+                            }
                         }
                         else if (isBindingElement(declaration) && isObjectBindingPattern(declaration.parent)) {
                             // In `{ a, ...b }, `a` is considered used since it removes a property from `b`. `b` may still be unused though.
@@ -46449,7 +46452,7 @@ namespace ts {
         function tryCacheTsPlusGlobalSymbol(declaration: ImportDeclaration): void {
             if (declaration.isTsPlusGlobal) {
                 (declaration.importClause!.namedBindings as NamedImports).elements.forEach((importSpecifier) => {
-                    globalSymbolsCache.set(importSpecifier.name.escapedText as string, { declaration, importSpecifier, moduleSpecifier: declaration.moduleSpecifier as StringLiteral });
+                    tsPlusGlobalImportCache.set(importSpecifier.name.escapedText as string, { declaration, importSpecifier, moduleSpecifier: declaration.moduleSpecifier as StringLiteral });
                 })
             }
         }
@@ -47143,7 +47146,7 @@ namespace ts {
         // TSPLUS EXTENSION END
 
         function initializeTypeChecker() {
-            globalSymbolsCache.clear();
+            tsPlusGlobalImportCache.clear();
 
             // Bind all source files and propagate errors
             for (const file of host.getSourceFiles()) {

@@ -8,8 +8,5 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "files": [
-    "./prelude.d.ts"
-  ],
   "include": ["src/**/*.ts"]
 }
