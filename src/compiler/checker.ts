@@ -369,7 +369,7 @@ namespace ts {
             rules: new Map()
         };
         const unresolvedFluentCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
-        const getterCache = new Map<string, ESMap<string, { patched: (node: Expression) => TsPlusSymbol | undefined, definition: SourceFile, exportName: string }>>();
+        const getterCache = new Map<string, ESMap<string, TsPlusGetterExtension>>();
         const operatorCache = new Map<string, ESMap<string, TsPlusOperatorExtension[]>>();
         const staticFunctionCache = new Map<string, ESMap<string, TsPlusStaticFunctionExtension>>()
         const staticValueCache = new Map<string, ESMap<string, TsPlusStaticValueExtension>>();
@@ -46608,7 +46608,8 @@ namespace ts {
                         (declaration as VariableDeclaration & { name: Identifier })
                     ),
                     exportName: declaration.name.escapedText.toString(),
-                    definition: file
+                    definition: file,
+                    declaration,
                 });
             }
         }
@@ -46791,7 +46792,8 @@ namespace ts {
                     map.set(name, {
                         patched: getTsPlusGetterSymbolForFunctionDeclaration(name, declaration),
                         exportName: declaration.name.escapedText.toString(),
-                        definition: file
+                        definition: file,
+                        declaration
                     });
                 }
             }

@@ -3715,6 +3715,13 @@ namespace ts {
         type: Type;
     }
 
+    export interface TsPlusGetterExtension {
+        patched: (node: Expression) => TsPlusSymbol | undefined
+        definition: SourceFile
+        exportName: string
+        declaration: FunctionDeclaration | VariableDeclarationWithIdentifier
+    }
+
     export interface TsPlusOperatorExtension {
         patched: Symbol;
         definition: SourceFile;
@@ -5678,7 +5685,7 @@ namespace ts {
         isTsPlusOperatorToken?: boolean;
         tsPlusCallExtension?: TsPlusStaticFunctionExtension;
         tsPlusStaticExtension?: TsPlusStaticFunctionExtension;
-        tsPlusGetterExtension?: { definition: SourceFile, exportName: string }
+        tsPlusGetterExtension?: TsPlusGetterExtension
         tsPlusDataFirstDeclaration?: FunctionDeclaration | ArrowFunction | FunctionExpression;
         tsPlusOptimizedDataFirst?: { definition: SourceFile, exportName: string };
         tsPlusResolvedType?: Type;

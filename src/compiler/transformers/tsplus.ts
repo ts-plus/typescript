@@ -146,7 +146,7 @@ namespace ts {
                         case SyntaxKind.FunctionDeclaration:
                             return visitFunctionDeclaration(source, traceInScope, node as FunctionDeclaration, context);
                         case SyntaxKind.PropertyAccessExpression:
-                            return visitPropertyAccessExpression(source, node as PropertyAccessExpression, visitor(source, traceInScope), context);
+                            return visitPropertyAccessExpression(source, traceInScope, node as PropertyAccessExpression, visitor(source, traceInScope), context);
                         case SyntaxKind.CallExpression:
                             return visitCallExpressionOrFluentCallExpression(source, traceInScope, node as CallExpression, visitor(source, traceInScope), context);
                         case SyntaxKind.VariableStatement:
@@ -305,7 +305,7 @@ namespace ts {
                 }
                 return visitEachChild(node, visitor(source, traceInScope), context)
             }
-            function visitPropertyAccessExpression(source: SourceFile, node: PropertyAccessExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
+            function visitPropertyAccessExpression(source: SourceFile, traceInScope: Identifier | undefined, node: PropertyAccessExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
                 const nodeLinks = checker.getNodeLinks(node);
                 if (nodeLinks.tsPlusStaticExtension) {
                     return getPathOfExtension(context, importer, nodeLinks.tsPlusStaticExtension, source, sourceFileUniqueNames)
@@ -314,10 +314,22 @@ namespace ts {
                     if (checker.isTsPlusMacroGetter(node, "identity")) {
                         return visitNode(node.expression, visitor);
                     }
+                    const args = [simplyfy(visitNode(node.expression, visitor))]
+                    const parameters = getParametersOfFunctionOrVariableDeclaration(nodeLinks.tsPlusGetterExtension.declaration)
+                    if (parameters) {
+                        const lastParam = parameters[parameters.length - 1];
+                        if (lastParam && isIdentifier(lastParam.name) && lastParam.name.escapedText === "___tsplusTrace") {
+                            if (traceInScope) {
+                                args.push(traceInScope);
+                            } else {
+                                args.push(getTrace(source, node.expression));
+                            }
+                        }
+                    }
                     return factory.createCallExpression(
                         getPathOfExtension(context, importer, nodeLinks.tsPlusGetterExtension, source, sourceFileUniqueNames),
                         void 0,
-                        [simplyfy(visitNode(node.expression, visitor))]
+                        args
                     );
                 }
                 return visitEachChild(node, visitor, context);
