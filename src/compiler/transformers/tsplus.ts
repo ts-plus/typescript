@@ -471,13 +471,9 @@ namespace ts {
                             );
                         }
                         case "FromObjectStructure": {
-                            const typeNode = checker.typeToTypeNode(derivation.type, undefined, undefined)
-                            if (!typeNode || !isObjectTypeDeclaration(typeNode)) {
-                                throw new Error("BUG: TypeNode in FromObjectStructure derivation case is undefined or not an ObjectTypeDeclaration")
-                            }
                             return factory.createObjectLiteralExpression(
-                                derivation.fields.map((child, index) => factory.createPropertyAssignment(
-                                    typeNode.members[index].name!,
+                                derivation.fields.map((child) => factory.createPropertyAssignment(
+                                    factory.createIdentifier(`"${escapeString(symbolName(child.prop), CharacterCodes.doubleQuote)}"`),
                                     produceDerivation(child.value, context, importer, source, sourceFileUniqueNames)
                                 )),
                                 false
