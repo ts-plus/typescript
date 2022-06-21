@@ -3060,8 +3060,11 @@ namespace ts {
         readonly modifiers?: NodeArray<ModifierLike>;
         /** May be undefined in `export default class { ... }`. */
         readonly name?: Identifier;
-        tsPlusTypeTags?: string[]
-        tsPlusCompanionTags?: string[]
+        // TSPLUS START
+        readonly tsPlusTypeTags?: string[]
+        readonly tsPlusCompanionTags?: string[]
+        readonly tsPlusDeriveTags?: string[]
+        // TSPLUS END
     }
 
     export interface ClassExpression extends ClassLikeDeclarationBase, PrimaryExpression {
@@ -3098,6 +3101,7 @@ namespace ts {
         
         // TSPLUS BEGIN
         readonly tsPlusTypeTags?: string[]
+        readonly tsPlusDeriveTags?: string[]
         // TSPLUS END
     }
 
@@ -5520,8 +5524,7 @@ namespace ts {
         // TSPLUS START
         tsPlusTypeAndImplicitTags?: {
             type: Type,
-            tags: readonly string[],
-            tagSet: Set<string>
+            tags: Set<string>
         }
         // TSPLUS END
     }

@@ -7531,6 +7531,7 @@ namespace ts {
                 if (finished.jsDoc) {
                     const typeTags: string[] = [];
                     const companionTags: string[] = [];
+                    const deriveTags: string[] = [];
                     for (const doc of finished.jsDoc) {
                         if (doc.tags) {
                             for (const tag of doc.tags) {
@@ -7553,13 +7554,22 @@ namespace ts {
                                             companionTags.push(target);
                                             break;
                                         }
+                                        case "derive": {
+                                            if (!target || target !== "nominal") {
+                                                parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_derive_extension_on_a_type_must_have_the_form_tsplus_derive_nominal);
+                                                continue;
+                                            }
+                                            deriveTags.push(target);
+                                            break
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                    finished.tsPlusTypeTags = undefinedIfZeroLength(typeTags);
-                    finished.tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
+                    (finished as Mutable<ClassDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+                    (finished as Mutable<ClassDeclaration>).tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
+                    (finished as Mutable<ClassDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
                 }
             }
             return finished;
@@ -7634,6 +7644,7 @@ namespace ts {
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
             if (finished.jsDoc) {
                 const typeTags: string[] = [];
+                const deriveTags: string[] = [];
                 for (const doc of finished.jsDoc) {
                     if (doc.tags) {
                         for (const tag of doc.tags) {
@@ -7646,11 +7657,19 @@ namespace ts {
                                     }
                                     typeTags.push(target);
                                 }
+                                if (tagName === "derive") {
+                                    if (!target || target !== "nominal") {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_derive_extension_on_a_type_must_have_the_form_tsplus_derive_nominal);
+                                        continue;
+                                    }
+                                    deriveTags.push(target);
+                                }
                             }
                         }
                     }
                 }
                 (finished as Mutable<InterfaceDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+                (finished as Mutable<InterfaceDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
             }
             return finished;
         }

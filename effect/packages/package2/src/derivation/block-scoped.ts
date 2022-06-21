@@ -26,7 +26,9 @@ interface Target {
 /**
  * @tsplus implicit local
  */
-const _showSourceScoped: Show<Target> = Derive()
+const _showSourceScoped: Show<{
+  x: number;
+}> = Derive()
 
 export function h() {
   // uses _showSourceScoped

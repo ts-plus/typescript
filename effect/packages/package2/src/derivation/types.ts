@@ -40,3 +40,10 @@ export type UnionToTuple<Union> =
     : [];
 
 export type IsNever<T> = [T] extends [never] ? true : false;
+
+declare global {
+    /** @tsplus derive nominal */
+    interface Date {}
+    /** @tsplus derive nominal */
+    interface Array<T> {}
+}

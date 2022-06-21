@@ -33378,27 +33378,52 @@ namespace ts {
             }
         }
 
-        function getImplicitTags(type: Type): readonly string[] {
-            if ((type.flags & TypeFlags.Intrinsic)) {
-                return [typeToString(type)];
-            }
-            if ((type.flags & TypeFlags.Intersection)) {
-                return flatMap((type as IntersectionType).types, getImplicitTags);
-            }
-            if (type.symbol) {
-                let tags: readonly string[] = [`${type.symbol.escapedName.toString()}<`];
-                if ((type.flags & TypeFlags.Object) && (getObjectFlags(type) & ObjectFlags.Reference)) {
-                    for (const arg of getTypeArguments(type as TypeReference)) {
-                        const tagsOfArg = getImplicitTags(arg);
-                        tags = flatMap(tags, (tag) => map(tagsOfArg, (argTag) => `${tag},${argTag}`));
+        function shouldTreatNominally(type: Type) {
+            if (type.symbol && type.symbol.declarations) {
+                for (const declaration of type.symbol.declarations) {
+                    if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.tsPlusDeriveTags && declaration.tsPlusDeriveTags.length > 0) {
+                        return true;
                     }
                 }
-                return map(tags, (tag) => `${tag}>`);
             }
-            if ((type.flags && TypeFlags.UnionOrIntersection)) {
-                return flatMap((type as IntersectionType | UnionType).types, getImplicitTags);
+            return false;
+        }
+
+        function getImplicitTags(type: Type): Set<string> {
+            const tags = new Set<string>();
+            collectImplicitTagsWorker(type, tags, undefined);
+            return tags;
+        }
+
+        function collectImplicitTagsWorker(type: Type, tags: Set<string>, prefix: string | undefined) {
+            if (type.flags & TypeFlags.UnionOrIntersection) {
+                forEach((type as UnionOrIntersectionType).types, (d) => {
+                    collectImplicitTagsWorker(d, tags, prefix);
+                })
             }
-            return ["__"];
+            else if (shouldTreatNominally(type)) {
+                if ((getObjectFlags(type) & ObjectFlags.Reference)) {
+                    const name = symbolName(type.symbol);
+                    const args = getTypeArguments(type as TypeReference);
+                    forEach(args, (arg) => {
+                        collectImplicitTagsWorker(arg, tags, prefix ? `${prefix}.${name}` : name)
+                    })
+                } else {
+                    tags.add(prefix ? `${prefix}.${symbolName(type.symbol)}` : symbolName(type.symbol));
+                }
+            }
+            else if (type.flags & (TypeFlags.Intrinsic | TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.TypeParameter)) {
+                tags.add(prefix ? `${prefix}.${typeToString(type)}` : typeToString(type));
+            }
+            else {
+                const props = getPropertiesOfType(type);
+                forEach(props, (prop) => {
+                    tags.add(prefix ? `${prefix}.${symbolName(prop)}` : symbolName(prop));
+                })
+                if (props.length === 0) {
+                    tags.add(prefix ? `${prefix}._` : `_`);
+                }
+            }
         }
 
         function getTypeAndImplicitTags(symbol: Symbol) {
@@ -33408,8 +33433,7 @@ namespace ts {
                 const tags = getImplicitTags(type);
                 links.tsPlusTypeAndImplicitTags = {
                     type,
-                    tags,
-                    tagSet: new Set(tags)
+                    tags
                 }
             }
             return links.tsPlusTypeAndImplicitTags;
@@ -33417,26 +33441,35 @@ namespace ts {
 
         function indexInScope(entry: Symbol) {
             const { tags } = getTypeAndImplicitTags(entry);
-            for (const tag of tags) {
+            forEach(arrayFrom(tags.values()), (tag) => {
                 let index = tsPlusWorldScope.implicits.get(tag);
                 if (!index) {
                     index = new Set();
                     tsPlusWorldScope.implicits.set(tag, index);
                 }
                 index.add(entry);
-            }
+            });
         }
 
         function lookupInGlobalScope(location: Node, type: Type, selfExport: Node | undefined, tags: readonly string[]): Derivation | undefined {
-            const [head, ...rest] = tags;
-            const candidatesIterator = tsPlusWorldScope.implicits.get(head)?.values();
+            let candidates: Set<Symbol> | undefined;
+            for (const tag of tags) {
+                const maybeBetter = tsPlusWorldScope.implicits.get(tag);
+                if (!maybeBetter) {
+                    return
+                }
+                if (!candidates || maybeBetter.size < candidates.size) {
+                    candidates = maybeBetter;
+                }
+            }
+            const candidatesIterator = candidates?.values();
             if (!candidatesIterator) {
                 return
             }
             let current = candidatesIterator.next();
             while (!current.done) {
                 const candidate = current.value;
-                if (rest.every((tag) => tsPlusWorldScope.implicits.get(tag)?.has(candidate) === true)) {
+                if (tags.every((tag) => tsPlusWorldScope.implicits.get(tag)?.has(candidate) === true)) {
                     if (getSelfExportStatement(candidate.valueDeclaration!) !== selfExport &&
                         isBlockScopedNameDeclaredBeforeUse(candidate.valueDeclaration!, location)) {
                         const { type: implicitType } = getTypeAndImplicitTags(candidate);
@@ -33464,7 +33497,7 @@ namespace ts {
                             isIdentifier(local.valueDeclaration.name) && 
                             isBlockScopedNameDeclaredBeforeUse(local.valueDeclaration.name, location)
                             ) {
-                                const { tagSet: implicitTags, type: implicitType } = getTypeAndImplicitTags(local);
+                                const { tags: implicitTags, type: implicitType } = getTypeAndImplicitTags(local);
                                 if (tags.every((tag) => implicitTags.has(tag))) {
                                     if (isTypeAssignableTo(implicitType, type)) {
                                         local.valueDeclaration.symbol.isReferenced = SymbolFlags.Value;
@@ -33516,7 +33549,7 @@ namespace ts {
                     return rule;
                 }
             }
-            const tagsForLookup = getImplicitTags(type);
+            const tagsForLookup = arrayFrom(getImplicitTags(type).values());
             const inBlockdScope = lookupInBlockScope(location, type, tagsForLookup);
             if (inBlockdScope) {
                 return inBlockdScope;

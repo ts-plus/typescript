@@ -4,6 +4,7 @@ import { OptionalKeys, RequiredKeys, UnionToIntersection } from "./types";
 
 /**
  * @tsplus type Show
+ * @tsplus derive nominal
  */
 export class Show<A> {
     constructor(readonly show: (a: A) => string) { }

@@ -3,6 +3,7 @@ import { IsUnion, OptionalKeys, RequiredKeys, UnionToIntersection } from "./type
 
 /**
  * @tsplus type Guard
+ * @tsplus derive nominal
  */
 export class Guard<A> {
     readonly _tag = "Guard"

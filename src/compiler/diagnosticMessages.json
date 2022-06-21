@@ -7498,6 +7498,10 @@
         "category": "Error",
         "code": 50022
     },
+    "Annotation of a derive extension on a type must have the form '@tsplus derive nominal'.": {
+        "category": "Error",
+        "code": 50023
+    },
     "A call to bind is only allowed in the context of a Do.": {
         "category": "Error",
         "code": 51000
