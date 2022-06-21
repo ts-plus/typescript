@@ -31561,7 +31561,7 @@ namespace ts {
                     const argType = checkExpressionWithContextualType(arg, unionIfLazy(originalParamType), /*inferenceContext*/ undefined, checkMode);
                     let paramType = originalParamType;
                     if (isLazyParameterByType(originalParamType)) {
-                        if (isTypeIdenticalTo(argType, anyType) || isTypeIdenticalTo(argType, neverType)) {
+                        if ((isTypeIdenticalTo(argType, anyType) || isTypeIdenticalTo(argType, neverType)) && !(checkMode & CheckMode.SkipGenericFunctions)) {
                             return [createDiagnosticForNode(
                                 arg,
                                 Diagnostics.Values_of_type_any_or_never_are_not_allowed_in_lazy_function_arguments_if_the_behaviour_is_intended_use_an_arrow_function

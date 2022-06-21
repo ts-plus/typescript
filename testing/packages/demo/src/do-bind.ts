@@ -12,8 +12,8 @@ export const Bar = Service.Tag<Bar>();
 
 export const res = Do(($) => {
     $(Effect.succeed(0));
-    $(Effect.serviceWith(Foo)((_) => _.foo));
-    $(Effect.serviceWith(Bar)((_) => _.bar));
+    $(Effect.serviceWith(Foo, (_) => _.foo));
+    $(Effect.serviceWith(Bar, (_) => _.bar));
     $(Effect.fail("a" as const));
     $(Effect.fail("b" as const));
 });
