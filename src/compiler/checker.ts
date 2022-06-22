@@ -385,6 +385,7 @@ namespace ts {
         const unificationInProgress = {
             isRunning: false
         };
+        const tsPlusFiles = new Set<SourceFile>();
         // TSPLUS EXTENSION END
 
         // Cancellation that controls whether or not we can cancel in the middle of type checking.
@@ -909,7 +910,8 @@ namespace ts {
                     .concat(collectTsPlusFluentTags(node))
                     .concat(collectTsPlusGetterTags(node))
                     .concat(collectTsPlusOperatorTags(node))
-            }
+            },
+            getTsPlusFiles: () => tsPlusFiles
             // TSPLUS EXTENSION END
         };
 
@@ -46568,6 +46570,7 @@ namespace ts {
         function cacheTsPlusType(declaration: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration): void {
             const type = getTypeOfNode(declaration);
             for (const typeTag of collectTsPlusTypeTags(declaration)) {
+                tsPlusFiles.add(getSourceFileOfNode(declaration));
                 if (type === globalStringType) {
                     addToTypeSymbolCache(tsplusStringPrimitiveSymbol, typeTag, "after");
                 }
@@ -46657,6 +46660,7 @@ namespace ts {
             const tags = collectTsPlusCompanionTags(declaration);
             if (type.symbol) {
                 for (const companionTag of tags) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
                     addToCompanionSymbolCache(type.symbol, companionTag);
                 }
             }
@@ -46664,6 +46668,7 @@ namespace ts {
         function cacheTsPlusStaticVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
             const staticTags = collectTsPlusStaticTags(declaration);
             if (staticTags.length > 0) {
+                tsPlusFiles.add(getSourceFileOfNode(declaration));
                 const symbol = getSymbolAtLocation(declaration.name);
                 if (symbol) {
                     for (const { target, name } of staticTags) {
@@ -46686,6 +46691,7 @@ namespace ts {
         function cacheTsPlusFluentVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
             const fluentTags = collectTsPlusFluentTags(declaration);
             for (const tag of fluentTags) {
+                tsPlusFiles.add(getSourceFileOfNode(declaration));
                 if (!unresolvedFluentCache.has(tag.target)) {
                     unresolvedFluentCache.set(tag.target, new Map());
                 }
@@ -46734,6 +46740,7 @@ namespace ts {
             if(declaration.name && isIdentifier(declaration.name)) {
                 const operatorTags = collectTsPlusOperatorTags(declaration);
                 if (operatorTags.length > 0) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
                     const symbol = getSymbolAtLocation(declaration.name);
                     if (symbol) {
                         for (const tag of operatorTags) {
@@ -46761,6 +46768,7 @@ namespace ts {
                 const symbol = getSymbolAtLocation(declaration.name);
                 if (symbol) {
                     for (const tag of operatorTags) {
+                        tsPlusFiles.add(getSourceFileOfNode(declaration));
                         if (!operatorCache.has(tag.target)) {
                             operatorCache.set(tag.target, new Map());
                         }
@@ -46781,6 +46789,7 @@ namespace ts {
         function cacheTsPlusFluentFunction(file: SourceFile, declaration: FunctionDeclaration) {
             const fluentTags = collectTsPlusFluentTags(declaration);
             for (const tag of fluentTags) {
+                tsPlusFiles.add(getSourceFileOfNode(declaration));
                 if (!unresolvedFluentCache.has(tag.target)) {
                     unresolvedFluentCache.set(tag.target, new Map());
                 }
@@ -46812,6 +46821,7 @@ namespace ts {
             if (declaration.name && isIdentifier(declaration.name)) {
                 const pipeableTags = collectTsPlusPipeableTags(declaration);
                 for (const { target, name } of pipeableTags) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
                     if (!pipeableCache.has(target)) {
                         pipeableCache.set(target, new Map());
                     }
@@ -46855,6 +46865,7 @@ namespace ts {
             if((declaration.initializer && isFunctionLikeDeclaration(declaration.initializer)) ||
                 (declaration.type && isFunctionTypeNode(declaration.type))) {
                 for (const { target, name } of collectTsPlusPipeableTags(declaration)) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
                     if (!pipeableCache.has(target)) {
                         pipeableCache.set(target, new Map());
                     }
@@ -46902,6 +46913,7 @@ namespace ts {
         function cacheTsPlusGetterFunction(file: SourceFile, declaration: FunctionDeclaration) {
             if(declaration.name && isIdentifier(declaration.name)) {
                 for (const { target, name } of collectTsPlusGetterTags(declaration)) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
                     if (!getterCache.has(target)) {
                         getterCache.set(target, new Map());
                     }
@@ -46918,6 +46930,7 @@ namespace ts {
         function cacheTsPlusStaticFunction(file: SourceFile, declaration: FunctionDeclaration) {
             if(declaration.name && isIdentifier(declaration.name)) {
                 for (const { target, name } of collectTsPlusStaticTags(declaration)) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
                     if (!staticCache.has(target)) {
                         staticCache.set(target, new Map());
                     }
@@ -46954,6 +46967,7 @@ namespace ts {
         function cacheTsPlusUnifyFunction(declaration: FunctionDeclaration) {
             if(declaration.name && isIdentifier(declaration.name)) {
                 for (const target of collectTsPlusUnifyTags(declaration)) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
                     identityCache.set(target, declaration);
                 }
             }
@@ -46961,6 +46975,8 @@ namespace ts {
         function cacheTsPlusIndexFunction(declaration: FunctionDeclaration) {
             if(declaration.name && isIdentifier(declaration.name)) {
                 for (const target of collectTsPlusIndexTags(declaration)) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
                     indexCache.set(target, {
                         declaration,
                         definition: getSourceFileOfNode(declaration),
@@ -47083,6 +47099,7 @@ namespace ts {
             staticValueCache.clear();
             unresolvedStaticCache.clear();
             identityCache.clear();
+            tsPlusFiles.clear();
             getterCache.clear();
             callCache.clear();
             indexCache.clear();

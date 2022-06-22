@@ -4963,6 +4963,8 @@ namespace ts {
         getPrimitiveTypeName(type: Type): string | undefined
         getResolvedOperator(node: BinaryExpression): Signature | undefined
         getNodeLinks(node: Node): NodeLinks
+        // TSPLUS START
+        getTsPlusFiles(): Set<SourceFile>
         collectTsPlusMacroTags(statement: Declaration): readonly string[]
         getTsPlusGlobals(): Symbol[];
         getTsPlusGlobal(name: string): TsPlusGlobalImport | undefined;
@@ -4970,6 +4972,7 @@ namespace ts {
         getTsPlusExtensionsAtLocation(node: Node): TsPlusExtensionTag[];
         getTsPlusSymbolAtLocation(node: Node): TsPlusSymbol | undefined;
         getExtensionsForDeclaration(node: Declaration): TsPlusExtensionTag[]
+        // TSPLUS END
     }
 
     /* @internal */
