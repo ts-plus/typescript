@@ -1041,17 +1041,15 @@ namespace ts {
                     }
                     // If the current type is an intersection type, simply enqueue all unseen members
                     if (target.flags & TypeFlags.Intersection) {
-                        for (const member of (target as IntersectionType).types) {
-                            if (!seen.has(member)) {
-                                seen.add(member);
-                                queue.push(member);
-                            }
-                        }
+                        collectIntersectionType(target as IntersectionType)
                     }
                 }
                 if (!target.symbol && !target.aliasSymbol) {
                     if (target.flags & TypeFlags.Union) {
                         collectUnionType(target as UnionType);
+                    }
+                    if (target.flags & TypeFlags.Intersection) {
+                        collectIntersectionType(target as IntersectionType)
                     }
                 }
             }
@@ -1095,6 +1093,15 @@ namespace ts {
                 intersectSets(inherited).forEach((s) => {
                     relevant.add(s)
                 })
+            }
+
+            function collectIntersectionType(type: IntersectionType) {
+                for (const member of type.types) {
+                    if (!seen.has(member)) {
+                        seen.add(member);
+                        queue.push(member);
+                    }
+                }
             }
         }
         function collectRelevantSymbols(target: Type) {
@@ -8532,7 +8539,6 @@ namespace ts {
                             }
                             // We don't know how to serialize this (nested?) binding element
                             Debug.failBadSyntaxKind(node.parent?.parent || node, "Unhandled binding element grandparent kind in declaration serialization");
-                            break;
                         case SyntaxKind.ShorthandPropertyAssignment:
                             if (node.parent?.parent?.kind === SyntaxKind.BinaryExpression) {
                                 // module.exports = { SomeClass }
@@ -9455,7 +9461,6 @@ namespace ts {
                 case TypeSystemPropertyName.WriteType:
                     return !!getSymbolLinks(target as Symbol).writeType;
             }
-            return Debug.assertNever(propertyName);
         }
 
         /**
@@ -32970,7 +32975,6 @@ namespace ts {
                 case SyntaxKind.JsxSelfClosingElement:
                     return resolveJsxOpeningLikeElement(node, candidatesOutArray, checkMode);
             }
-            throw Debug.assertNever(node, "Branch in 'resolveSignature' should be unreachable.");
         }
 
         /**
@@ -35637,7 +35641,6 @@ namespace ts {
                     }
                     return getUnaryResultType(operandType);
             }
-            return errorType;
         }
 
         function checkPostfixUnaryExpression(node: PostfixUnaryExpression): Type {
