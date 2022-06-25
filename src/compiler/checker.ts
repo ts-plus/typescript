@@ -47387,55 +47387,57 @@ namespace ts {
                 }
                 const fluentMap = fluentCache.get(typeName)!;
                 map.forEach(({ name, definition }) => {
-                    fluentMap.set(name, () => {
-                        if (resolvedFluentCache.has(typeName)) {
-                            const resolvedMap = resolvedFluentCache.get(typeName)!;
-                            if (resolvedMap.has(name)) {
-                                return resolvedMap.get(name)!;
-                            }
-                        }
-                        const allTypes: { type: Type, signatures: readonly TsPlusSignature[] }[] = [];
-                        const prioritizedSignaturesMap = new Map<number, TsPlusSignature[]> ()
-                        
-                        definition.forEach(({ priority, getTypeAndSignatures }) => {
-                            const typeAndSignatures = getTypeAndSignatures();
-                            if (typeAndSignatures) {
-                                const [type, signatures] = typeAndSignatures;
-                                if (prioritizedSignaturesMap.has(priority)) {
-                                    prioritizedSignaturesMap.get(priority)!.push(...signatures)
+                    if (!fluentMap.has(name)) {
+                        fluentMap.set(name, () => {
+                            if (resolvedFluentCache.has(typeName)) {
+                                const resolvedMap = resolvedFluentCache.get(typeName)!;
+                                if (resolvedMap.has(name)) {
+                                    return resolvedMap.get(name)!;
                                 }
-                                else {
-                                    prioritizedSignaturesMap.set(priority, signatures);
-                                }
-                                allTypes.push({ type, signatures });
                             }
-                        });
-                        
-                        const prioritizedSignatures: [number, TsPlusSignature[]][] = []
-                        prioritizedSignaturesMap.forEach((signatures, priority) => {
-                            prioritizedSignatures.push([priority, signatures])
-                        })
-                        prioritizedSignatures.sort((x, y) => x[0] > y[0] ? 1 : x[0] < y[0] ? -1 : 0)
+                            const allTypes: { type: Type, signatures: readonly TsPlusSignature[] }[] = [];
+                            const prioritizedSignaturesMap = new Map<number, TsPlusSignature[]> ()
+                            
+                            definition.forEach(({ priority, getTypeAndSignatures }) => {
+                                const typeAndSignatures = getTypeAndSignatures();
+                                if (typeAndSignatures) {
+                                    const [type, signatures] = typeAndSignatures;
+                                    if (prioritizedSignaturesMap.has(priority)) {
+                                        prioritizedSignaturesMap.get(priority)!.push(...signatures)
+                                    }
+                                    else {
+                                        prioritizedSignaturesMap.set(priority, signatures);
+                                    }
+                                    allTypes.push({ type, signatures });
+                                }
+                            });
+                            
+                            const prioritizedSignatures: [number, TsPlusSignature[]][] = []
+                            prioritizedSignaturesMap.forEach((signatures, priority) => {
+                                prioritizedSignatures.push([priority, signatures])
+                            })
+                            prioritizedSignatures.sort((x, y) => x[0] > y[0] ? 1 : x[0] < y[0] ? -1 : 0)
 
-                        const allSignatures = prioritizedSignatures.flatMap((signatures) => signatures[1])
-                        
-                        if (allSignatures.length === 0) {
-                            return undefined;
-                        }
-                        const symbol = createTsPlusFluentSymbol(name, allSignatures);
-                        const type = createAnonymousType(symbol, emptySymbols, allSignatures, [], []);
-                        const extension: TsPlusFluentExtension = {
-                            patched: createSymbolWithType(symbol, type),
-                            signatures: allSignatures,
-                            types: allTypes
-                        };
-                        if (!resolvedFluentCache.has(typeName)) {
-                            resolvedFluentCache.set(typeName, new Map());
-                        }
-                        const resolvedMap = resolvedFluentCache.get(typeName)!;
-                        resolvedMap.set(name, extension);
-                        return extension;
-                    });
+                            const allSignatures = prioritizedSignatures.flatMap((signatures) => signatures[1])
+                            
+                            if (allSignatures.length === 0) {
+                                return undefined;
+                            }
+                            const symbol = createTsPlusFluentSymbol(name, allSignatures);
+                            const type = createAnonymousType(symbol, emptySymbols, allSignatures, [], []);
+                            const extension: TsPlusFluentExtension = {
+                                patched: createSymbolWithType(symbol, type),
+                                signatures: allSignatures,
+                                types: allTypes
+                            };
+                            if (!resolvedFluentCache.has(typeName)) {
+                                resolvedFluentCache.set(typeName, new Map());
+                            }
+                            const resolvedMap = resolvedFluentCache.get(typeName)!;
+                            resolvedMap.set(name, extension);
+                            return extension;
+                        });
+                    }
                 });
             });
             unresolvedPipeableCache.clear();
