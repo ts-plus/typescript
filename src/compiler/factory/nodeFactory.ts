@@ -5312,6 +5312,7 @@ namespace ts {
                 fluent: [],
                 pipeable: [],
                 operator: [],
+                pipeableOperator: [],
                 static: [],
                 getter: [],
                 unify: [],

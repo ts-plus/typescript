@@ -262,8 +262,15 @@ namespace ts {
                 const operatorLinks = checker.getNodeLinks(node.operatorToken);
                 if (operatorLinks.isTsPlusOperatorToken && operatorLinks.resolvedSignature && operatorLinks.resolvedSignature.declaration) {
                     const call = operatorLinks.resolvedSignature;
+                    const isPipeable = (isTsPlusSignature(call) && !!call.tsPlusPipeable) || (!!call.target && isTsPlusSignature(call.target) && !!call.target.tsPlusPipeable);
                     const declaration = call.declaration!;
-                    const exportName = isFunctionDeclaration(declaration) ? declaration.symbol.escapedName as string : declaration.parent.symbol.escapedName as string;
+                    let exportName: string
+                    if (isPipeable) {
+                        exportName = (declaration.symbol as TsPlusPipeableDeclarationSymbol).tsPlusDeclaration.symbol.escapedName!
+                    }
+                    else {
+                        exportName = isFunctionDeclaration(declaration) ? declaration.symbol.escapedName as string : declaration.parent.symbol.escapedName as string;
+                    }
                     const params = [visitNode(node.left, visitor(source, traceInScope)), visitNode(node.right, visitor(source, traceInScope))];
                     if (checker.getNodeLinks(node.left).tsPlusLazy) {
                         params[0] = context.factory.createArrowFunction(void 0, void 0, [], void 0, void 0, params[0]);
@@ -282,14 +289,30 @@ namespace ts {
                     if (lastTrace) {
                         params.push(traceInScope ? traceInScope : getTrace(source, node.operatorToken))
                     }
-                    return context.factory.createCallExpression(
-                        getPathOfExtension(context, importer, {
-                            definition: getSourceFileOfNode(declaration),
-                            exportName: exportName
-                        }, source, sourceFileUniqueNames),
-                        [],
-                        params
-                    )
+                    if (isPipeable) {
+                        return context.factory.createCallExpression(
+                            context.factory.createCallExpression(
+                                getPathOfExtension(context, importer, {
+                                    definition: getSourceFileOfNode((declaration.symbol as TsPlusPipeableDeclarationSymbol).tsPlusDeclaration),
+                                    exportName: exportName
+                                }, source, sourceFileUniqueNames),
+                                [],
+                                params.slice(1)
+                            ),
+                            [],
+                            [params[0]]
+                        )
+                    }
+                    else {
+                        return context.factory.createCallExpression(
+                            getPathOfExtension(context, importer, {
+                                definition: getSourceFileOfNode(declaration),
+                                exportName: exportName
+                            }, source, sourceFileUniqueNames),
+                            [],
+                            params
+                        )
+                    }
                 }
                 return visitEachChild(node, visitor(source, traceInScope), context)
             }

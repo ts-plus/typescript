@@ -1388,6 +1388,7 @@ namespace ts {
         tsPlusStaticTags?: TsPlusExtensionTag[];
         tsPlusGetterTags?: TsPlusExtensionTag[];
         tsPlusOperatorTags?: TsPlusPrioritizedExtensionTag[];
+        tsPlusPipeableOperatorTags?: TsPlusPrioritizedExtensionTag[];
         tsPlusMacroTags?: string[];
         tsPlusUnifyTags?: string[];
         tsPlusIndexTags?: string[];
@@ -1605,6 +1606,7 @@ namespace ts {
         readonly tsPlusStaticTags?: TsPlusExtensionTag[];
         readonly tsPlusGetterTags?: TsPlusExtensionTag[];
         readonly tsPlusOperatorTags?: TsPlusPrioritizedExtensionTag[];
+        readonly tsPlusPipeableOperatorTags?: TsPlusPrioritizedExtensionTag[];
         readonly tsPlusMacroTags?: string[];
         readonly tsPlusUnifyTags?: string[];
         readonly tsPlusIndexTags?: string[];
@@ -4188,6 +4190,7 @@ namespace ts {
             fluent: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             pipeable: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             operator: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
+            pipeableOperator: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             static: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             getter: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             unify: FunctionDeclaration[];

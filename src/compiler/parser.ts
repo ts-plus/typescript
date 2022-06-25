@@ -1243,6 +1243,9 @@ namespace ts {
                             if (declaration.tsPlusOperatorTags && declaration.tsPlusOperatorTags.length > 0) {
                                 file.tsPlusContext.operator.push(declaration as VariableDeclarationWithIdentifier);
                             }
+                            if (declaration.tsPlusPipeableOperatorTags && declaration.tsPlusPipeableOperatorTags.length > 0) {
+                                file.tsPlusContext.pipeableOperator.push(declaration as VariableDeclarationWithIdentifier);
+                            }
                             if (declaration.tsPlusStaticTags && declaration.tsPlusStaticTags.length > 0) {
                                 file.tsPlusContext.static.push(declaration as VariableDeclarationWithIdentifier);
                             }
@@ -1260,6 +1263,9 @@ namespace ts {
                         }
                         if (statement.tsPlusOperatorTags && statement.tsPlusOperatorTags.length > 0) {
                             file.tsPlusContext.operator.push(statement);
+                        }
+                        if (statement.tsPlusPipeableOperatorTags && statement.tsPlusPipeableOperatorTags.length > 0) {
+                            file.tsPlusContext.pipeableOperator.push(statement);
                         }
                         if (statement.tsPlusStaticTags && statement.tsPlusStaticTags.length > 0) {
                             file.tsPlusContext.static.push(statement);
@@ -7027,6 +7033,7 @@ namespace ts {
             const fluentTags: TsPlusPrioritizedExtensionTag[] = [];
             const staticTags: TsPlusExtensionTag[] = [];
             const pipeableTags: TsPlusPrioritizedExtensionTag[] = [];
+            const pipeableOperatorTags: TsPlusPrioritizedExtensionTag[] = [];
             const getterTags: TsPlusExtensionTag[] = [];
             const operatorTags: TsPlusPrioritizedExtensionTag[] = [];
             const unifyTags: string[] = [];
@@ -7086,6 +7093,15 @@ namespace ts {
                                     operatorTags.push(parsedTag);
                                     break;
                                 }
+                                case "pipeable-operator": {
+                                    const parsedTag = parseTsPlusExtensionTag(tagType, target, name, priority);
+                                    if (!parsedTag) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_an_operator_extension_must_have_the_form_tsplus_operator_typename_symbol_priority);
+                                        break;
+                                    }
+                                    pipeableOperatorTags.push(parsedTag);
+                                    break;
+                                }
                                 case "implicit": {
                                     if (!tag.comment.includes("local")) {
                                         isImplicit = true;
@@ -7127,6 +7143,7 @@ namespace ts {
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusPipeableTags = undefinedIfZeroLength(pipeableTags);
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusGetterTags = undefinedIfZeroLength(getterTags);
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusOperatorTags = undefinedIfZeroLength(operatorTags);
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusPipeableOperatorTags = undefinedIfZeroLength(pipeableOperatorTags);
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusMacroTags = undefinedIfZeroLength(macroTags);
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusUnifyTags = undefinedIfZeroLength(unifyTags);
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusIndexTags = undefinedIfZeroLength(indexTags);

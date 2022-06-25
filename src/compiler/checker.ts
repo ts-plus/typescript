@@ -370,6 +370,7 @@ namespace ts {
         };
         const unresolvedFluentCache = new Map<string, ESMap<string, TsPlusUnresolvedFluentExtension>>();
         const unresolvedPipeableCache = new Map<string, ESMap<string, TsPlusUnresolvedPipeableExtension>>();
+        const unresolvedPipeableOperatorCache = new Map<string, ESMap<string, TsPlusUnresolvedPipeableExtension>>();
         const getterCache = new Map<string, ESMap<string, TsPlusGetterExtension>>();
         const operatorCache = new Map<string, ESMap<string, TsPlusOperatorExtension[]>>();
         const staticFunctionCache = new Map<string, ESMap<string, TsPlusStaticFunctionExtension>>()
@@ -46123,6 +46124,12 @@ namespace ts {
             }
             return [];
         }
+        function collectTsPlusPipeableOperatorTags(declaration: Node) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusPipeableOperatorTags || [];
+            }
+            return [];
+        }
         function collectTsPlusGetterTags(declaration: Node) {
             if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
                 return declaration.tsPlusGetterTags || [];
@@ -46306,7 +46313,7 @@ namespace ts {
         function isPipeableSelfARestParameter(signature: Signature): boolean {
             return getSignaturesOfType(getReturnTypeOfSignature(signature), SignatureKind.Call).find(isSelfARestParameter) != null;
         }
-        function getTsPlusFluentSignatureForPipeableFunction(file: SourceFile, exportName: string, name: string, pipeable: FunctionDeclaration): [Type, TsPlusSignature[]] | undefined {
+        function getTsPlusFluentSignatureForPipeableFunction(file: SourceFile, exportName: string, name: string, pipeable: FunctionDeclaration, thisify = false): [Type, TsPlusSignature[]] | undefined {
             function reportDiagnostic(diagnostic: DiagnosticMessage) {
                 error(pipeable, diagnostic);
             }
@@ -46327,7 +46334,7 @@ namespace ts {
                         const returnType = getReturnTypeOfSignature(sig);
                         const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
                         return flatMap(returnSignatures, (rsig) => {
-                            const newSig = cloneSignature(sig) as TsPlusSignature;
+                            let newSig = createTsPlusSignature(sig, exportName, file);
                             newSig.parameters = [...rsig.parameters, ...sig.parameters];
                             newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
                             newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
@@ -46344,14 +46351,18 @@ namespace ts {
                             );
                             newDecl.jsDoc = pipeable.jsDoc;
                             newDecl.jsDocCache = pipeable.jsDocCache;
-                            newSig.declaration = newDecl;
                             newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
-                            const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
-                            if (!thisifiedSignature) {
-                                return;
+                            newSig.declaration = newDecl;
+                            newSig.tsPlusDeclaration = pipeable;
+                            if (thisify) {
+                                const thisified = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
+                                if (!thisified) {
+                                    return;
+                                }
+                                newSig = thisified;
                             }
-                            thisifiedSignature.tsPlusPipeable = true;
-                            return thisifiedSignature;
+                            newSig.tsPlusPipeable = true;
+                            return newSig;
                         });
                     }) as TsPlusSignature[];
                     const dataFirstType = createAnonymousType(undefined, emptySymbols, tsPlusSignatures, [], []);
@@ -46370,7 +46381,7 @@ namespace ts {
                         return;
                     }
                     return flatMap(returnSignatures, (rsig) => {
-                        const newSig = cloneSignature(sig) as TsPlusSignature;
+                        let newSig = createTsPlusSignature(sig, exportName, file);
                         newSig.parameters = [...rsig.parameters, ...sig.parameters];
                         newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
                         newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
@@ -46387,14 +46398,18 @@ namespace ts {
                         );
                         newDecl.jsDoc = pipeable.jsDoc;
                         newDecl.jsDocCache = pipeable.jsDocCache;
-                        newSig.declaration = newDecl;
                         newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
-                        const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
-                        if (!thisifiedSignature) {
-                            return;
+                        newSig.declaration = newDecl;
+                        newSig.tsPlusDeclaration = pipeable;
+                        if (thisify) {
+                            const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
+                            if (!thisifiedSignature) {
+                                return;
+                            }
+                            newSig = thisifiedSignature;
                         }
-                        thisifiedSignature.tsPlusPipeable = true;
-                        return thisifiedSignature;
+                        newSig.tsPlusPipeable = true;
+                        return newSig;
                     });
                 }) as TsPlusSignature[];
                 const dataFirstType = createAnonymousType(undefined, emptySymbols, tsPlusSignatures, [], []);
@@ -46413,7 +46428,7 @@ namespace ts {
             }
             return true;
         }
-        function getTsPlusFluentSignatureForPipeableVariableDeclaration(file: SourceFile, exportName: string, name: string, pipeable: VariableDeclarationWithFunction | VariableDeclarationWithFunctionType): [Type, TsPlusSignature[]] | undefined {
+        function getTsPlusFluentSignatureForPipeableVariableDeclaration(file: SourceFile, exportName: string, name: string, pipeable: VariableDeclarationWithFunction | VariableDeclarationWithFunctionType, thisify = false): [Type, TsPlusSignature[]] | undefined {
             function reportDiagnostic(diagnostic: DiagnosticMessage) {
                 error(pipeable, diagnostic);
             }
@@ -46445,7 +46460,7 @@ namespace ts {
                         const returnType = getReturnTypeOfSignature(sig);
                         const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
                         return flatMap(returnSignatures, (rsig) => {
-                            const newSig = cloneSignature(sig) as TsPlusSignature;
+                            let newSig = createTsPlusSignature(sig, exportName, file);
                             newSig.parameters = [...rsig.parameters, ...sig.parameters];
                             newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
                             newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
@@ -46476,14 +46491,18 @@ namespace ts {
                             }
                             newDecl.jsDoc = pipeable.jsDoc;
                             newDecl.jsDocCache = pipeable.jsDocCache;
-                            newSig.declaration = newDecl;
                             newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
-                            const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
-                            if (!thisifiedSignature) {
-                                return;
+                            newSig.declaration = newDecl;
+                            newSig.tsPlusDeclaration = pipeable;
+                            if (thisify) {
+                                const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
+                                if (!thisifiedSignature) {
+                                    return;
+                                }
+                                newSig = thisifiedSignature;
                             }
-                            thisifiedSignature.tsPlusPipeable = true;
-                            return thisifiedSignature;
+                            newSig.tsPlusPipeable = true;
+                            return newSig;
                         });
                     }) as TsPlusSignature[];
                     const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
@@ -46503,7 +46522,7 @@ namespace ts {
                         const returnType = getReturnTypeOfSignature(sig);
                         const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
                         return flatMap(returnSignatures, (rsig) => {
-                            const newSig = cloneSignature(sig) as TsPlusSignature;
+                            let newSig = createTsPlusSignature(sig, exportName, file);
                             newSig.parameters = [...rsig.parameters, ...sig.parameters];
                             newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
                             newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
@@ -46516,14 +46535,18 @@ namespace ts {
                             );
                             newDecl.jsDoc = pipeable.jsDoc;
                             newDecl.jsDocCache = pipeable.jsDocCache;
-                            newSig.declaration = newDecl;
                             newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
-                            const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
-                            if (!thisifiedSignature) {
-                                return;
+                            newSig.declaration = newDecl;
+                            newSig.tsPlusDeclaration = pipeable;
+                            if (thisify) {
+                                const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
+                                if (!thisifiedSignature) {
+                                    return;
+                                }
+                                newSig = thisifiedSignature;
                             }
-                            thisifiedSignature.tsPlusPipeable = true;
-                            return thisifiedSignature;
+                            newSig.tsPlusPipeable = true;
+                            return newSig;
                         });
                     }) as TsPlusSignature[];
                     const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
@@ -46821,6 +46844,109 @@ namespace ts {
                 }
             }
         }
+        function cacheTsPlusPipeableOperatorFunction(file: SourceFile, declaration: FunctionDeclaration) {
+            if (declaration.name && isIdentifier(declaration.name)) {
+                const pipeableOperatorTags = collectTsPlusPipeableOperatorTags(declaration);
+                if (pipeableOperatorTags.length > 0) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
+                    for (const { target, name, priority } of pipeableOperatorTags) {
+                        if (!unresolvedPipeableOperatorCache.has(target)) {
+                            unresolvedPipeableOperatorCache.set(target, new Map())
+                        }
+                        const exportName = declaration.name.escapedText.toString();
+                        let cached: [Type, TsPlusSignature[]] | false = false
+                        const getTypeAndSignatures = (): [Type, TsPlusSignature[]] => {
+                            if (cached === false) {
+                                const resolved = getTsPlusFluentSignatureForPipeableFunction(file, exportName, name, declaration);
+                                if (resolved) {
+                                    cached = resolved;
+                                }
+                                else {
+                                    error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
+                                    cached = [errorType, []];
+                                }
+                            }
+                            return [cached[0], [...cached[1]]];
+                        }
+                        const map = unresolvedPipeableOperatorCache.get(target)!;
+                        if (!map.has(name)) {
+                            map.set(name, {
+                                target,
+                                name,
+                                definition: new Set()
+                            })
+                        }
+                        map.get(name)!.definition.add({
+                            definition: file,
+                            declaration,
+                            exportName,
+                            priority,
+                            getTypeAndSignatures
+                        })
+                        augmentPipeableIdentifierSymbol(
+                            declaration.name,
+                            target,
+                            declaration.name.escapedText.toString(),
+                            name,
+                            () => getTypeAndSignatures()[0],
+                            declaration
+                        );
+                    }
+                }
+            }
+        }
+        function cacheTsPlusPipeableOperatorVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+            if((declaration.initializer && isFunctionLikeDeclaration(declaration.initializer)) ||
+                (declaration.type && isFunctionTypeNode(declaration.type))) {
+                const pipeableOperatorTags = collectTsPlusPipeableOperatorTags(declaration);
+                if (pipeableOperatorTags.length > 0) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
+                    for (const { target, name, priority } of pipeableOperatorTags) {
+                        if (!unresolvedPipeableOperatorCache.has(target)) {
+                            unresolvedPipeableOperatorCache.set(target, new Map())
+                        }
+                        const exportName = declaration.name.escapedText.toString();
+                        let cached: [Type, TsPlusSignature[]] | false = false
+                        const getTypeAndSignatures = (): [Type, TsPlusSignature[]] => {
+                            if (cached === false) {
+                                const resolved = getTsPlusFluentSignatureForPipeableVariableDeclaration(file, exportName, name, declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType);
+                                if (resolved) {
+                                    cached = resolved;
+                                }
+                                else {
+                                    error(declaration, Diagnostics.Invalid_declaration_annotated_as_pipeable);
+                                    cached = [errorType, []];
+                                }
+                            }
+                            return [cached[0], [...cached[1]]];
+                        }
+                        const map = unresolvedPipeableOperatorCache.get(target)!;
+                        if (!map.has(name)) {
+                            map.set(name, {
+                                target,
+                                name,
+                                definition: new Set()
+                            })
+                        }
+                        map.get(name)!.definition.add({
+                            definition: file,
+                            declaration,
+                            exportName,
+                            priority,
+                            getTypeAndSignatures
+                        })
+                        augmentPipeableIdentifierSymbol(
+                            declaration.name,
+                            target,
+                            declaration.name.escapedText.toString(),
+                            name,
+                            () => getTypeAndSignatures()[0],
+                            declaration as VariableDeclarationWithFunction
+                        );
+                    }
+                }
+            }
+        }
         function cacheTsPlusPipeableFunction(file: SourceFile, declaration: FunctionDeclaration) {
             if (declaration.name && isIdentifier(declaration.name)) {
                 const pipeableTags = collectTsPlusPipeableTags(declaration);
@@ -46833,7 +46959,7 @@ namespace ts {
                     let cached : [Type, TsPlusSignature[]] | false = false
                     const getTypeAndSignatures = (): [Type, TsPlusSignature[]] => {
                         if (cached === false) {
-                            const resolved = getTsPlusFluentSignatureForPipeableFunction(file, exportName, name, declaration);
+                            const resolved = getTsPlusFluentSignatureForPipeableFunction(file, exportName, name, declaration, /** thisify */ true);
                             if (resolved) {
                                 cached = resolved;
                             }
@@ -46897,7 +47023,8 @@ namespace ts {
                                 file,
                                 exportName,
                                 name,
-                                declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType
+                                declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType,
+                                /** thisify */ true
                             )
                             if (resolved) {
                                 cached = resolved;
@@ -47058,6 +47185,14 @@ namespace ts {
                     cacheTsPlusOperatorVariable(file, declaration);
                 }
             }
+            for (const declaration of file.tsPlusContext.pipeableOperator) {
+                if (isFunctionDeclaration(declaration)) {
+                    cacheTsPlusPipeableOperatorFunction(file, declaration);
+                }
+                else {
+                    cacheTsPlusPipeableOperatorVariable(file, declaration);
+                }
+            }
             for (const declaration of file.tsPlusContext.static) {
                 if (isFunctionDeclaration(declaration)) {
                     cacheTsPlusStaticFunction(file, declaration);
@@ -47135,6 +47270,7 @@ namespace ts {
             fluentCache.clear();
             unresolvedFluentCache.clear();
             unresolvedPipeableCache.clear();
+            unresolvedPipeableOperatorCache.clear();
             operatorCache.clear();
             typeSymbolCache.clear();
             typeHashCache.clear();
@@ -47324,6 +47460,30 @@ namespace ts {
                     });
                 });
             })
+            unresolvedPipeableOperatorCache.forEach((map, typeName) => {
+                if (!operatorCache.has(typeName)) {
+                    operatorCache.set(typeName, new Map());
+                }
+                const cache = operatorCache.get(typeName)!;
+                map.forEach((member, funcName) => {
+                    if (!cache.has(funcName)) {
+                        cache.set(funcName, []);
+                    }
+                    member.definition.forEach(({ priority, getTypeAndSignatures, exportName, definition }) => {
+                        const [memberType, memberSignatures] = getTypeAndSignatures();
+                        const symbol = createSymbol(SymbolFlags.Function, funcName as __String);
+                        symbol.declarations = memberSignatures.map((sig) => sig.declaration!);
+                        symbol.type = memberType;
+                        cache.get(funcName)!.push({
+                            patched: symbol,
+                            exportName,
+                            definition,
+                            priority
+                        })
+                    })
+                })
+            })
+            unresolvedPipeableOperatorCache.clear();
             operatorCache.forEach((map) => {
                 map.forEach((extensions) => {
                     extensions.sort(({ priority: x }, { priority: y }) => x > y ? 1 : x < y ? -1 : 0)
