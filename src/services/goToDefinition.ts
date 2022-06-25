@@ -87,7 +87,12 @@ namespace ts.GoToDefinition {
         else if (isBinaryOperatorToken(node) && isBinaryExpression(parent)) {
             const extension = typeChecker.getResolvedOperator(parent);
             if (extension && extension.declaration) {
-                symbol = extension.declaration.symbol;
+                if (isTsPlusSymbol(extension.declaration.symbol) && extension.declaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableDeclaration) {
+                    symbol = extension.declaration.symbol.tsPlusDeclaration.symbol
+                }
+                else {
+                    symbol = extension.declaration.symbol;
+                }
             }
         }
 

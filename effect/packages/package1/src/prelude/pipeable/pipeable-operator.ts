@@ -21,3 +21,6 @@ declare const t2: T
 const test1 = t1 + t2
 
 const test2 = t1 + new Date()
+
+
+
