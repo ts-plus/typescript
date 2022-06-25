@@ -46316,6 +46316,8 @@ namespace ts {
             function reportDiagnostic(diagnostic: DiagnosticMessage) {
                 error(pipeable, diagnostic);
             }
+            const type = getTypeOfNode(pipeable);
+            const signatures = getSignaturesOfType(type, SignatureKind.Call);
             if (pipeable.body) {
                 const returnStatement = find(
                     pipeable.body.statements,
@@ -46323,8 +46325,6 @@ namespace ts {
                         isReturnStatement(s) && !!s.expression && isArrowFunction(s.expression)
                 );
                 if (returnStatement && returnStatement.expression.parameters.length === 1) {
-                    const type = getTypeOfNode(pipeable);
-                    const signatures = getSignaturesOfType(type, SignatureKind.Call);
                     if (signatures.find(isPipeableSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
@@ -46368,12 +46368,10 @@ namespace ts {
                     return [dataFirstType, tsPlusSignatures];
                 }
             }
-            else if (pipeable.type && isFunctionTypeNode(pipeable.type) && pipeable.type.parameters.length === 1) {
-                const returnTypeNode = pipeable.type;
-                const type = getTypeOfNode(pipeable);
-                const signatures = getSignaturesOfType(type, SignatureKind.Call);
+            else if (every(signatures, (sig) => !!sig.declaration && !!sig.declaration.type && isFunctionTypeNode(sig.declaration.type) && sig.declaration.type.parameters.length === 1)) {
                 const tsPlusSignatures = flatMap(signatures, (sig) => {
                     const returnType = getReturnTypeOfSignature(sig);
+                    const returnTypeNode = sig.declaration!.type! as FunctionTypeNode;
                     const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
                     if (signatures.find(isPipeableSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
@@ -46431,6 +46429,8 @@ namespace ts {
             function reportDiagnostic(diagnostic: DiagnosticMessage) {
                 error(pipeable, diagnostic);
             }
+            const type = getTypeOfNode(pipeable);
+            const signatures = getSignaturesOfType(type, SignatureKind.Call);
             if (isVairableDeclarationWithFunction(pipeable)) {
                 const initializer = pipeable.initializer;
                 const body = initializer.body;
@@ -46449,8 +46449,6 @@ namespace ts {
                     returnFn = body;
                 }
                 if (returnFn && returnFn.parameters.length === 1) {
-                    const type = getTypeOfNode(pipeable);
-                    const signatures = getSignaturesOfType(type, SignatureKind.Call);
                     if (signatures.find(isPipeableSelfARestParameter)) {
                         error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                         return;
@@ -46508,49 +46506,49 @@ namespace ts {
                     return [dataFirstType, tsPlusSignatures];
                 }
             }
-            else {
-                const returnFn = pipeable.type.type;
-                if (isFunctionTypeNode(returnFn) && returnFn.parameters.length === 1) {
-                    const type = getTypeOfNode(pipeable);
-                    const signatures = getSignaturesOfType(type, SignatureKind.Call);
-                    if (signatures.find(isPipeableSelfARestParameter)) {
-                        error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
-                        return;
-                    }
-                    const tsPlusSignatures = flatMap(signatures, (sig) => {
-                        const returnType = getReturnTypeOfSignature(sig);
-                        const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
-                        return flatMap(returnSignatures, (rsig) => {
-                            let newSig = createTsPlusSignature(sig, exportName, file);
-                            newSig.parameters = [...rsig.parameters, ...sig.parameters];
-                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
-                            newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
-                            newSig.minArgumentCount = newSig.minArgumentCount + 1;
-                            const newDecl = factory.updateFunctionTypeNode(
-                                pipeable.type,
-                                factory.createNodeArray([...(returnFn.typeParameters ?? []), ...(pipeable.type.typeParameters ?? [])]),
-                                factory.createNodeArray([...returnFn.parameters, ...pipeable.type.parameters]),
-                                returnFn.type
-                            );
-                            newDecl.jsDoc = pipeable.jsDoc;
-                            newDecl.jsDocCache = pipeable.jsDocCache;
-                            newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
-                            newSig.declaration = newDecl;
-                            newSig.tsPlusDeclaration = pipeable;
-                            if (thisify) {
-                                const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
-                                if (!thisifiedSignature) {
-                                    return;
-                                }
-                                newSig = thisifiedSignature;
-                            }
-                            newSig.tsPlusPipeable = true;
-                            return newSig;
-                        });
-                    }) as TsPlusSignature[];
-                    const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
-                    return [dataFirstType, tsPlusSignatures];
+            else if (every(signatures, (sig) =>
+                !!sig.declaration &&
+                !!sig.declaration.type &&
+                isFunctionTypeNode(sig.declaration.type) &&
+                sig.declaration.type.parameters.length === 1)) {
+                if (signatures.find(isPipeableSelfARestParameter)) {
+                    error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
+                    return;
                 }
+                const tsPlusSignatures = flatMap(signatures, (sig) => {
+                    const returnFn = sig.declaration!.type! as FunctionTypeNode
+                    const returnType = getReturnTypeOfSignature(sig);
+                    const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
+                    return flatMap(returnSignatures, (rsig) => {
+                        let newSig = createTsPlusSignature(sig, exportName, file);
+                        newSig.parameters = [...rsig.parameters, ...sig.parameters];
+                        newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                        newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
+                        newSig.minArgumentCount = newSig.minArgumentCount + 1;
+                        const newDecl = factory.updateFunctionTypeNode(
+                            pipeable.type,
+                            factory.createNodeArray([...(returnFn.typeParameters ?? []), ...(pipeable.type.typeParameters ?? [])]),
+                            factory.createNodeArray([...returnFn.parameters, ...pipeable.type.parameters]),
+                            returnFn.type
+                        );
+                        newDecl.jsDoc = pipeable.jsDoc;
+                        newDecl.jsDocCache = pipeable.jsDocCache;
+                        newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
+                        newSig.declaration = newDecl;
+                        newSig.tsPlusDeclaration = pipeable;
+                        if (thisify) {
+                            const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
+                            if (!thisifiedSignature) {
+                                return;
+                            }
+                            newSig = thisifiedSignature;
+                        }
+                        newSig.tsPlusPipeable = true;
+                        return newSig;
+                    });
+                }) as TsPlusSignature[];
+                const dataFirstType = createAnonymousType(type.symbol, emptySymbols, tsPlusSignatures, [], []);
+                return [dataFirstType, tsPlusSignatures];
             }
             return undefined;
         }
