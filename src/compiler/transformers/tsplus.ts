@@ -607,13 +607,7 @@ namespace ts {
                                             }
                                         }
                                     }
-                                    currentScope = [
-                                        factory.createReturnStatement(factory.createCallExpression(
-                                            getPathOfExtension(context, importer, { definition: functions.map.tsPlusFile, exportName: functions.map.tsPlusExportName }, source, sourceFileUniqueNames),
-                                            undefined,
-                                            args
-                                        ))
-                                    ];
+                                    currentScope = [factory.createReturnStatement(produceTsPlusCallExpression(functions.map, args, context, importer, source, sourceFileUniqueNames))];
                                 }
                                 else {
                                     const mapper = factory.createArrowFunction(
@@ -641,13 +635,7 @@ namespace ts {
                                             }
                                         }
                                     }
-                                    currentScope = [
-                                        factory.createReturnStatement(factory.createCallExpression(
-                                            getPathOfExtension(context, importer, { definition: functions.flatMap.tsPlusFile, exportName: functions.flatMap.tsPlusExportName }, source, sourceFileUniqueNames),
-                                            undefined,
-                                            args
-                                        ))
-                                    ];
+                                    currentScope = [factory.createReturnStatement(produceTsPlusCallExpression(functions.flatMap, args, context, importer, source, sourceFileUniqueNames))];
                                 }
                             }
                             else if (isExpressionStatement(statement) && isCallExpression(statement.expression) && checker.getNodeLinks(statement).tsPlusDoBindType) {
@@ -671,13 +659,7 @@ namespace ts {
                                             }
                                         }
                                     }
-                                    currentScope = [
-                                        factory.createReturnStatement(factory.createCallExpression(
-                                            getPathOfExtension(context, importer, { definition: functions.map.tsPlusFile, exportName: functions.map.tsPlusExportName }, source, sourceFileUniqueNames),
-                                            undefined,
-                                            [visitNode(statement.expression.arguments[0], visitor), mapper]
-                                        ))
-                                    ];
+                                    currentScope = [factory.createReturnStatement(produceTsPlusCallExpression(functions.map, args, context, importer, source, sourceFileUniqueNames))];
                                 }
                                 else {
                                     const mapper = factory.createArrowFunction(
@@ -698,25 +680,15 @@ namespace ts {
                                             }
                                         }
                                     }
-                                    currentScope = [
-                                        factory.createReturnStatement(factory.createCallExpression(
-                                            getPathOfExtension(context, importer, { definition: functions.flatMap.tsPlusFile, exportName: functions.flatMap.tsPlusExportName }, source, sourceFileUniqueNames),
-                                            undefined,
-                                            args
-                                        ))
-                                    ];
+                                    currentScope = [factory.createReturnStatement(produceTsPlusCallExpression(functions.flatMap, args, context, importer, source, sourceFileUniqueNames))];
                                 }
                             }
                             else if (isReturnStatement(statement) && statement.expression && isCallExpression(statement.expression) && checker.getNodeLinks(statement).tsPlusDoBindType) {
                                 isLast = false
-                                currentScope = [
-                                    factory.createReturnStatement(visitNode(statement.expression.arguments[0], visitor))
-                                ];
+                                currentScope = [factory.createReturnStatement(visitNode(statement.expression.arguments[0], visitor))];
                             }
                             else {
-                                currentScope.push(
-                                    visitNode(statement, visitor)
-                                )
+                                currentScope.push(visitNode(statement, visitor))
                             }
                         }
                         if (currentScope.length === 1 && isReturnStatement(currentScope[0]) && currentScope[0].expression) {
@@ -995,6 +967,24 @@ namespace ts {
                 return visitEachChild(node, visitor, context);
             }
         }
+
+        function produceTsPlusCallExpression(fn: TsPlusSignature, args: Expression[], context: TransformationContext, importer: TsPlusImporter, source: SourceFile, sourceFileUniqueNames: SourceFileUniqueNames) {
+            const expr = getPathOfExtension(context, importer, { definition: fn.tsPlusFile, exportName: fn.tsPlusExportName }, source, sourceFileUniqueNames)
+            return fn.tsPlusPipeable ? factory.createCallExpression(
+                factory.createCallExpression(
+                    expr,
+                    undefined,
+                    args.slice(1)
+                ),
+                undefined,
+                [args[0]]
+            ) : factory.createCallExpression(
+                expr,
+                undefined,
+                args
+            );
+        }
+
         function addSourceFileUniqueNamesVisitor(hoistedStatements: Array<Statement>, sourceFileUniqueNames: SourceFileUniqueNames, context: TransformationContext) {
             return function (node: Node): VisitResult<Node> {
                 switch (node.kind) {

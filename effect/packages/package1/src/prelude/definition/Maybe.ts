@@ -107,3 +107,23 @@ export function assertJustNothing(self: Nothing): never {
 
 export const result = Maybe.just(0).match(() => 0, () => 1)
 export const op = Maybe.just(0) + Maybe.just(1)
+
+/**
+ * @tsplus pipeable Maybe map
+ */
+export function map<A, B>(f: (a: A) => B) {
+    return (self: Maybe<A>): Maybe<B> => self.isJust() ? Maybe.just(f(self.value)) : Maybe.nothing()
+}
+
+/**
+ * @tsplus pipeable Maybe flatMap
+ */
+export function flatMap<A, B>(f: (a: A) => Maybe<B>) {
+    return (self: Maybe<A>): Maybe<B> => self.isJust() ? f(self.value) : Maybe.nothing()
+}
+
+export const useDo = Do(($) => {
+    const x = $(Maybe.just(0))
+    const y = $(Maybe.just(1))
+    return x + y
+})
