@@ -7026,7 +7026,7 @@ namespace ts {
             const deriveTags: string[] = [];
             const fluentTags: TsPlusPrioritizedExtensionTag[] = [];
             const staticTags: TsPlusExtensionTag[] = [];
-            const pipeableTags: TsPlusExtensionTag[] = [];
+            const pipeableTags: TsPlusPrioritizedExtensionTag[] = [];
             const getterTags: TsPlusExtensionTag[] = [];
             const operatorTags: TsPlusPrioritizedExtensionTag[] = [];
             const unifyTags: string[] = [];
@@ -7061,11 +7061,12 @@ namespace ts {
                                     break;
                                 }
                                 case "pipeable": {
-                                    if(!target || !name) {
+                                    const parsedTag = parseTsPlusExtensionTag(tagType, target, name, priority);
+                                    if(!parsedTag) {
                                         parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_pipeable_extension_must_have_the_form_tsplus_pipeable_typename_name);
                                         break;
                                     }
-                                    pipeableTags.push({ tagType, target, name });
+                                    pipeableTags.push(parsedTag);
                                     break;
                                 }
                                 case "getter": {

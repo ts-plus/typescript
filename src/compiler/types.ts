@@ -1383,7 +1383,7 @@ namespace ts {
         readonly initializer?: Expression;             // Optional initializer
         isTsPlusImplicit: boolean;
         tsPlusDeriveTags?: string[];
-        tsPlusPipeableTags?: TsPlusExtensionTag[];
+        tsPlusPipeableTags?: TsPlusPrioritizedExtensionTag[];
         tsPlusFluentTags?: TsPlusPrioritizedExtensionTag[];
         tsPlusStaticTags?: TsPlusExtensionTag[];
         tsPlusGetterTags?: TsPlusExtensionTag[];
@@ -1600,7 +1600,7 @@ namespace ts {
         
         // TSPLUS BEGIN
         readonly tsPlusDeriveTags?: string[];
-        readonly tsPlusPipeableTags?: TsPlusExtensionTag[];
+        readonly tsPlusPipeableTags?: TsPlusPrioritizedExtensionTag[];
         readonly tsPlusFluentTags?: TsPlusPrioritizedExtensionTag[];
         readonly tsPlusStaticTags?: TsPlusExtensionTag[];
         readonly tsPlusGetterTags?: TsPlusExtensionTag[];
@@ -3697,6 +3697,20 @@ namespace ts {
         exportName: string;
         definition: SourceFile;
         priority: number;
+    }
+
+    export interface TsPlusUnresolvedPipeableExtensionDefinition {
+        declaration: (VariableDeclaration & { name: Identifier }) | FunctionDeclaration;
+        exportName: string;
+        definition: SourceFile;
+        priority: number;
+        getTypeAndSignatures(): [Type, TsPlusSignature[]];
+    }
+
+    export interface TsPlusUnresolvedPipeableExtension {
+        definition: Set<TsPlusUnresolvedPipeableExtensionDefinition>;
+        target: string;
+        name: string;
     }
 
     export interface TsPlusUnresolvedFluentExtension {
