@@ -15496,82 +15496,15 @@ namespace ts {
             errorNode: Node,
             args: Expression[],
             checkMode: CheckMode | undefined,
+            signature?: Signature,
             addDiagnostic?: (_: Diagnostic) => void,
         ): Type {
             const funcType = getTypeOfNode(declaration);
             const apparentType = getApparentType(funcType);
-            const candidate = getSignaturesOfType(apparentType, SignatureKind.Call)[0]!;
+            const candidate = signature ?? getSignaturesOfType(apparentType, SignatureKind.Call)[0]!;
             if (!candidate) {
                 return errorType;
             }
-            const node = factory.createCallExpression(
-                factory.createIdentifier("$tsplus_custom_call"),
-                [],
-                args
-            );
-            setTextRange(node, errorNode)
-            setParent(node, declaration.parent);
-            if (candidate.typeParameters) {
-                const inferenceContext = createInferenceContext(
-                    candidate.typeParameters,
-                    candidate,
-                    InferenceFlags.None
-                );
-                const typeArgumentTypes = inferTypeArguments(
-                    node,
-                    candidate,
-                    args,
-                    checkMode || CheckMode.Normal,
-                    inferenceContext
-                );
-                const signature = getSignatureInstantiation(
-                    candidate,
-                    typeArgumentTypes,
-                    /*isJavascript*/ false,
-                    inferenceContext && inferenceContext.inferredTypeParameters
-                );
-                const digs = getSignatureApplicabilityError(
-                    node,
-                    args,
-                    signature,
-                    assignableRelation,
-                    checkMode || CheckMode.Normal,
-                    /*reportErrors*/ addDiagnostic ? true : false,
-                    /*containingMessageChain*/ void 0
-                );
-                if (digs) {
-                    digs.forEach((dig) => {
-                        addDiagnostic?.(dig);
-                    });
-                    return errorType;
-                }
-                return getReturnTypeOfSignature(signature);
-            }
-            const digs = getSignatureApplicabilityError(
-                node,
-                args,
-                candidate,
-                assignableRelation,
-                CheckMode.Normal,
-                /*reportErrors*/ true,
-                /*containingMessageChain*/ void 0
-            );
-            if (digs) {
-                digs.forEach((dig) => {
-                    addDiagnostic?.(dig);
-                });
-                return errorType;
-            }
-            return getReturnTypeOfSignature(candidate);
-        }
-        function checkTsPlusCustomSignature(
-            declaration: Declaration,
-            candidate: Signature,
-            errorNode: Node,
-            args: Expression[],
-            checkMode: CheckMode | undefined,
-            addDiagnostic?: (_: Diagnostic) => void,
-        ): Type {
             const node = factory.createCallExpression(
                 factory.createIdentifier("$tsplus_custom_call"),
                 [],
@@ -31008,12 +30941,12 @@ namespace ts {
                 return []
             })[0]
             if (indexer) {
-                const res = checkTsPlusCustomSignature(
+                const res = checkTsPlusCustomCall(
                     indexer.declaration,
-                    indexer.signatures[0],
                     node,
                     [node.expression, indexExpression],
-                    checkMode
+                    checkMode,
+                    indexer.signatures[0],
                 )
                 if (!isErrorType(res)) {
                     indexAccessExpressionCache.set(node, indexer)
