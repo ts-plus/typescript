@@ -4973,7 +4973,7 @@ namespace ts {
         cloneSymbol(symbol: Symbol): Symbol
         getTextOfBinaryOp(kind: SyntaxKind): string | undefined
         getInstantiatedTsPlusSignature(declaration: Declaration, args: Expression[], checkMode: CheckMode | undefined): Signature
-        getIndexAccessExpressionCache(): ESMap<Node, { signatures: Signature[], declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, definition: SourceFile, exportName: string }>
+        getIndexAccessExpressionCache(): ESMap<Node, { signature: Signature, declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, definition: SourceFile, exportName: string }>
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isTsPlusMacroGetter(node: Node, macro: string): boolean
         isClassCompanionReference(node: Expression): boolean

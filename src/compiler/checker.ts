@@ -379,9 +379,9 @@ namespace ts {
         const unresolvedStaticCache = new Map<string, ESMap<string, TsPlusUnresolvedStaticExtension>>();
         const identityCache = new Map<string, FunctionDeclaration>();
         const callCache = new Map<Node, TsPlusStaticFunctionExtension>();
-        const indexCache = new Map<string, () => { declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, signatures: Signature[], definition: SourceFile, exportName: string } | undefined>();
-        const resolvedIndexCache = new Map<string, { declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, signatures: Signature[], definition: SourceFile, exportName: string }>();
-        const indexAccessExpressionCache = new Map<Node, { signatures: Signature[], declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, definition: SourceFile, exportName: string }>();
+        const indexCache = new Map<string, () => { declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, signature: Signature, definition: SourceFile, exportName: string } | undefined>();
+        const resolvedIndexCache = new Map<string, { declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, signature: Signature, definition: SourceFile, exportName: string }>();
+        const indexAccessExpressionCache = new Map<Node, { signature: Signature, declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
         const tsPlusGlobalImportCache = new Map<string, TsPlusGlobalImport>()
         const unificationInProgress = {
@@ -30946,7 +30946,7 @@ namespace ts {
                     node,
                     [node.expression, indexExpression],
                     checkMode,
-                    indexer.signatures[0],
+                    indexer.signature,
                 )
                 if (!isErrorType(res)) {
                     indexAccessExpressionCache.set(node, indexer)
@@ -47142,7 +47142,9 @@ namespace ts {
                         }
                         const definition = getSourceFileOfNode(declaration);
                         const signatures = getSignaturesOfType(getTypeOfNode(declaration), SignatureKind.Call) as Signature[];
-                        resolvedIndexCache.set(target, { declaration, signatures, definition, exportName: declaration.name!.escapedText.toString() });
+                        if (signatures[0]) {
+                            resolvedIndexCache.set(target, { declaration, signature: signatures[0], definition, exportName: declaration.name!.escapedText.toString() });
+                        }
                         return resolvedIndexCache.get(target)!;
                     });
                 }
@@ -47157,7 +47159,9 @@ namespace ts {
                     }
                     const definition = getSourceFileOfNode(declaration);
                     const signatures = getSignaturesOfType(getTypeOfNode(declaration), SignatureKind.Call) as Signature[];
-                    resolvedIndexCache.set(target, { declaration, signatures, definition, exportName: declaration.name.escapedText.toString() });
+                    if (signatures[0]) {
+                        resolvedIndexCache.set(target, { declaration, signature: signatures[0], definition, exportName: declaration.name!.escapedText.toString() });
+                    }
                     return resolvedIndexCache.get(target)!;
                 });
             }
@@ -47173,8 +47177,8 @@ namespace ts {
                         const definition = getSourceFileOfNode(declaration);
                         const exportName = declaration.name!.escapedText.toString();
                         const typeAndSignatures = getTsPlusFluentSignatureForPipeableFunction(definition, exportName, exportName, declaration);
-                        if (typeAndSignatures) {
-                            resolvedIndexCache.set(target, { declaration, signatures: typeAndSignatures[1], definition, exportName });
+                        if (typeAndSignatures && typeAndSignatures[1][0]) {
+                            resolvedIndexCache.set(target, { declaration, signature: typeAndSignatures[1][0], definition, exportName });
                             return resolvedIndexCache.get(target);
                         }
                     })
@@ -47191,8 +47195,8 @@ namespace ts {
                     const definition = getSourceFileOfNode(declaration);
                     const exportName = declaration.name!.escapedText.toString();
                     const typeAndSignatures = getTsPlusFluentSignatureForPipeableVariableDeclaration(definition, exportName, exportName, declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType);
-                    if (typeAndSignatures) {
-                        resolvedIndexCache.set(target, { declaration, signatures: typeAndSignatures[1], definition, exportName });
+                    if (typeAndSignatures && typeAndSignatures[1][0]) {
+                        resolvedIndexCache.set(target, { declaration, signature: typeAndSignatures[1][0], definition, exportName });
                         return resolvedIndexCache.get(target);
                     }
                 })
