@@ -46493,7 +46493,7 @@ namespace ts {
             }
             return undefined;
         }
-        function isVairableDeclarationWithFunction(node: VariableDeclaration): node is VariableDeclarationWithFunction {
+        function isVariableDeclarationWithFunction(node: VariableDeclaration): node is VariableDeclarationWithFunction {
             return isIdentifier(node.name) && !!node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer));
         }
         function isEachDefined<A>(array: (A | undefined)[]): array is A[] {
@@ -46510,7 +46510,7 @@ namespace ts {
             }
             const type = getTypeOfNode(pipeable);
             const signatures = getSignaturesOfType(type, SignatureKind.Call);
-            if (isVairableDeclarationWithFunction(pipeable)) {
+            if (isVariableDeclarationWithFunction(pipeable)) {
                 const initializer = pipeable.initializer;
                 const body = initializer.body;
                 let returnFn: ArrowFunction | FunctionTypeNode | undefined;
