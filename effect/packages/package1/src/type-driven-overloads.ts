@@ -8,7 +8,6 @@ T.make(1).op(1)
 
 T.make(1) + true
 
-// @ts-expect-error
 T.make(1).op(true)
 
 T.make(1)

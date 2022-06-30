@@ -5313,6 +5313,7 @@ namespace ts {
                 pipeable: [],
                 operator: [],
                 pipeableOperator: [],
+                pipeableIndex: [],
                 static: [],
                 getter: [],
                 unify: [],
