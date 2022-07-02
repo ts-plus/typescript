@@ -5,7 +5,9 @@
     "declarationDir": "build/dts",
     "declarationMap": true,
     "tsPlusConfig": "../../tsplus.config.json",
-    "rootDir": "src"
+    "rootDir": "src",
+    "incremental": true,
+    "tsBuildInfoFile": "build/.tsbuildinfo"
   },
   "include": ["src/**/*.ts"]
 }

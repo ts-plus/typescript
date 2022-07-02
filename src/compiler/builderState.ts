@@ -225,8 +225,18 @@ namespace ts {
             }
 
             // TSPLUS START
-            for (const file of arrayFrom(program.getTypeChecker().getTsPlusFiles().values())) {
-                addReferencedFile(file.resolvedPath);
+            program.getTypeChecker().getTsPlusFiles().get(sourceFile)?.forEach((file) => {
+                if (file !== sourceFile) {
+                    addReferencedFile(file.resolvedPath);
+                }
+            })
+            if (!sourceFile.isDeclarationFile) {
+                program.getTypeChecker().getTsPlusGlobalImports().forEach((imp) => {
+                    const file = getSourceFileOfNode(imp.declaration);
+                    if (file !== sourceFile) {
+                        addReferencedFile(file.resolvedPath);
+                    }
+                })
             }
             // TSPLUS END
 

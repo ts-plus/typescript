@@ -4984,7 +4984,8 @@ namespace ts {
         getResolvedOperator(node: BinaryExpression): Signature | undefined
         getNodeLinks(node: Node): NodeLinks
         // TSPLUS START
-        getTsPlusFiles(): Set<SourceFile>
+        getTsPlusFiles(): ESMap<SourceFile, Set<SourceFile>>
+        getTsPlusGlobalImports(): ESMap<string, TsPlusGlobalImport>
         collectTsPlusMacroTags(statement: Declaration): readonly string[]
         getTsPlusGlobals(): Symbol[];
         getTsPlusGlobal(name: string): TsPlusGlobalImport | undefined;
