@@ -830,9 +830,12 @@ namespace ts {
             collectTsPlusFluentTags,
             hasExportedPlusTags: (declaration) => {
                 return collectTsPlusFluentTags(declaration).length > 0 ||
-                    collectTsPlusGetterTags(declaration).length > 0 ||
-                    collectTsPlusOperatorTags(declaration).length > 0 ||
                     collectTsPlusPipeableTags(declaration).length > 0 ||
+                    collectTsPlusGetterTags(declaration).length > 0 ||
+                    collectTsPlusIndexTags(declaration).length > 0 ||
+                    collectTsPlusPipeableIndexTags(declaration).length > 0 ||
+                    collectTsPlusOperatorTags(declaration).length > 0 ||
+                    collectTsPlusPipeableOperatorTags(declaration).length > 0 ||
                     collectTsPlusStaticTags(declaration).length > 0 ||
                     isTsPlusImplicit(declaration) ||
                     collectTsPlusDeriveTags(declaration).length > 0
