@@ -250,6 +250,17 @@ namespace ts {
                 if (custom) {
                     const expression = visitNode(node.expression, visitor(source, traceInScope))
                     const argument = visitNode(node.argumentExpression, visitor(source, traceInScope))
+                    if (custom.signature && isTsPlusSignature(custom.signature) && custom.signature.tsPlusPipeable) {
+                        return context.factory.createCallExpression(
+                            context.factory.createCallExpression(
+                                getPathOfExtension(context, importer, custom, source, sourceFileUniqueNames),
+                                [],
+                                [argument]
+                            ),
+                            [],
+                            [expression]
+                        )
+                    }
                     return context.factory.createCallExpression(
                         getPathOfExtension(context, importer, custom, source, sourceFileUniqueNames),
                         [],

@@ -379,8 +379,9 @@ namespace ts {
         const unresolvedStaticCache = new Map<string, ESMap<string, TsPlusUnresolvedStaticExtension>>();
         const identityCache = new Map<string, FunctionDeclaration>();
         const callCache = new Map<Node, TsPlusStaticFunctionExtension>();
-        const indexCache = new Map<string, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
-        const indexAccessExpressionCache = new Map<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>();
+        const indexCache = new Map<string, () => { declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, signature: Signature, definition: SourceFile, exportName: string } | undefined>();
+        const resolvedIndexCache = new Map<string, { declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, signature: Signature, definition: SourceFile, exportName: string }>();
+        const indexAccessExpressionCache = new Map<Node, { signature: Signature, declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
         const tsPlusGlobalImportCache = new Map<string, TsPlusGlobalImport>()
         const unificationInProgress = {
@@ -15495,11 +15496,15 @@ namespace ts {
             errorNode: Node,
             args: Expression[],
             checkMode: CheckMode | undefined,
+            signature?: Signature,
             addDiagnostic?: (_: Diagnostic) => void,
         ): Type {
             const funcType = getTypeOfNode(declaration);
             const apparentType = getApparentType(funcType);
-            const candidate = getSignaturesOfType(apparentType, SignatureKind.Call)[0]!;
+            const candidate = signature ?? getSignaturesOfType(apparentType, SignatureKind.Call)[0]!;
+            if (!candidate) {
+                return errorType;
+            }
             const node = factory.createCallExpression(
                 factory.createIdentifier("$tsplus_custom_call"),
                 [],
@@ -30931,7 +30936,7 @@ namespace ts {
             const indexer = tags.flatMap((tag) => {
                 const indexer = indexCache.get(tag)
                 if (indexer) {
-                    return [indexer]
+                    return [indexer()]
                 }
                 return []
             })[0]
@@ -30940,7 +30945,8 @@ namespace ts {
                     indexer.declaration,
                     node,
                     [node.expression, indexExpression],
-                    checkMode
+                    checkMode,
+                    indexer.signature,
                 )
                 if (!isErrorType(res)) {
                     indexAccessExpressionCache.set(node, indexer)
@@ -46087,6 +46093,12 @@ namespace ts {
             }
             return [];
         }
+        function collectTsPlusPipeableIndexTags(declaration: Declaration) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+                return declaration.tsPlusPipeableIndexTags || [];
+            }
+            return [];
+        }
         function collectTsPlusTypeTags(declaration: Declaration) {
             if (isInterfaceDeclaration(declaration) || isTypeAliasDeclaration(declaration) || isClassDeclaration(declaration)) {
                 return declaration.tsPlusTypeTags || [];
@@ -46414,7 +46426,7 @@ namespace ts {
             }
             return undefined;
         }
-        function isVairableDeclarationWithFunction(node: VariableDeclaration): node is VariableDeclarationWithFunction {
+        function isVariableDeclarationWithFunction(node: VariableDeclaration): node is VariableDeclarationWithFunction {
             return isIdentifier(node.name) && !!node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer));
         }
         function isEachDefined<A>(array: (A | undefined)[]): array is A[] {
@@ -46431,7 +46443,7 @@ namespace ts {
             }
             const type = getTypeOfNode(pipeable);
             const signatures = getSignaturesOfType(type, SignatureKind.Call);
-            if (isVairableDeclarationWithFunction(pipeable)) {
+            if (isVariableDeclarationWithFunction(pipeable)) {
                 const initializer = pipeable.initializer;
                 const body = initializer.body;
                 let returnFn: ArrowFunction | FunctionTypeNode | undefined;
@@ -47124,13 +47136,70 @@ namespace ts {
             if(declaration.name && isIdentifier(declaration.name)) {
                 for (const target of collectTsPlusIndexTags(declaration)) {
                     tsPlusFiles.add(getSourceFileOfNode(declaration));
-                    tsPlusFiles.add(getSourceFileOfNode(declaration));
-                    indexCache.set(target, {
-                        declaration,
-                        definition: getSourceFileOfNode(declaration),
-                        exportName: declaration.name.escapedText.toString()
+                    indexCache.set(target, () => {
+                        if (resolvedIndexCache.has(target)) {
+                            return resolvedIndexCache.get(target);
+                        }
+                        const definition = getSourceFileOfNode(declaration);
+                        const signatures = getSignaturesOfType(getTypeOfNode(declaration), SignatureKind.Call) as Signature[];
+                        if (signatures[0]) {
+                            resolvedIndexCache.set(target, { declaration, signature: signatures[0], definition, exportName: declaration.name!.escapedText.toString() });
+                        }
+                        return resolvedIndexCache.get(target)!;
                     });
                 }
+            }
+        }
+        function cacheTsPlusIndexVariable(declaration: VariableDeclarationWithIdentifier) {
+            for (const target of collectTsPlusIndexTags(declaration)) {
+                tsPlusFiles.add(getSourceFileOfNode(declaration));
+                indexCache.set(target, () => {
+                    if (resolvedIndexCache.has(target)) {
+                        return resolvedIndexCache.get(target);
+                    }
+                    const definition = getSourceFileOfNode(declaration);
+                    const signatures = getSignaturesOfType(getTypeOfNode(declaration), SignatureKind.Call) as Signature[];
+                    if (signatures[0]) {
+                        resolvedIndexCache.set(target, { declaration, signature: signatures[0], definition, exportName: declaration.name!.escapedText.toString() });
+                    }
+                    return resolvedIndexCache.get(target)!;
+                });
+            }
+        }
+        function cacheTsPlusPipeableIndexFunction(declaration: FunctionDeclaration) {
+            if(declaration.name && isIdentifier(declaration.name)) {
+                for (const target of collectTsPlusPipeableIndexTags(declaration)) {
+                    tsPlusFiles.add(getSourceFileOfNode(declaration));
+                    indexCache.set(target, () => {
+                        if (resolvedIndexCache.has(target)) {
+                            return resolvedIndexCache.get(target);
+                        }
+                        const definition = getSourceFileOfNode(declaration);
+                        const exportName = declaration.name!.escapedText.toString();
+                        const typeAndSignatures = getTsPlusFluentSignatureForPipeableFunction(definition, exportName, exportName, declaration);
+                        if (typeAndSignatures && typeAndSignatures[1][0]) {
+                            resolvedIndexCache.set(target, { declaration, signature: typeAndSignatures[1][0], definition, exportName });
+                            return resolvedIndexCache.get(target);
+                        }
+                    })
+                }
+            }
+        }
+        function cacheTsPlusPipeableIndexVariable(declaration: VariableDeclarationWithIdentifier) {
+            for (const target of collectTsPlusPipeableIndexTags(declaration)) {
+                tsPlusFiles.add(getSourceFileOfNode(declaration));
+                indexCache.set(target, () => {
+                    if (resolvedIndexCache.has(target)) {
+                        return resolvedIndexCache.get(target);
+                    }
+                    const definition = getSourceFileOfNode(declaration);
+                    const exportName = declaration.name!.escapedText.toString();
+                    const typeAndSignatures = getTsPlusFluentSignatureForPipeableVariableDeclaration(definition, exportName, exportName, declaration as VariableDeclarationWithFunction | VariableDeclarationWithFunctionType);
+                    if (typeAndSignatures && typeAndSignatures[1][0]) {
+                        resolvedIndexCache.set(target, { declaration, signature: typeAndSignatures[1][0], definition, exportName });
+                        return resolvedIndexCache.get(target);
+                    }
+                })
             }
         }
         function collectTsPlusSymbols(file: SourceFile): void {
@@ -47192,7 +47261,20 @@ namespace ts {
                 cacheTsPlusUnifyFunction(declaration);
             }
             for (const declaration of file.tsPlusContext.index) {
-                cacheTsPlusIndexFunction(declaration);                        
+                if (isFunctionDeclaration(declaration)) {
+                    cacheTsPlusIndexFunction(declaration);
+                }
+                else {
+                    cacheTsPlusIndexVariable(declaration);                        
+                }
+            }
+            for (const declaration of file.tsPlusContext.pipeableIndex) {
+                if (isFunctionDeclaration(declaration)) {
+                    cacheTsPlusPipeableIndexFunction(declaration);
+                }
+                else {
+                    cacheTsPlusPipeableIndexVariable(declaration);                        
+                }
             }
         }
         function fillTsPlusLocalScope(file: SourceFile) {
@@ -47261,6 +47343,7 @@ namespace ts {
             getterCache.clear();
             callCache.clear();
             indexCache.clear();
+            resolvedIndexCache.clear();
             indexAccessExpressionCache.clear();
             inheritanceSymbolCache.clear();
             tsPlusWorldScope.implicits.clear();

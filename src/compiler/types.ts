@@ -1392,6 +1392,7 @@ namespace ts {
         tsPlusMacroTags?: string[];
         tsPlusUnifyTags?: string[];
         tsPlusIndexTags?: string[];
+        tsPlusPipeableIndexTags?: string[];
         tsPlusValidFluent?: boolean
     }
 
@@ -1610,6 +1611,7 @@ namespace ts {
         readonly tsPlusMacroTags?: string[];
         readonly tsPlusUnifyTags?: string[];
         readonly tsPlusIndexTags?: string[];
+        readonly tsPlusPipeableIndexTags?: string[];
         readonly tsPlusValidFluent?: boolean
         // TSPLUS END
     }
@@ -4194,7 +4196,8 @@ namespace ts {
             static: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             getter: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             unify: FunctionDeclaration[];
-            index: FunctionDeclaration[];
+            index: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
+            pipeableIndex: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
         }
         // TSPLUS EXTENSION END
     }
@@ -4970,7 +4973,7 @@ namespace ts {
         cloneSymbol(symbol: Symbol): Symbol
         getTextOfBinaryOp(kind: SyntaxKind): string | undefined
         getInstantiatedTsPlusSignature(declaration: Declaration, args: Expression[], checkMode: CheckMode | undefined): Signature
-        getIndexAccessExpressionCache(): ESMap<Node, { declaration: FunctionDeclaration, definition: SourceFile, exportName: string }>
+        getIndexAccessExpressionCache(): ESMap<Node, { signature: Signature, declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, definition: SourceFile, exportName: string }>
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isTsPlusMacroGetter(node: Node, macro: string): boolean
         isClassCompanionReference(node: Expression): boolean

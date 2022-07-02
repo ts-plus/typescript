@@ -1252,6 +1252,12 @@ namespace ts {
                             if (declaration.tsPlusGetterTags && declaration.tsPlusGetterTags.length > 0) {
                                 file.tsPlusContext.getter.push(declaration as VariableDeclarationWithIdentifier);
                             }
+                            if (declaration.tsPlusIndexTags && declaration.tsPlusIndexTags.length > 0) {
+                                file.tsPlusContext.index.push(declaration as VariableDeclarationWithIdentifier);
+                            }
+                            if (declaration.tsPlusPipeableIndexTags && declaration.tsPlusPipeableIndexTags.length > 0) {
+                                file.tsPlusContext.pipeableIndex.push(declaration as VariableDeclarationWithIdentifier);
+                            }
                         }
                     }
                     if (isFunctionDeclaration(statement) && statement.name) {
@@ -1278,6 +1284,9 @@ namespace ts {
                         }
                         if (statement.tsPlusIndexTags && statement.tsPlusIndexTags.length > 0) {
                             file.tsPlusContext.index.push(statement);
+                        }
+                        if (statement.tsPlusPipeableIndexTags && statement.tsPlusPipeableIndexTags.length > 0) {
+                            file.tsPlusContext.pipeableIndex.push(statement);
                         }
                     }
                 }
@@ -7039,6 +7048,7 @@ namespace ts {
             const unifyTags: string[] = [];
             const macroTags: string[] = [];
             const indexTags: string[] = [];
+            const pipeableIndexTags: string[] = [];
             let isImplicit = false;
             for (const doc of jsDoc) {
                 if (doc.tags) {
@@ -7132,6 +7142,14 @@ namespace ts {
                                     indexTags.push(target);
                                     break;
                                 }
+                                case "pipeable-index": {
+                                    if (!target) {
+                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_an_index_extension_must_have_the_form_tsplus_index_typename);
+                                        break;
+                                    }
+                                    pipeableIndexTags.push(target);
+                                    break;
+                                }
                             }
                         }
                     }
@@ -7147,6 +7165,7 @@ namespace ts {
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusMacroTags = undefinedIfZeroLength(macroTags);
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusUnifyTags = undefinedIfZeroLength(unifyTags);
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusIndexTags = undefinedIfZeroLength(indexTags);
+            (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusPipeableIndexTags = undefinedIfZeroLength(pipeableIndexTags);
             if (isVariableDeclaration(declaration)) {
                 declaration.isTsPlusImplicit = isImplicit;
             }
