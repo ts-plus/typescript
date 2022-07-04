@@ -1,7 +1,15 @@
 /**
- * @tsplus macro identity
+ * @tsplus type Macros
  */
-function identity<A>(a: A): A {
+export interface Macros {}
+
+declare const macros: Macros
+
+/**
+ * @tsplus macro identity
+ * @tsplus getter Macros identity
+ */
+export function identity<A>(a: A): A {
   return a
 }
 
@@ -11,6 +19,8 @@ function identity<A>(a: A): A {
 function concrete(u: unknown): asserts u is any {
   //
 }
+
+macros.identity
 
 identity(0);
 

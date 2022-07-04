@@ -1555,13 +1555,9 @@ namespace ts {
         }
         function isTsPlusMacroGetter(node: Node, macro: string): boolean {
             const links = getNodeLinks(node)
-            const resolvedType = links.resolvedType ?? links.tsPlusResolvedType;
-            return !!resolvedType &&
-                isTsPlusType(resolvedType) &&
-                isTsPlusSymbol(resolvedType.tsPlusSymbol) &&
-                (resolvedType.tsPlusSymbol.tsPlusTag === TsPlusSymbolTag.Getter ||
-                 resolvedType.tsPlusSymbol.tsPlusTag === TsPlusSymbolTag.GetterVariable) &&
-                collectTsPlusMacroTags(resolvedType.tsPlusSymbol.tsPlusDeclaration).findIndex((tag) => tag === macro) !== -1
+            return !!links.tsPlusGetterExtension &&
+                !!links.tsPlusGetterExtension.declaration.tsPlusMacroTags &&
+                links.tsPlusGetterExtension.declaration.tsPlusMacroTags.includes(macro);
         }
         function isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K> {
             if (!isCallExpression(node) && !isBinaryExpression(node)) {
