@@ -16,3 +16,21 @@ export function filterOrDie<A>(p: Predicate<A>, dieWith: LazyArgument<unknown>, 
 }
 
 Effect.succeed(1).filterOrElse((n) => true, () => Effect.succeed(""))
+
+/**
+ * @tsplus type pipeable/type-resolution/Test
+ */
+export type Test = number & {
+  readonly Test: unique symbol
+}
+
+/**
+ * @tsplus pipeable pipeable/type-resolution/Test isEnabled
+ */
+export function isEnabled(flag: number) {
+  return (self: Test) => !!(self & flag)
+}
+
+declare const test: Test
+
+const x = test.isEnabled(1)
