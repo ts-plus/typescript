@@ -47346,6 +47346,9 @@ namespace ts {
             tsPlusDebug && console.timeEnd("initTsPlusTypeChecker build dependency tree")
         }
         function initTsPlusTypeChecker() {
+            if (compilerOptions.tsPlusEnabled === false) {
+                return;
+            }
             tsPlusDebug && console.time("initTsPlusTypeChecker caches")
             fileMap.map = getFileMap(host.getCompilerOptions(), host);
             fluentCache.clear();

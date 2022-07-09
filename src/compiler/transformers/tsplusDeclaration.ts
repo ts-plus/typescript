@@ -17,7 +17,10 @@ namespace ts {
         }
     }
 
-    export function transformTsPlusDeclaration(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
+    export function transformTsPlusDeclaration(checker: TypeChecker, options: CompilerOptions, host: CompilerHost): (context: TransformationContext) => (sourceFile: SourceFile | Bundle) => SourceFile | Bundle {
+        if (options.tsPlusEnabled === false) {
+            return () => identity;
+        }
         const fileMap: [string, RegExp][] = getFileMap(options, host);
         
         return function (context: TransformationContext) {

@@ -6900,6 +6900,7 @@ namespace ts {
         [option: string]: CompilerOptionsValue | TsConfigSourceFile | undefined;
 
         tsPlusConfig?: string
+        tsPlusEnabled?: boolean
     }
 
     export interface WatchOptions {

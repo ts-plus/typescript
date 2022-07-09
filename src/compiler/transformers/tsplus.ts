@@ -57,7 +57,10 @@ namespace ts {
         readonly name: Identifier
         readonly isExported: boolean
     }
-    export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, host: CompilerHost) {
+    export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, host: CompilerHost): (context: TransformationContext) => (sourceFile: SourceFile | Bundle) => SourceFile | Bundle {
+        if (options.tsPlusEnabled === false) {
+            return () => identity;
+        }
         const fileMap: [string, RegExp][] = getFileMap(options, host);
         const traceMap: [string, RegExp][] = getTraceMap(options, host);
         return function (context: TransformationContext) {

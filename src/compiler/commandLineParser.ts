@@ -207,6 +207,11 @@ namespace ts {
             type: "string"
         },
         {
+            name: "tsPlusEnabled",
+            type: "boolean",
+            defaultValueDescription: true,
+        },
+        {
             name: "watch",
             shortName: "w",
             type: "boolean",
