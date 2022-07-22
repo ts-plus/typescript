@@ -7514,6 +7514,10 @@
         "category": "Error",
         "code": 50023
     },
+    "Annotation of a no-inherit extension must have the form '@tsplus no-inherit [typename]": {
+        "category": "Error",
+        "code": 50024
+    },
     "A call to bind is only allowed in the context of a Do.": {
         "category": "Error",
         "code": 51000

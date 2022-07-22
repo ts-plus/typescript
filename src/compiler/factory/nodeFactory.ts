@@ -5309,6 +5309,7 @@ namespace ts {
             node.tsPlusContext = {
                 type: [],
                 companion: [],
+                noInherit: [],
                 fluent: [],
                 pipeable: [],
                 operator: [],
@@ -5317,7 +5318,7 @@ namespace ts {
                 static: [],
                 getter: [],
                 unify: [],
-                index: []
+                index: [],
             }
             return node;
         }

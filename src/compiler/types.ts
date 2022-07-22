@@ -3065,9 +3065,10 @@ namespace ts {
         /** May be undefined in `export default class { ... }`. */
         readonly name?: Identifier;
         // TSPLUS START
-        readonly tsPlusTypeTags?: string[]
-        readonly tsPlusCompanionTags?: string[]
-        readonly tsPlusDeriveTags?: string[]
+        readonly tsPlusTypeTags?: string[];
+        readonly tsPlusCompanionTags?: string[];
+        readonly tsPlusDeriveTags?: string[];
+        readonly tsPlusNoInheritTags?: string[];
         // TSPLUS END
     }
 
@@ -3104,8 +3105,9 @@ namespace ts {
         /* @internal */ readonly decorators?: NodeArray<Decorator> | undefined;
         
         // TSPLUS BEGIN
-        readonly tsPlusTypeTags?: string[]
-        readonly tsPlusDeriveTags?: string[]
+        readonly tsPlusTypeTags?: string[];
+        readonly tsPlusDeriveTags?: string[];
+        readonly tsPlusNoInheritTags?: string[];
         // TSPLUS END
     }
 
@@ -3127,7 +3129,8 @@ namespace ts {
         /* @internal */ readonly decorators?: NodeArray<Decorator> | undefined;
 
         // TSPLUS BEGIN
-        readonly tsPlusTypeTags?: string[]
+        readonly tsPlusTypeTags?: string[];
+        readonly tsPlusNoInheritTags?: string[];
         // TSPLUS END
     }
 
@@ -4198,6 +4201,7 @@ namespace ts {
             unify: FunctionDeclaration[];
             index: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             pipeableIndex: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
+            noInherit: (InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration)[];
         }
         // TSPLUS EXTENSION END
     }

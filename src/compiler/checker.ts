@@ -1013,13 +1013,20 @@ namespace ts {
 
             return out;
         }
-        function collectRelevantSymbolsLoop(target: Type, lastSeen?: Set<Type>) {
+        function collectRelevantSymbolsLoop(target: Type, lastNoInherit: Set<string>, lastSeen?: Set<Type>) {
             const seen: Set<Type> = new Set(lastSeen);
+            const noInherit: Set<string> = new Set(lastNoInherit);
             const relevant: Set<Symbol> = new Set();
             let queue: Type[] = [target]
             while (queue.length > 0) {
                 const target = queue.shift()!
                 if (target.symbol) {
+                    collectExcludedInheritance(target.symbol);
+                }
+                if (target.aliasSymbol) {
+                    collectExcludedInheritance(target.aliasSymbol);
+                }
+                if (target.symbol && shouldInherit(target.symbol)) {
                     // Add the current symbol to the return Set
                     relevant.add(target.symbol)
                     // Check if the current type inherits other types
@@ -1037,7 +1044,8 @@ namespace ts {
                         })
                     }
                 }
-                if (target.aliasSymbol) {
+                if (target.aliasSymbol && shouldInherit(target.aliasSymbol)) {
+                    // Add the current symbol to the return Set
                     relevant.add(target.aliasSymbol);
                     if (inheritanceSymbolCache.has(target.aliasSymbol)) {
                         inheritanceSymbolCache.get(target.aliasSymbol)!.forEach(addInheritedSymbol)
@@ -1064,7 +1072,7 @@ namespace ts {
             return relevant;
 
             function addInheritedSymbol(symbol: Symbol) {
-                if (symbol.declarations && symbol.declarations.length > 0) {
+                if (shouldInherit(symbol) && symbol.declarations && symbol.declarations.length > 0) {
                     for (const decl of symbol.declarations) {
                         // Exclude all declarations but interface and class declarations.
                         // Symbol declarations can also include other declarations, such as variable declarations
@@ -1089,7 +1097,7 @@ namespace ts {
                 const inherited: Set<Symbol>[] = []
                 for (const member of types) {
                     if (!seen.has(member)) {
-                        inherited.push(collectRelevantSymbolsLoop(member, seen));
+                        inherited.push(collectRelevantSymbolsLoop(member, noInherit, seen));
                     }
                 }
                 // Add union members as "seen" only after the union has been collected
@@ -1098,7 +1106,7 @@ namespace ts {
                 }
 
                 intersectSets(inherited).forEach((s) => {
-                    relevant.add(s)
+                    shouldInherit(s) && relevant.add(s)
                 })
             }
 
@@ -1109,6 +1117,29 @@ namespace ts {
                         queue.push(member);
                     }
                 }
+            }
+
+            function collectExcludedInheritance(symbol: Symbol) {
+                if (symbol.declarations) {
+                    symbol.declarations.forEach((declaration) => {
+                        if ((isInterfaceDeclaration(declaration) || isTypeAliasDeclaration(declaration) || isClassDeclaration(declaration)) &&
+                            declaration.tsPlusNoInheritTags) {
+                            declaration.tsPlusNoInheritTags.forEach((tag) => {
+                                noInherit.add(tag)
+                            })
+                        }
+                    })
+                }
+            }
+
+            function shouldInherit(symbol: Symbol) {
+                const tags = typeSymbolCache.get(symbol);
+                if (tags) {
+                    for (const tag of tags) {
+                        if (noInherit.has(tag)) return false;
+                    }
+                }
+                return true;
             }
         }
         function collectRelevantSymbols(target: Type) {
@@ -1128,7 +1159,7 @@ namespace ts {
          * followed by subtypes, subtypes of subtypes, etc.
          */
         function collectRelevantSymbolsWorker(target: Type) {
-            const returnArray = arrayFrom(collectRelevantSymbolsLoop(target).values())
+            let returnArray = arrayFrom(collectRelevantSymbolsLoop(target, new Set()).values())
 
             // collect primitive symbols last, in case they have overridden extensions
             if (target.flags & TypeFlags.StringLike) {

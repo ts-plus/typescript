@@ -1223,6 +1223,9 @@ namespace ts {
                     if (statement.tsPlusTypeTags && statement.tsPlusTypeTags.length > 0) {
                         file.tsPlusContext.type.push(statement);                        
                     }
+                    if (statement.tsPlusNoInheritTags && statement.tsPlusNoInheritTags.length > 0) {
+                        file.tsPlusContext.noInherit.push(statement);
+                    }
                     if (isClassDeclaration(statement) && statement.tsPlusCompanionTags && statement.tsPlusCompanionTags.length > 0) {
                         file.tsPlusContext.companion.push(statement);
                     }
@@ -7596,6 +7599,7 @@ namespace ts {
                     const typeTags: string[] = [];
                     const companionTags: string[] = [];
                     const deriveTags: string[] = [];
+                    const noInheritTags: string[] = [];
                     for (const doc of finished.jsDoc) {
                         if (doc.tags) {
                             for (const tag of doc.tags) {
@@ -7621,10 +7625,18 @@ namespace ts {
                                         case "derive": {
                                             if (!target || target !== "nominal") {
                                                 parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_derive_extension_on_a_type_must_have_the_form_tsplus_derive_nominal);
-                                                continue;
+                                                break;
                                             }
                                             deriveTags.push(target);
                                             break
+                                        }
+                                        case "no-inherit": {
+                                            if (!target) {
+                                                parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_no_inherit_extension_must_have_the_form_tsplus_no_inherit_typename);
+                                                break;
+                                            }
+                                            noInheritTags.push(target);
+                                            break;
                                         }
                                     }
                                 }
@@ -7634,6 +7646,7 @@ namespace ts {
                     (finished as Mutable<ClassDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
                     (finished as Mutable<ClassDeclaration>).tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
                     (finished as Mutable<ClassDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
+                    (finished as Mutable<ClassDeclaration>).tsPlusNoInheritTags = undefinedIfZeroLength(noInheritTags);
                 }
             }
             return finished;
@@ -7709,24 +7722,37 @@ namespace ts {
             if (finished.jsDoc) {
                 const typeTags: string[] = [];
                 const deriveTags: string[] = [];
+                const noInheritTags: string[] = [];
                 for (const doc of finished.jsDoc) {
                     if (doc.tags) {
                         for (const tag of doc.tags) {
                             if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
                                 const [tagName, target] = tag.comment.split(" ");
-                                if (tagName === "type") {
-                                    if (!target) {
-                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
-                                        continue;
+                                switch (tagName) {
+                                    case "type": {
+                                        if (!target) {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                            break;
+                                        }
+                                        typeTags.push(target);
+                                        break;
                                     }
-                                    typeTags.push(target);
-                                }
-                                if (tagName === "derive") {
-                                    if (!target || target !== "nominal") {
-                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_derive_extension_on_a_type_must_have_the_form_tsplus_derive_nominal);
-                                        continue;
+                                    case "derive": {
+                                        if (!target || target !== "nominal") {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_derive_extension_on_a_type_must_have_the_form_tsplus_derive_nominal);
+                                            break;
+                                        }
+                                        deriveTags.push(target);
+                                        break;
                                     }
-                                    deriveTags.push(target);
+                                    case "no-inherit": {
+                                        if (!target) {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_no_inherit_extension_must_have_the_form_tsplus_no_inherit_typename);
+                                            break;
+                                        }
+                                        noInheritTags.push(target);
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -7734,6 +7760,7 @@ namespace ts {
                 }
                 (finished as Mutable<InterfaceDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
                 (finished as Mutable<InterfaceDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
+                (finished as Mutable<InterfaceDeclaration>).tsPlusNoInheritTags = undefinedIfZeroLength(noInheritTags);
             }
             return finished;
         }
@@ -7750,23 +7777,36 @@ namespace ts {
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
             if (finished.jsDoc) {
                 const typeTags: string[] = [];
+                const noInheritTags: string[] = [];
                 for (const doc of finished.jsDoc) {
                     if (doc.tags) {
                         for (const tag of doc.tags) {
                             if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
                                 const [tagName, target] = tag.comment.split(" ");
-                                if (tagName === "type") {
-                                    if (!target) {
-                                        parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
-                                        continue;
+                                switch (tagName) {
+                                    case "type": {
+                                        if (!target) {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_type_extension_must_have_the_form_tsplus_type_typename);
+                                            break;
+                                        }
+                                        typeTags.push(target);
+                                        break;
                                     }
-                                    typeTags.push(target);
+                                    case "no-inherit": {
+                                        if (!target) {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_no_inherit_extension_must_have_the_form_tsplus_no_inherit_typename);
+                                            break;
+                                        }
+                                        noInheritTags.push(target)
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
                 }
                 (finished as Mutable<TypeAliasDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+                (finished as Mutable<TypeAliasDeclaration>).tsPlusNoInheritTags = undefinedIfZeroLength(noInheritTags);
             }
             return finished;
         }
