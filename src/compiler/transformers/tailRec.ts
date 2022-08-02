@@ -197,7 +197,11 @@ namespace ts {
                                 statements.push(factory.createContinueStatement());
                                 return statements
                             } else {
-                                return node;
+                                return ts.visitEachChild(
+                                    node,
+                                    visitExpression(originalParamNames, paramNames, checker, factory, context),
+                                    context
+                                );
                             }
                         }
                         else {
