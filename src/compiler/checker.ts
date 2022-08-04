@@ -384,9 +384,6 @@ namespace ts {
         const indexAccessExpressionCache = new Map<Node, { signature: Signature, declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, definition: SourceFile, exportName: string }>();
         const inheritanceSymbolCache = new Map<Symbol, Set<Symbol>>()
         const tsPlusGlobalImportCache = new Map<string, TsPlusGlobalImport>()
-        const unificationInProgress = {
-            isRunning: false
-        };
         const tsPlusFiles = new Map<string, Set<SourceFile>>();
         const tsPlusFilesFinal = new Map<SourceFile, Set<SourceFile>>();
         // TSPLUS EXTENSION END
@@ -1618,7 +1615,7 @@ namespace ts {
         }
 
         const tupleTypes = new Map<string, GenericType>();
-        const unionTypes = new Map<string, UnionType>();
+        const unionTypes = new Map<string, Type>();
         const intersectionTypes = new Map<string, Type>();
         const stringLiteralTypes = new Map<string, StringLiteralType>();
         const numberLiteralTypes = new Map<number, NumberLiteralType>();
@@ -15696,6 +15693,7 @@ namespace ts {
             }
             return candidate;
         }
+
         function computeUnifiedType(unifier: FunctionDeclaration, union: Type) {
             for (const signature of getSignaturesOfType(getTypeOfNode(unifier), SignatureKind.Call)) {
                 if (signature.minArgumentCount === 1 && signature.typeParameters) {
@@ -15709,55 +15707,21 @@ namespace ts {
             }
             return errorType;
         }
-        function getUnionType(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type, forInference?: boolean): Type {
-            const unionType = getUnionTypeOriginal(types, unionReduction, aliasSymbol, aliasTypeArguments, origin);
-            if (types.length <= 1 || aliasSymbol || unificationInProgress.isRunning || forInference) {
-                return unionType;
+
+        function getUnifiedType(unionType: UnionType): Type {
+            let type = unionType.types[0];
+            while (type.flags & TypeFlags.Union) {
+                type = (type as UnionType).types[0];
             }
-            const seen = new Set<string | Symbol>()
-            for (let type of types) {
-                let tags = 0
-                const targetSymbol = type.symbol || type.aliasSymbol;
-                if (!seen.has(targetSymbol)) {
-                    seen.add(targetSymbol);
-                } else {
-                    break
-                }
-                for (let declaration of (targetSymbol?.declarations || [])) {
+            const targetSymbol = type.symbol || type.aliasSymbol;
+            if (targetSymbol) {
+                for (const declaration of (targetSymbol.declarations ?? [])) {
                     for (let target of collectTsPlusTypeTags(declaration)) {
-                        if (!seen.has(target)) {
-                            seen.add(target);
-                        } else {
-                            break
-                        }
-                        tags++;
                         const id = identityCache.get(target);
                         if (id) {
-                            unificationInProgress.isRunning = true;
-                            const result = computeUnifiedType(id, unionType);
-                            unificationInProgress.isRunning = false;
-                            if (!isErrorType(result)) {
-                                if (result.aliasTypeArguments && result.aliasSymbol) {
-                                    return getTypeAliasInstantiation(
-                                        result.aliasSymbol,
-                                        map(result.aliasTypeArguments, (type) => type.flags & TypeFlags.Union ? getUnionType((type as UnionType).types) : type)
-                                    );
-                                }
-                                if (result.flags & TypeFlags.Object && (result as ObjectType).objectFlags & ObjectFlags.Reference) {
-                                    const ref = result as TypeReference;
-                                    if (ref.resolvedTypeArguments) {
-                                        const newRef = cloneTypeReference(ref);
-                                        newRef.resolvedTypeArguments = map(ref.resolvedTypeArguments, (type) => type.flags & TypeFlags.Union ? getUnionType((type as UnionType).types) : type);
-                                        return newRef;
-                                    }
-                                }
-                                return result;
-                            }
+                            return computeUnifiedType(id, unionType);
                         }
                     }
-                }
-                if (tags === 0) {
-                    return unionType
                 }
             }
             return unionType;
@@ -15771,7 +15735,7 @@ namespace ts {
         // expression constructs such as array literals and the || and ?: operators). Named types can
         // circularly reference themselves and therefore cannot be subtype reduced during their declaration.
         // For example, "type Item = string | (() => Item" is a named type that circularly references itself.
-        function getUnionTypeOriginal(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type): Type {
+        function getUnionType(types: readonly Type[], unionReduction: UnionReduction = UnionReduction.Literal, aliasSymbol?: Symbol, aliasTypeArguments?: readonly Type[], origin?: Type): Type {
             if (types.length === 0) {
                 return neverType;
             }
@@ -15834,7 +15798,14 @@ namespace ts {
             }
             const objectFlags = (includes & TypeFlags.NotPrimitiveUnion ? 0 : ObjectFlags.PrimitiveUnion) |
                 (includes & TypeFlags.Intersection ? ObjectFlags.ContainsIntersections : 0);
-            return getUnionTypeFromSortedList(typeSet, objectFlags, aliasSymbol, aliasTypeArguments, origin);
+            
+            const union = getUnionTypeFromSortedList(typeSet, objectFlags, aliasSymbol, aliasTypeArguments, origin);
+
+            if (unionReduction === UnionReduction.Subtype && union.flags & TypeFlags.Union && !union.aliasSymbol && (union as UnionType).types.length > 1) {
+                return getUnifiedType(union as UnionType);
+            }
+
+            return union;
         }
 
         function getUnionOrIntersectionTypePredicate(signatures: readonly Signature[], kind: TypeFlags | undefined): TypePredicate | undefined {
@@ -15889,16 +15860,17 @@ namespace ts {
             const id = typeKey + getAliasId(aliasSymbol, aliasTypeArguments);
             let type = unionTypes.get(id);
             if (!type) {
-                type = createType(TypeFlags.Union) as UnionType;
-                type.objectFlags = objectFlags | getPropagatingFlagsOfTypes(types, /*excludeKinds*/ TypeFlags.Nullable);
-                type.types = types;
-                type.origin = origin;
-                type.aliasSymbol = aliasSymbol;
-                type.aliasTypeArguments = aliasTypeArguments;
+                const unionType = createType(TypeFlags.Union) as UnionType;
+                unionType.objectFlags = objectFlags | getPropagatingFlagsOfTypes(types, /*excludeKinds*/ TypeFlags.Nullable);
+                unionType.types = types;
+                unionType.origin = origin;
+                unionType.aliasSymbol = aliasSymbol;
+                unionType.aliasTypeArguments = aliasTypeArguments;
                 if (types.length === 2 && types[0].flags & TypeFlags.BooleanLiteral && types[1].flags & TypeFlags.BooleanLiteral) {
-                    type.flags |= TypeFlags.Boolean;
-                    (type as UnionType & IntrinsicType).intrinsicName = "boolean";
+                    unionType.flags |= TypeFlags.Boolean;
+                    (unionType as UnionType & IntrinsicType).intrinsicName = "boolean";
                 }
+                type = unionType;
                 unionTypes.set(id, type);
             }
             return type;
@@ -23534,7 +23506,7 @@ namespace ts {
                     if (targets.length === 0) {
                         return;
                     }
-                    target = getUnionType(targets, void 0, void 0, void 0, void 0, true);
+                    target = getUnionType(targets, void 0, void 0, void 0, void 0);
                     if (sources.length === 0) {
                         // All source constituents have been matched and there is nothing further to infer from.
                         // However, simply making no inferences is undesirable because it could ultimately mean
@@ -23544,7 +23516,7 @@ namespace ts {
                         inferWithPriority(source, target, InferencePriority.NakedTypeVariable);
                         return;
                     }
-                    source = getUnionType(sources, void 0, void 0, void 0, void 0, true);
+                    source = getUnionType(sources, void 0, void 0, void 0, void 0);
                 }
                 else if (target.flags & TypeFlags.Intersection && some((target as IntersectionType).types,
                     t => !!getInferenceInfoForType(t) || (isGenericMappedType(t) && !!getInferenceInfoForType(getHomomorphicTypeVariable(t) || neverType)))) {
@@ -47674,7 +47646,6 @@ namespace ts {
             inheritanceSymbolCache.clear();
             tsPlusWorldScope.implicits.clear();
             tsPlusWorldScope.rules.clear();
-            unificationInProgress.isRunning = false;
             tsPlusDebug && console.timeEnd("initTsPlusTypeChecker caches")
             tsPlusDebug && console.time("initTsPlusTypeChecker collect")
             for (const file of host.getSourceFiles()) {
