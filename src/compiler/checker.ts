@@ -1615,7 +1615,7 @@ namespace ts {
         }
 
         const tupleTypes = new Map<string, GenericType>();
-        const unionTypes = new Map<string, Type>();
+        const unionTypes = new Map<string, UnionType>();
         const intersectionTypes = new Map<string, Type>();
         const stringLiteralTypes = new Map<string, StringLiteralType>();
         const numberLiteralTypes = new Map<number, NumberLiteralType>();
@@ -15860,17 +15860,16 @@ namespace ts {
             const id = typeKey + getAliasId(aliasSymbol, aliasTypeArguments);
             let type = unionTypes.get(id);
             if (!type) {
-                const unionType = createType(TypeFlags.Union) as UnionType;
-                unionType.objectFlags = objectFlags | getPropagatingFlagsOfTypes(types, /*excludeKinds*/ TypeFlags.Nullable);
-                unionType.types = types;
-                unionType.origin = origin;
-                unionType.aliasSymbol = aliasSymbol;
-                unionType.aliasTypeArguments = aliasTypeArguments;
+                type = createType(TypeFlags.Union) as UnionType;
+                type.objectFlags = objectFlags | getPropagatingFlagsOfTypes(types, /*excludeKinds*/ TypeFlags.Nullable);
+                type.types = types;
+                type.origin = origin;
+                type.aliasSymbol = aliasSymbol;
+                type.aliasTypeArguments = aliasTypeArguments;
                 if (types.length === 2 && types[0].flags & TypeFlags.BooleanLiteral && types[1].flags & TypeFlags.BooleanLiteral) {
-                    unionType.flags |= TypeFlags.Boolean;
-                    (unionType as UnionType & IntrinsicType).intrinsicName = "boolean";
+                    type.flags |= TypeFlags.Boolean;
+                    (type as UnionType & IntrinsicType).intrinsicName = "boolean";
                 }
-                type = unionType;
                 unionTypes.set(id, type);
             }
             return type;
