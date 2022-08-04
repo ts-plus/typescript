@@ -15709,6 +15709,9 @@ namespace ts {
         }
 
         function getUnifiedType(unionType: UnionType): Type {
+            if (unionType.tsPlusUnified) {
+                return unionType;
+            }
             let type = unionType.types[0];
             while (type.flags & TypeFlags.Union) {
                 type = (type as UnionType).types[0];
@@ -15724,6 +15727,7 @@ namespace ts {
                     }
                 }
             }
+            unionType.tsPlusUnified = true;
             return unionType;
         }
         // TSPLUS EXTENSION END
@@ -34187,7 +34191,10 @@ namespace ts {
             return errorType;
         }
         function checkCallExpression(node: CallExpression | NewExpression, checkMode?: CheckMode): Type {
-            const checked = checkCallExpressionOriginal(node, checkMode);
+            let checked = checkCallExpressionOriginal(node, checkMode);
+            if ((checked.flags & TypeFlags.Union) && !checked.aliasSymbol) {
+                checked = getUnifiedType(checked as UnionType);
+            }
             if (isTsPlusMacroCall(node, "Bind") && !isErrorType(checked)) {
                 return tsPlusDoCheckBind(node, checked);
             }

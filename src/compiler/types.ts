@@ -5936,6 +5936,9 @@ namespace ts {
         immediateBaseConstraint?: Type;  // Immediate base constraint cache
         /* @internal */
         widened?: Type; // Cached widened form of the type
+        // TSPLUS BEGIN
+        tsPlusUnified?: boolean
+        // TSPLUS END
     }
 
     /* @internal */
