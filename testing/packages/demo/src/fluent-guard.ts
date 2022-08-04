@@ -7,7 +7,6 @@ if (either.isLeft()) {
     console.log(x)
 }
 
-
 if (either.isRight()) {
     const x: number = either.right
     console.log(x)

@@ -5,6 +5,9 @@ export interface Nothing {
     readonly _tag: "Nothing"
 }
 
+/**
+ * @tsplus type Just
+ */
 export interface Just<A> {
     readonly _tag: "Just"
     readonly value: A
@@ -24,6 +27,8 @@ export const Maybe: MaybeOps = {}
 
 /**
  * @tsplus unify Maybe
+ * @tsplus unify Nothing
+ * @tsplus unify Just
  */
 export function unifyMaybe<X extends Maybe<any>>(self: X): Maybe<
     [X] extends [Maybe<infer A>] ? A : never
