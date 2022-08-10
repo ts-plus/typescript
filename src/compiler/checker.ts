@@ -15805,7 +15805,7 @@ namespace ts {
             
             const union = getUnionTypeFromSortedList(typeSet, objectFlags, aliasSymbol, aliasTypeArguments, origin);
 
-            if (unionReduction === UnionReduction.Subtype && union.flags & TypeFlags.Union && !union.aliasSymbol && (union as UnionType).types.length > 1) {
+            if (union.flags & TypeFlags.Union && !union.aliasSymbol && (union as UnionType).types.length > 1) {
                 return getUnifiedType(union as UnionType);
             }
 
