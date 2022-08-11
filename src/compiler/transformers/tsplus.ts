@@ -614,7 +614,6 @@ namespace ts {
                                 statement.declarationList.declarations.length === 1 &&
                                 statement.declarationList.declarations[0].initializer &&
                                 statement.declarationList.declarations[0].name &&
-                                isIdentifier(statement.declarationList.declarations[0].name) &&
                                 isCallExpression(statement.declarationList.declarations[0].initializer)
                             ) {
                                 if (isLast) {

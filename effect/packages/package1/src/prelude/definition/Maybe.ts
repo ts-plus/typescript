@@ -23,7 +23,7 @@ export type Maybe<A> = Nothing | Just<A>;
 /**
  * @tsplus type MaybeOps
  */
-export interface MaybeOps {}
+export interface MaybeOps { }
 
 export const Maybe: MaybeOps = {};
 
@@ -143,4 +143,9 @@ export const useDo = Do(($) => {
   const x = $(Maybe.just(0));
   const y = $(Maybe.just(1));
   return x + y;
+});
+
+export const useDoDestructure = Do(($) => {
+  const { x } = $(Maybe.just({ x: 0 }));
+  return x;
 });
