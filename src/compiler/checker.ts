@@ -37458,8 +37458,8 @@ namespace ts {
                             undefined
                         );
                         if (diagnostics) {
-                            const leftParam = getTypeAtPosition(signature, 0);
-                            const rightParam = getTypeAtPosition(signature, 1);
+                            const leftParam = getTypeAtPosition(instantiated, 0);
+                            const rightParam = getTypeAtPosition(instantiated, 1);
                             resolutionDiagnostics.set(signature, () => {
                                 const diags: Diagnostic[] = [];
                                 if (!isTypeAssignableTo(rightType, rightParam)) {
