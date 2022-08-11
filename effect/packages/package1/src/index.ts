@@ -174,3 +174,6 @@ const zzz2 = Effect.succeed(() => zzz);
 const zzz3 = Effect.succeed(zzz);
 
 Effect.do.bind("0", () => Effect(0)).bind("1", () => Effect(1));
+
+// @ts-expect-error
+export const x3 = Effect.succeed(0) | 0

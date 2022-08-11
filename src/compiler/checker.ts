@@ -37424,8 +37424,8 @@ namespace ts {
                         links.isTsPlusOperatorToken = true;
                         const diagnosticsForSignature = resolutionDiagnostics.get(lastSignature);
                         if (diagnosticsForSignature) {
-                            links.resolvedSignature = undefined;
                             diagnosticsForSignature().forEach((diagnostic) => diagnostics.add(diagnostic));
+                            links.resolvedSignature = undefined;
                         }
                         return [errorType, errorType] as const;
                     }
@@ -37458,20 +37458,20 @@ namespace ts {
                             undefined
                         );
                         if (diagnostics) {
+                            const leftParam = getTypeAtPosition(signature, 0);
+                            const rightParam = getTypeAtPosition(signature, 1);
                             resolutionDiagnostics.set(signature, () => {
-                                const diags = getSignatureApplicabilityError(
-                                    undefined,
-                                    [left, right],
-                                    instantiated,
-                                    assignableRelation,
-                                    CheckMode.Normal,
-                                    true,
-                                    undefined
-                                );
-                                if (diags) {
-                                    return diags;
+                                const diags: Diagnostic[] = [];
+                                if (!isTypeAssignableTo(rightType, rightParam)) {
+                                    diags.push(error(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightParam)));
                                 }
-                                Debug.fail("Diagnostics not found")
+                                if (!isTypeAssignableTo(leftType, leftParam)) {
+                                    diags.push(error(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightParam)));
+                                }
+                                if (diags.length === 0) {
+                                    Debug.fail("Cannot find diagnostics");
+                                }
+                                return diags;
                             });
                         } else {
                             return instantiated;
@@ -37489,19 +37489,21 @@ namespace ts {
                         );
                         if (diagnostics) {
                             resolutionDiagnostics.set(signature, () => {
-                                const diags = getSignatureApplicabilityError(
-                                    undefined,
-                                    [left, right],
-                                    signature,
-                                    assignableRelation,
-                                    CheckMode.Normal,
-                                    true,
-                                    undefined
-                                );
-                                if (diags) {
-                                    return diags;
+                                const diags: Diagnostic[] = [];
+                                const leftParam = getTypeAtPosition(signature, 0);
+                                const rightParam = getTypeAtPosition(signature, 1);
+                                const leftType = getTypeOfNode(left);
+                                const rightType = getTypeOfNode(right);
+                                if (!isTypeAssignableTo(rightType, rightParam)) {
+                                    diags.push(error(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightParam)));
                                 }
-                                Debug.fail("Diagnostics not found")
+                                if (!isTypeAssignableTo(leftType, leftParam)) {
+                                    diags.push(error(right, Diagnostics.Type_0_is_not_assignable_to_type_1, typeToString(rightType), typeToString(rightParam)));
+                                }
+                                if (diags.length === 0) {
+                                    Debug.fail("Cannot find diagnostics");
+                                }
+                                return diags;
                             });
                         } else {
                             return signature;
