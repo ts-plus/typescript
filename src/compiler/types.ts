@@ -6752,6 +6752,11 @@ namespace ts {
         name: string;
     }
 
+    export interface TransformerImport {
+        name: string
+        position?: "after" | "afterDeclaration"
+    }
+
     export interface ProjectReference {
         /** A normalized path on disk */
         path: string;
@@ -6786,7 +6791,7 @@ namespace ts {
         FixedChunkSize,
     }
 
-    export type CompilerOptionsValue = string | number | boolean | (string | number)[] | string[] | MapLike<string[]> | PluginImport[] | ProjectReference[] | null | undefined;
+    export type CompilerOptionsValue = string | number | boolean | (string | number)[] | string[] | MapLike<string[]> | PluginImport[] | ProjectReference[] | TransformerImport[] | null | undefined;
 
     export interface CompilerOptions {
         /*@internal*/ all?: boolean;
@@ -6920,6 +6925,7 @@ namespace ts {
 
         tsPlusConfig?: string
         tsPlusEnabled?: boolean
+        transformers?: TransformerImport[];
     }
 
     export interface WatchOptions {

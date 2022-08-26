@@ -207,6 +207,15 @@ namespace ts {
             type: "string"
         },
         {
+            name: "transformers",
+            type: "list",
+            isTSConfigOnly: true,
+            element: {
+                name: "transformer",
+                type: "object"
+            },
+        },
+        {
             name: "tsPlusEnabled",
             type: "boolean",
             defaultValueDescription: true,
