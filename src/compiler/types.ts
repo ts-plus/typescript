@@ -6751,7 +6751,7 @@ namespace ts {
 
     export interface TransformerImport {
         name: string
-        position?: "after" | "afterDeclaration"
+        position?: "before" | "after" | "afterDeclaration"
     }
 
     export interface ProjectReference {
