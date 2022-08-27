@@ -4973,6 +4973,7 @@ namespace ts {
         /* @internal */ getTypeOnlyAliasDeclaration(symbol: Symbol): TypeOnlyAliasDeclaration | undefined;
         /* @internal */ getMemberOverrideModifierStatus(node: ClassLikeDeclaration, member: ClassElement): MemberOverrideStatus;
 
+        // TSPLUS START
         getExtensions(selfNode: Expression): ESMap<string, Symbol>
         getFluentExtension(target: Type, name: string): Type | undefined
         getGetterExtension(target: Type, name: string): { definition: SourceFile, exportName: string } | undefined
@@ -4984,7 +4985,7 @@ namespace ts {
         isTailRec(node: Node): boolean
         cloneSymbol(symbol: Symbol): Symbol
         getTextOfBinaryOp(kind: SyntaxKind): string | undefined
-        getInstantiatedTsPlusSignature(declaration: Declaration, args: Expression[], checkMode: CheckMode | undefined): Signature
+        /* @internal */ getInstantiatedTsPlusSignature(declaration: Declaration, args: Expression[], checkMode: CheckMode | undefined): Signature
         getIndexAccessExpressionCache(): ESMap<Node, { signature: Signature, declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, definition: SourceFile, exportName: string }>
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isTsPlusMacroGetter(node: Node, macro: string): boolean
@@ -4995,7 +4996,6 @@ namespace ts {
         getPrimitiveTypeName(type: Type): string | undefined
         getResolvedOperator(node: BinaryExpression): Signature | undefined
         getNodeLinks(node: Node): NodeLinks
-        // TSPLUS START
         getTsPlusFiles(): ESMap<SourceFile, Set<SourceFile>>
         getTsPlusGlobalImports(): ESMap<string, TsPlusGlobalImport>
         collectTsPlusMacroTags(statement: Declaration): readonly string[]
@@ -5601,7 +5601,6 @@ namespace ts {
         Partial = ReadPartial | WritePartial
     }
 
-    /* @internal */
     export interface TransientSymbol extends Symbol, SymbolLinks {
         checkFlags: CheckFlags;
     }
@@ -5667,7 +5666,6 @@ namespace ts {
         symbol: Symbol;
     }
 
-    /* @internal */
     export const enum NodeCheckFlags {
         TypeChecked                              = 0x00000001,  // Node has been type checked
         LexicalThis                              = 0x00000002,  // Lexical 'this' reference
@@ -5701,7 +5699,6 @@ namespace ts {
         paramActions: string[]
     }
 
-    /* @internal */
     export interface NodeLinks {
         flags: NodeCheckFlags;              // Set of flags specific to Node
         resolvedType?: Type;                // Cached type of type node
