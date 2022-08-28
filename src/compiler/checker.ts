@@ -46660,7 +46660,7 @@ namespace ts {
                     return [dataFirstType, tsPlusSignatures];
                 }
             }
-            else if (every(signatures, (sig) => !!sig.declaration && !!sig.declaration.type && isFunctionTypeNode(sig.declaration.type) && sig.declaration.type.parameters.length === 1)) {
+            if (every(signatures, (sig) => !!sig.declaration && !!sig.declaration.type && isFunctionTypeNode(sig.declaration.type) && sig.declaration.type.parameters.length === 1)) {
                 const tsPlusSignatures = flatMap(signatures, (sig) => {
                     const returnType = getReturnTypeOfSignature(sig);
                     const returnTypeNode = sig.declaration!.type! as FunctionTypeNode;
@@ -46798,11 +46798,14 @@ namespace ts {
                     return [dataFirstType, tsPlusSignatures];
                 }
             }
-            else if (every(signatures, (sig) =>
-                !!sig.declaration &&
-                !!sig.declaration.type &&
-                isFunctionTypeNode(sig.declaration.type) &&
-                sig.declaration.type.parameters.length === 1)) {
+            if (pipeable.type &&
+                every(signatures, (sig) =>
+                    !!sig.declaration &&
+                    !!sig.declaration.type &&
+                    isFunctionTypeNode(sig.declaration.type) &&
+                    sig.declaration.type.parameters.length === 1)
+                ) {
+                const pipeableWithType = pipeable as VariableDeclarationWithFunctionType
                 if (signatures.find(isPipeableSelfARestParameter)) {
                     error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                     return;
@@ -46818,9 +46821,9 @@ namespace ts {
                         newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
                         newSig.minArgumentCount = newSig.minArgumentCount + 1;
                         const newDecl = factory.updateFunctionTypeNode(
-                            pipeable.type,
-                            factory.createNodeArray([...(returnFn.typeParameters ?? []), ...(pipeable.type.typeParameters ?? [])]),
-                            factory.createNodeArray([...returnFn.parameters, ...pipeable.type.parameters]),
+                            pipeableWithType.type,
+                            factory.createNodeArray([...(returnFn.typeParameters ?? []), ...(pipeableWithType.type.typeParameters ?? [])]),
+                            factory.createNodeArray([...returnFn.parameters, ...pipeableWithType.type.parameters]),
                             returnFn.type
                         );
                         newDecl.jsDoc = pipeable.jsDoc;
