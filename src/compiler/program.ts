@@ -2113,7 +2113,7 @@ namespace ts {
                     // @ts-expect-error
                     global['ts-plus'].resolvingTransformer = false;
                     requireStack.pop();
-                    const factoryModule = (typeof commonJsModule === 'function' ? {default: commonJsModule} : commonJsModule);
+                    const factoryModule = (typeof commonJsModule === 'function' ? { default: commonJsModule } : commonJsModule);
                     const factory = factoryModule.default;
                     if (!factory) {
                         throw new Error(`tsconfig.json > transformers: "${entry.name}" does not have export "default": ` + require("util").inspect(factoryModule));
@@ -2121,7 +2121,7 @@ namespace ts {
                     if (typeof factory !== "function") {
                         throw new Error(`tsconfig.json > transformers: "${entry.name} export "default" is not a plugin: ` + require("util").inspect(factory));
                     }
-                    const transformer = factory(program, cleanConfig);
+                    const transformer: ExternalTransformers = factory(program, cleanConfig);
                     if (typeof transformer === "function") {
                         if (position && position === 'after') {
                             afterTransformers.push(transformer);
@@ -2133,9 +2133,9 @@ namespace ts {
                             beforeTransformers.push(transformer);
                         }
                     } else {
-                        transformer.before && beforeTransformers.push(transformer.before);
-                        transformer.after && afterTransformers.push(transformer.after);
-                        transformer.afterDeclarations && afterDeclarationsTransformers.push(transformer.afterDeclarations);
+                        transformer.before && beforeTransformers.push(...toArray(transformer.before));
+                        transformer.after && afterTransformers.push(...toArray(transformer.after));
+                        transformer.afterDeclarations && afterDeclarationsTransformers.push(...toArray(transformer.afterDeclarations));
                     }
                 }
             }

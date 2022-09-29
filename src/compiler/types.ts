@@ -4859,6 +4859,18 @@ namespace ts {
         afterDeclarations?: (TransformerFactory<Bundle | SourceFile> | CustomTransformerFactory)[];
     }
 
+    // TSPLUS START
+    export type ExternalTransformers =
+        | TransformerFactory<SourceFile>
+        | ExternalCustomTransformers
+
+    export interface ExternalCustomTransformers {
+        before?: TransformerFactory<SourceFile>[] | TransformerFactory<SourceFile>;
+        after?: TransformerFactory<SourceFile>[] | TransformerFactory<SourceFile>;
+        afterDeclarations?: TransformerFactory<Bundle | SourceFile>[] | TransformerFactory<Bundle | SourceFile>
+    }
+    // TSPLUS END
+
     /*@internal*/
     export interface EmitTransformers {
         scriptTransformers: readonly TransformerFactory<SourceFile | Bundle>[];
