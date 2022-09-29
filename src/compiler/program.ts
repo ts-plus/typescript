@@ -2133,17 +2133,32 @@ namespace ts {
                             beforeTransformers.push(transformer);
                         }
                     } else {
-                        beforeTransformers.push(...transformer.before);
-                        afterTransformers.push(...transformer.after);
-                        afterDeclarationsTransformers.push(...transformer.afterDeclarations);
+                        transformer.before && beforeTransformers.push(transformer.before);
+                        transformer.after && afterTransformers.push(transformer.after);
+                        transformer.afterDeclarations && afterDeclarationsTransformers.push(transformer.afterDeclarations);
                     }
                 }
             }
 
+            customTransformers = {
+                before: [
+                    ...(customTransformers?.before ?? []),
+                    ...beforeTransformers
+                ],
+                after: [
+                    ...(customTransformers?.after ?? []),
+                    ...afterTransformers
+                ],
+                afterDeclarations: [
+                    ...(customTransformers?.afterDeclarations ?? []),
+                    ...afterDeclarationsTransformers
+                ]
+            }
+
             const emitTransformers = getTransformers(options, customTransformers, emitOnlyDtsFiles);
             const patchedTransformers: EmitTransformers = {
-                scriptTransformers: [...beforeTransformers, transformTsPlus(checker, options, host), transformTailRec(checker, options, host), ...emitTransformers.scriptTransformers, ...afterTransformers],
-                declarationTransformers: [transformTsPlusDeclaration(checker, options, host), ...emitTransformers.declarationTransformers, ...afterDeclarationsTransformers]
+                scriptTransformers: [transformTsPlus(checker, options, host), transformTailRec(checker, options, host), ...emitTransformers.scriptTransformers],
+                declarationTransformers: [transformTsPlusDeclaration(checker, options, host), ...emitTransformers.declarationTransformers]
             }
             const emitResult = emitFiles(
                 emitResolver,
