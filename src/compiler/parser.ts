@@ -1411,6 +1411,9 @@ namespace ts {
                     if (isClassDeclaration(statement) && statement.tsPlusCompanionTags && statement.tsPlusCompanionTags.length > 0) {
                         file.tsPlusContext.companion.push(statement);
                     }
+                    if (isClassDeclaration(statement) && statement.name && statement.tsPlusStaticTags && statement.tsPlusStaticTags.length > 0) {
+                        file.tsPlusContext.static.push(statement as ClassDeclarationWithIdentifier);
+                    }
                 }
                 if(
                     (isVariableStatement(statement) || isFunctionDeclaration(statement) || isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement) || isClassDeclaration(statement)) &&
@@ -7800,13 +7803,14 @@ namespace ts {
                 if (finished.jsDoc) {
                     const typeTags: string[] = [];
                     const companionTags: string[] = [];
+                    const staticTags: TsPlusExtensionTag[] = [];
                     const deriveTags: string[] = [];
                     const noInheritTags: string[] = [];
                     for (const doc of finished.jsDoc) {
                         if (doc.tags) {
                             for (const tag of doc.tags) {
                                 if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
-                                    const [tagName, target] = tag.comment.split(" ");
+                                    const [tagName, target, name] = tag.comment.split(" ");
                                     switch (tagName) {
                                         case "type": {
                                             if (!target) {
@@ -7823,6 +7827,14 @@ namespace ts {
                                             }
                                             companionTags.push(target);
                                             break;
+                                        }
+                                        case "static": {
+                                            if (!target || !name) {
+                                                parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_static_extension_must_have_the_form_tsplus_static_typename_name);
+                                                break;
+                                            }
+                                            staticTags.push({ tagType: tagName, target, name });
+                                            break
                                         }
                                         case "derive": {
                                             if (!target || target !== "nominal") {
@@ -7847,6 +7859,7 @@ namespace ts {
                     }
                     (finished as Mutable<ClassDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
                     (finished as Mutable<ClassDeclaration>).tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
+                    (finished as Mutable<ClassDeclaration>).tsPlusStaticTags = undefinedIfZeroLength(staticTags);
                     (finished as Mutable<ClassDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
                     (finished as Mutable<ClassDeclaration>).tsPlusNoInheritTags = undefinedIfZeroLength(noInheritTags);
                 }

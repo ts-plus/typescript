@@ -5796,13 +5796,21 @@ namespace ts {
 
         // TSPLUS EXTENSION START
         function isClassCompanionReference(node: Expression | QualifiedName): boolean {
+            let type: Type | undefined
+
             const symbol = getSymbolAtLocation(node);
             if (symbol) {
-                const type = getTypeOfSymbol(symbol);
-                // test if type is a constructor object
-                return !!(getObjectFlags(type) & ObjectFlags.Anonymous && type.symbol && type.symbol.flags & SymbolFlags.Class);
+                type = getTypeOfSymbol(symbol);
             }
-            return false;
+            else {
+                type = getNodeLinks(node).tsPlusResolvedType;
+            }
+
+            if (!type) {
+                return false
+            }
+
+            return !!(getObjectFlags(type) & ObjectFlags.Anonymous && type.symbol && type.symbol.flags & SymbolFlags.Class);
         }
         // TSPLUS EXTENSION END
 
@@ -46773,7 +46781,7 @@ namespace ts {
             return [];
         }
         function collectTsPlusStaticTags(declaration: Node) {
-            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration)) {
+            if (isVariableDeclaration(declaration) || isFunctionDeclaration(declaration) || isClassDeclaration(declaration)) {
                 return declaration.tsPlusStaticTags || [];
             }
             return [];
@@ -46862,23 +46870,36 @@ namespace ts {
             symbol.tsPlusDeclaration = declaration;
             return symbol;
         }
-        function createTsPlusStaticValueSymbol(name: string, declaration: VariableDeclaration, originalSymbol: Symbol): Symbol {
+        function createTsPlusStaticValueSymbol(name: string, declaration: VariableDeclaration | ClassDeclaration, originalSymbol: Symbol): Symbol {
             const symbol = cloneSymbol(originalSymbol) as TsPlusStaticValueSymbol;
             symbol.tsPlusTag = TsPlusSymbolTag.StaticValue;
             symbol.tsPlusResolvedSignatures = [];
             symbol.tsPlusName = name;
-            symbol.tsPlusDeclaration = declaration as VariableDeclaration & { name: Identifier };
+            symbol.tsPlusDeclaration = declaration as (VariableDeclaration | ClassDeclaration) & { name: Identifier };
             symbol.escapedName = name as __String;
-            const patchedDeclaration = factory.updateVariableDeclaration(
-                declaration,
-                factory.createIdentifier(name),
-                declaration.exclamationToken,
-                declaration.type,
-                declaration.initializer
-            );
+            let patchedDeclaration: VariableDeclaration | ClassDeclaration
+            if (isVariableDeclaration(declaration)) {
+                patchedDeclaration = factory.updateVariableDeclaration(
+                    declaration,
+                    factory.createIdentifier(name),
+                    declaration.exclamationToken,
+                    declaration.type,
+                    declaration.initializer
+                );
+            }
+            else {
+                patchedDeclaration = factory.updateClassDeclaration(
+                    declaration,
+                    declaration.modifiers,
+                    factory.createIdentifier(name),
+                    declaration.typeParameters,
+                    declaration.heritageClauses,
+                    declaration.members
+                )
+            }
             setParent(patchedDeclaration, declaration.parent);
-            setParent(patchedDeclaration.name, patchedDeclaration)
-            patchedDeclaration.name.tsPlusName = name;
+            setParent(patchedDeclaration.name!, patchedDeclaration)
+            patchedDeclaration.name!.tsPlusName = name;
             symbol.declarations = [patchedDeclaration];
             patchedDeclaration.jsDoc = getJSDocCommentsAndTags(declaration) as JSDoc[];
 
@@ -47356,7 +47377,7 @@ namespace ts {
                 }
             }
         }
-        function cacheTsPlusStaticVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
+        function cacheTsPlusStaticVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier | ClassDeclarationWithIdentifier) {
             const staticTags = collectTsPlusStaticTags(declaration);
             if (staticTags.length > 0) {
                 const symbol = getSymbolAtLocation(declaration.name);
@@ -48047,9 +48068,16 @@ namespace ts {
                             staticValueCache.set(target, new Map());
                         }
                         const resolvedMap = staticValueCache.get(typeName)!;
-                        const nameSymbol = getSymbolAtLocation(declaration.name);
+                        const nameSymbol = getSymbolAtLocation(declaration.name!);
                         if (nameSymbol) {
                             const patched = createTsPlusStaticValueSymbol(name, declaration, nameSymbol);
+                            if (isClassDeclaration(declaration)) {
+                                const companionTags = collectTsPlusCompanionTags(declaration);
+                                for (const companionTag of companionTags) {
+                                    getTsPlusSourceFileCache(companionTag).add(getSourceFileOfNode(declaration));
+                                    addToCompanionSymbolCache(patched, companionTag);
+                                }
+                            }
                             const type = getTypeOfSymbol(patched);
                             // @ts-expect-error
                             type.tsPlusSymbol = patched;

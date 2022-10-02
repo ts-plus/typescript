@@ -1092,6 +1092,41 @@ namespace ts {
                         }
                         return node;
                     }
+                    case SyntaxKind.ClassDeclaration: {
+                        const classDeclaration = node as ClassDeclaration;
+                        if (classDeclaration.name) {
+                            const name = classDeclaration.name.escapedText.toString()
+                            if (sourceFileUniqueNames.has(name)) {
+                                const uniqueName = sourceFileUniqueNames.get(name)!;
+                                const updated: Node[] = [
+                                    context.factory.updateClassDeclaration(
+                                        classDeclaration,
+                                        filter((node as ClassDeclaration).modifiers, (mod) => mod.kind !== SyntaxKind.ExportKeyword),
+                                        uniqueName.name,
+                                        classDeclaration.typeParameters,
+                                        classDeclaration.heritageClauses,
+                                        classDeclaration.members
+                                    ),
+                                    context.factory.createAssignment(
+                                        context.factory.createPropertyAccessExpression(context.factory.createPropertyAccessExpression(uniqueName.name, context.factory.createIdentifier("constructor")), context.factory.createIdentifier('name')),
+                                        context.factory.createStringLiteral(name)
+                                    )
+                                ]
+                                if (uniqueName.isExported) {
+                                    updated.push(
+                                        context.factory.createVariableStatement(
+                                            [context.factory.createModifier(SyntaxKind.ExportKeyword), context.factory.createModifier(SyntaxKind.ConstKeyword)],
+                                            context.factory.createVariableDeclarationList([
+                                                context.factory.createVariableDeclaration(classDeclaration.name, undefined, undefined, uniqueName.name)
+                                            ], NodeFlags.Const)
+                                        )
+                                    );
+                                }
+                                return updated;
+                            }
+                        }
+                        return node;
+                    }
                     default: {
                         return node;
                     }

@@ -3292,6 +3292,7 @@ namespace ts {
         // TSPLUS START
         readonly tsPlusTypeTags?: string[];
         readonly tsPlusCompanionTags?: string[];
+        readonly tsPlusStaticTags?: TsPlusExtensionTag[];
         readonly tsPlusDeriveTags?: string[];
         readonly tsPlusNoInheritTags?: string[];
         // TSPLUS END
@@ -3856,6 +3857,8 @@ namespace ts {
 
     export type VariableDeclarationWithIdentifier = VariableDeclaration & { name: Identifier };
 
+    export type ClassDeclarationWithIdentifier = ClassDeclaration & { name: Identifier };
+
     export interface TsPlusUnresolvedStaticSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.UnresolvedStatic
         tsPlusDeclaration: VariableDeclaration
@@ -3873,7 +3876,7 @@ namespace ts {
         tsPlusTag: TsPlusSymbolTag.StaticValue;
         tsPlusResolvedSignatures: TsPlusSignature[];
         tsPlusName: string;
-        tsPlusDeclaration: VariableDeclaration & { name: Identifier };
+        tsPlusDeclaration: (VariableDeclaration | ClassDeclaration) & { name: Identifier };
     }
 
     export interface TsPlusGetterSymbol extends TransientSymbol {
@@ -3917,7 +3920,7 @@ namespace ts {
 
     export interface TsPlusUnresolvedStaticExtension {
         symbol: Symbol;
-        declaration: VariableDeclaration;
+        declaration: VariableDeclaration | ClassDeclaration;
         definition: SourceFile;
         target: string;
         name: string;
@@ -4429,7 +4432,7 @@ namespace ts {
             pipeable: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             operator: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             pipeableOperator: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
-            static: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
+            static: (VariableDeclarationWithIdentifier | FunctionDeclaration | ClassDeclarationWithIdentifier)[];
             getter: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             unify: FunctionDeclaration[];
             index: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
