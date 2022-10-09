@@ -32907,6 +32907,7 @@ namespace ts {
                                     (s as TsPlusSignature).tsPlusFile
                                 );
                                 sig.tsPlusDeclaration = (s as TsPlusSignature).tsPlusDeclaration;
+                                sig.tsPlusPipeable = (s as TsPlusSignature).tsPlusPipeable;
                                 return sig;
                             }));
                             getNodeLinks(node).isFluentCall = true;
