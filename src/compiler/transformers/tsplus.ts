@@ -1,16 +1,22 @@
 /*@internal*/
 namespace ts {
     class TsPlusImporter {
-        readonly imports: ESMap<string, Identifier> = new Map();
+        readonly imports: ESMap<string, { name: Identifier, exists: boolean }> = new Map();
+
         readonly refCount: ESMap<string, number> = new Map();
         constructor(readonly factory: NodeFactory) { }
 
+        add(name: Identifier, path: string): void {
+            this.imports.set(path, { name, exists: true })
+            this.refCount.set(path, Infinity)
+        }
+
         get(path: string): Identifier {
             if (!this.imports.has(path)) {
-                this.imports.set(path, this.factory.createUniqueName("tsplus_module"));
+                this.imports.set(path, { name: this.factory.createUniqueName("tsplus_module"), exists: false });
             }
             this.refCount.set(path, (this.refCount.get(path) ?? 0) + 1);
-            return this.imports.get(path)!;
+            return this.imports.get(path)!.name;
         }
 
         remove(path: string): void {
@@ -88,19 +94,21 @@ namespace ts {
                 sourceFileUniqueNames.clear();
 
                 const imports: Statement[] = []
-                importer.imports.forEach((id, path) => {
-                    imports.push(
-                        factory.createImportDeclaration(
-                            undefined,
-                            factory.createImportClause(
-                                false,
+                importer.imports.forEach(({ name, exists }, path) => {
+                    if (!exists) {
+                        imports.push(
+                            factory.createImportDeclaration(
                                 undefined,
-                                factory.createNamespaceImport(id)
-                            ),
-                            factory.createStringLiteral(path),
-                            undefined
-                        )
-                    );
+                                factory.createImportClause(
+                                    false,
+                                    undefined,
+                                    factory.createNamespaceImport(name)
+                                ),
+                                factory.createStringLiteral(path),
+                                undefined
+                            )
+                        );
+                    }
                 })
                 const fileVarDef = fileVarUsed ? [
                     context.factory.createVariableStatement(
@@ -158,6 +166,8 @@ namespace ts {
                             return visitIdentifier(source, traceInScope, node as Identifier, context);
                         case SyntaxKind.Block:
                             return visitBlock(node as Block, visitor(source, traceInScope), context);
+                        case SyntaxKind.ImportDeclaration:
+                            return visitImportDeclaration(node as ImportDeclaration)
                         default:
                             return visitEachChild(node, visitor(source, traceInScope), context);
                     }
@@ -214,6 +224,12 @@ namespace ts {
                     )
                 }
                 return visitEachChild(node, visitor, context);
+            }
+            function visitImportDeclaration(node: ImportDeclaration) {
+                if (node.importClause && node.importClause.namedBindings && isNamespaceImport(node.importClause.namedBindings) && isStringLiteral(node.moduleSpecifier)) {
+                    importer.add(node.importClause.namedBindings.name, node.moduleSpecifier.text)
+                }
+                return node
             }
             function isExtension(node: Node): boolean {
                 const extensionRegex = /^(static|fluent|getter|operator|index|pipeable).*/;

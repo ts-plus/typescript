@@ -1496,6 +1496,17 @@ namespace ts.Completions {
                 // module imports then the global keywords will be filtered out so auto
                 // import suggestions will win in the completion
                 const symbolOrigin = skipAlias(symbol, typeChecker);
+
+                // TSPLUS EXTENSION START
+                const isCompanion = !!find(
+                    [...symbol.declarations ?? [], ...symbolOrigin.declarations ?? []],
+                    (decl) => (isInterfaceDeclaration(decl) || isTypeAliasDeclaration(decl) || isClassDeclaration(decl)) && !!decl.tsPlusCompanionTags && decl.tsPlusCompanionTags.length > 0
+                )
+                if (isCompanion) {
+                    return true;
+                }
+                // TSPLUS EXTENSION END
+
                 // We only want to filter out the global keywords
                 // Auto Imports are not available for scripts so this conditional is always false
                 if (!!sourceFile.externalModuleIndicator

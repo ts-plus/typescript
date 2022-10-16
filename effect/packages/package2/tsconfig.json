@@ -6,7 +6,10 @@
     "declarationDir": "build/dts",
     "tsPlusConfig": "../../tsplus.config.json",
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "tsPlusTypes": [
+      "./fp-ts__core.json"
+    ]
   },
   "include": ["src/**/*.ts"]
 }

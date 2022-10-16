@@ -1030,7 +1030,7 @@ namespace ts {
             else if (this.currentFileVersion !== version) {
                 // This is the same file, just a newer version. Incrementally parse the file.
                 const editRange = scriptSnapshot.getChangeRange(this.currentFileScriptSnapshot!);
-                sourceFile = updateLanguageServiceSourceFile(this.currentSourceFile!, scriptSnapshot, version, editRange);
+                sourceFile = updateLanguageServiceSourceFile(this.currentSourceFile!, scriptSnapshot, version, editRange, undefined, this.host.getCompilationSettings());
             }
 
             if (sourceFile) {
@@ -1050,13 +1050,13 @@ namespace ts {
         sourceFile.scriptSnapshot = scriptSnapshot;
     }
 
-    export function createLanguageServiceSourceFile(fileName: string, scriptSnapshot: IScriptSnapshot, scriptTargetOrOptions: ScriptTarget | CreateSourceFileOptions, version: string, setNodeParents: boolean, scriptKind?: ScriptKind): SourceFile {
-        const sourceFile = createSourceFile(fileName, getSnapshotText(scriptSnapshot), scriptTargetOrOptions, setNodeParents, scriptKind);
+    export function createLanguageServiceSourceFile(fileName: string, scriptSnapshot: IScriptSnapshot, scriptTargetOrOptions: ScriptTarget | CreateSourceFileOptions, version: string, setNodeParents: boolean, scriptKind?: ScriptKind, compilerOptions?: CompilerOptions): SourceFile {
+        const sourceFile = createSourceFile(fileName, getSnapshotText(scriptSnapshot), scriptTargetOrOptions, setNodeParents, scriptKind, compilerOptions);
         setSourceFileFields(sourceFile, scriptSnapshot, version);
         return sourceFile;
     }
 
-    export function updateLanguageServiceSourceFile(sourceFile: SourceFile, scriptSnapshot: IScriptSnapshot, version: string, textChangeRange: TextChangeRange | undefined, aggressiveChecks?: boolean): SourceFile {
+    export function updateLanguageServiceSourceFile(sourceFile: SourceFile, scriptSnapshot: IScriptSnapshot, version: string, textChangeRange: TextChangeRange | undefined, aggressiveChecks?: boolean, compilerOptions?: CompilerOptions): SourceFile {
         // If we were given a text change range, and our version or open-ness changed, then
         // incrementally parse this file.
         if (textChangeRange) {
@@ -1088,7 +1088,7 @@ namespace ts {
                             : (changedText + suffix);
                 }
 
-                const newSourceFile = updateSourceFile(sourceFile, newText, textChangeRange, aggressiveChecks);
+                const newSourceFile = updateSourceFile(sourceFile, newText, textChangeRange, aggressiveChecks, compilerOptions);
                 setSourceFileFields(newSourceFile, scriptSnapshot, version);
                 // after incremental parsing nameTable might not be up-to-date
                 // drop it so it can be lazily recreated later

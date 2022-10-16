@@ -208,7 +208,15 @@ namespace ts {
         },
         {
             name: "tsPlusConfig",
-            type: "string"
+            type: "string",
+        },
+        {
+            name: "tsPlusTypes",
+            type: "list",
+            element: {
+                name: "tsPlusTypes",
+                type: "string"
+            },
         },
         {
             name: "transformers",

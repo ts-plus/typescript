@@ -80,7 +80,7 @@ namespace ts {
                 }
                 text = "";
             }
-            return text !== undefined ? createSourceFile(fileName, text, languageVersionOrOptions, setParentNodes) : undefined;
+            return text !== undefined ? createSourceFile(fileName, text, languageVersionOrOptions, setParentNodes, undefined, options) : undefined;
         }
 
         function directoryExists(directoryPath: string): boolean {

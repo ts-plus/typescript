@@ -15,6 +15,19 @@ namespace ts {
         Reparse
     }
 
+    interface TsPlusTypeDefinition {
+        definitionName: string
+        definitionKind: string
+        extensions: Array<TsPlusExtensionDefinition>
+    }
+
+    interface TsPlusExtensionDefinition {
+        kind: string
+        typeName: string
+        name?: string
+        priority?: string
+    }
+
     let NodeConstructor: new (kind: SyntaxKind, pos?: number, end?: number) => Node;
     let TokenConstructor: new (kind: SyntaxKind, pos?: number, end?: number) => Node;
     let IdentifierConstructor: new (kind: SyntaxKind, pos?: number, end?: number) => Node;
@@ -934,7 +947,7 @@ namespace ts {
         sourceFile.externalModuleIndicator = isFileProbablyExternalModule(sourceFile);
     }
 
-    export function createSourceFile(fileName: string, sourceText: string, languageVersionOrOptions: ScriptTarget | CreateSourceFileOptions, setParentNodes = false, scriptKind?: ScriptKind): SourceFile {
+    export function createSourceFile(fileName: string, sourceText: string, languageVersionOrOptions: ScriptTarget | CreateSourceFileOptions, setParentNodes = false, scriptKind?: ScriptKind, options?: CompilerOptions): SourceFile {
         tracing?.push(tracing.Phase.Parse, "createSourceFile", { path: fileName }, /*separateBeginAndEnd*/ true);
         performance.mark("beforeParse");
         let result: SourceFile;
@@ -946,14 +959,14 @@ namespace ts {
             impliedNodeFormat: format
         } = typeof languageVersionOrOptions === "object" ? languageVersionOrOptions : ({ languageVersion: languageVersionOrOptions } as CreateSourceFileOptions);
         if (languageVersion === ScriptTarget.JSON) {
-            result = Parser.parseSourceFile(fileName, sourceText, languageVersion, /*syntaxCursor*/ undefined, setParentNodes, ScriptKind.JSON, noop);
+            result = Parser.parseSourceFile(fileName, sourceText, languageVersion, /*syntaxCursor*/ undefined, setParentNodes, ScriptKind.JSON, noop, options);
         }
         else {
             const setIndicator = format === undefined ? overrideSetExternalModuleIndicator : (file: SourceFile) => {
                 file.impliedNodeFormat = format;
                 return (overrideSetExternalModuleIndicator || setExternalModuleIndicator)(file);
             };
-            result = Parser.parseSourceFile(fileName, sourceText, languageVersion, /*syntaxCursor*/ undefined, setParentNodes, scriptKind, setIndicator);
+            result = Parser.parseSourceFile(fileName, sourceText, languageVersion, /*syntaxCursor*/ undefined, setParentNodes, scriptKind, setIndicator, options);
         }
         perfLogger.logStopParseSourceFile();
 
@@ -990,8 +1003,8 @@ namespace ts {
     // from this SourceFile that are being held onto may change as a result (including
     // becoming detached from any SourceFile).  It is recommended that this SourceFile not
     // be used once 'update' is called on it.
-    export function updateSourceFile(sourceFile: SourceFile, newText: string, textChangeRange: TextChangeRange, aggressiveChecks = false): SourceFile {
-        const newSourceFile = IncrementalParser.updateSourceFile(sourceFile, newText, textChangeRange, aggressiveChecks);
+    export function updateSourceFile(sourceFile: SourceFile, newText: string, textChangeRange: TextChangeRange, aggressiveChecks = false, compilerOptions?: CompilerOptions): SourceFile {
+        const newSourceFile = IncrementalParser.updateSourceFile(sourceFile, newText, textChangeRange, aggressiveChecks, compilerOptions);
         // Because new source file node is created, it may not have the flag PossiblyContainDynamicImport. This is the case if there is no new edit to add dynamic import.
         // We will manually port the flag to the new source file.
         (newSourceFile as Mutable<SourceFile>).flags |= (sourceFile.flags & NodeFlags.PermanentlySetIncrementalFlags);
@@ -1152,7 +1165,10 @@ namespace ts {
         // attached to the EOF token.
         let parseErrorBeforeNextFinishedNode = false;
 
-        export function parseSourceFile(fileName: string, sourceText: string, languageVersion: ScriptTarget, syntaxCursor: IncrementalParser.SyntaxCursor | undefined, setParentNodes = false, scriptKind?: ScriptKind, setExternalModuleIndicatorOverride?: (file: SourceFile) => void): SourceFile {
+        let currentTsPlusTypes: TsPlusTypeDefinition[] | null = null;
+        let currentTsPlusFile: string | null = null;
+
+        export function parseSourceFile(fileName: string, sourceText: string, languageVersion: ScriptTarget, syntaxCursor: IncrementalParser.SyntaxCursor | undefined, setParentNodes = false, scriptKind?: ScriptKind, setExternalModuleIndicatorOverride?: (file: SourceFile) => void, options?: CompilerOptions): SourceFile {
             scriptKind = ensureScriptKind(fileName, scriptKind);
             if (scriptKind === ScriptKind.JSON) {
                 const result = parseJsonText(fileName, sourceText, languageVersion, syntaxCursor, setParentNodes);
@@ -1166,9 +1182,13 @@ namespace ts {
                 return result;
             }
 
+            options && parseTsPlusExternalTypes(fileName, options);
+
             initializeState(fileName, sourceText, languageVersion, syntaxCursor, scriptKind);
 
             const result = parseSourceFileWorker(languageVersion, setParentNodes, scriptKind, setExternalModuleIndicatorOverride || setExternalModuleIndicator);
+
+            currentTsPlusTypes = null;
 
             clearState();
 
@@ -1338,6 +1358,8 @@ namespace ts {
             identifiers = undefined!;
             notParenthesizedArrow = undefined;
             topLevel = true;
+            currentTsPlusTypes = null;
+            currentTsPlusFile = null; 
         }
 
         function parseSourceFileWorker(languageVersion: ScriptTarget, setParentNodes: boolean, scriptKind: ScriptKind, setExternalModuleIndicator: (file: SourceFile) => void): SourceFile {
@@ -1385,6 +1407,119 @@ namespace ts {
             }
         }
 
+        function parseTsPlusExternalTypes(fileName: string, options: CompilerOptions) {
+            if (options.configFilePath) {
+                let resolvedPath: string | undefined = undefined;
+                if (options.tsPlusTypes) {
+                    for (const path of options.tsPlusTypes) {
+                        if (pathIsRelative(path)) {
+                            resolvedPath = resolvePath(options.configFilePath.split("/").slice(0, -1).join('/'), path);
+                        }
+                        else {
+                            const { resolvedModule } = resolveModuleName(path, options.configFilePath, options, sys);
+                            if (resolvedModule) {
+                                resolvedPath = resolvedModule.resolvedFileName;
+                                break
+                            }
+                        }
+                    }
+                }
+
+                if (!resolvedPath) {
+                    let packageName = removeExtension(fileName.split("node_modules").slice(-1)[0].substring(1), ".d.ts");
+                    if (!packageName) {
+                        return;
+                    }
+                    if (packageName.startsWith("@")) {
+                        packageName = packageName.split(directorySeparator).slice(0, 2).join(directorySeparator);
+                    } else {
+                        packageName = fileName.split(directorySeparator).slice(0, 1)[0];
+                    }
+                    const resolvedPackageJson = resolvePackageNameToPackageJson(packageName, options.configFilePath, options, sys, undefined)
+                    if (resolvedPackageJson) {
+                        const packageJsonText = sys.readFile(resolvePath(resolvedPackageJson.packageDirectory, 'package.json'));
+                        if (packageJsonText) {
+                            const packageJson = JSON.parse(packageJsonText);
+                            if (packageJson["tsPlusTypes"]) {
+                                resolvedPath = resolvePath(resolvedPackageJson.packageDirectory, packageJson["tsPlusTypes"]);
+                            }
+                        }
+                    }
+                }
+
+                if (!resolvedPath) {
+                    let packageName = removeExtension(fileName.split("node_modules").slice(-1)[0].substring(1), ".d.ts");
+                    if (!packageName) {
+                        return;
+                    }
+                    if (packageName.startsWith("@")) {
+                        packageName = mangleScopedPackageName(packageName.split(directorySeparator).slice(0, 2).join(directorySeparator));
+                    } else {
+                        packageName = fileName.split(directorySeparator).slice(0, 1)[0];
+                    }
+                    const { resolvedModule } = resolveModuleName(`@tsplus-types/${packageName}`, options.configFilePath, { ...options, resolveJsonModule: true }, sys);
+                    if (resolvedModule) {
+                        resolvedPath = resolvedModule.resolvedFileName;
+                    }
+                }
+
+                if (!resolvedPath) {
+                    return;
+                }
+
+                const text = sys.readFile(resolvedPath);
+                if (text) {
+                    const json = JSON.parse(text);
+                    for (const moduleName in json) {
+                        const { resolvedModule } = resolveModuleName(moduleName, resolvedPath, options, sys);
+                        if (resolvedModule && resolvedModule.resolvedFileName === fileName) {
+                            currentTsPlusTypes = json[moduleName];
+                            currentTsPlusFile = moduleName;
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        function addTsPlusTagsFromExternalTypes(declaration: VariableDeclaration | FunctionDeclaration | InterfaceDeclaration | ClassDeclaration | TypeAliasDeclaration, jsDocNode?: HasJSDoc): void {
+            if (currentTsPlusTypes !== null) {
+                if (declaration.name && declaration.name.kind === SyntaxKind.Identifier) {
+                    const extensions = currentTsPlusTypes.filter(
+                        (type) =>
+                            (declaration.kind === SyntaxKind.VariableDeclaration ? (type.definitionKind === "const")
+                                : declaration.kind === SyntaxKind.FunctionDeclaration ? (type.definitionKind === "function")
+                                : declaration.kind === SyntaxKind.InterfaceDeclaration ? (type.definitionKind === "interface")
+                                : declaration.kind === SyntaxKind.ClassDeclaration ? (type.definitionKind === "class")
+                                : declaration.kind === SyntaxKind.TypeAliasDeclaration ? (type.definitionKind === "type")
+                                : false) &&
+                            type.definitionName === (declaration.name as Identifier).escapedText.toString()
+                    ).flatMap((definition) => definition.extensions);
+                    const newTags: JSDocTag[] = []
+                    for (const extension of extensions) {
+                        let comment = "";
+                        extension.kind && (comment += extension.kind);
+                        extension.typeName && (comment += ` ${extension.typeName}`);
+                        extension.name && (comment += ` ${extension.name}`);
+                        extension.priority && (comment += ` ${extension.priority}`);
+                        newTags.push(factory.createJSDocUnknownTag(factory.createIdentifier("tsplus"), comment));
+                    }
+                    newTags.push(factory.createJSDocUnknownTag(factory.createIdentifier("tsplus"), `location "${currentTsPlusFile}"`))
+                    if (!jsDocNode) {
+                        jsDocNode = declaration;
+                    }
+                    if (jsDocNode.jsDoc && jsDocNode.jsDoc[0]) {
+                        const jsDocTags = factory.createNodeArray(Array.from(jsDocNode.jsDoc[0].tags ?? []).concat(newTags))
+                        // @ts-expect-error
+                        jsDocNode.jsDoc[0].tags = jsDocTags;
+                    } else {
+                        // @ts-expect-error
+                        jsDocNode.jsDoc = factory.createJSDocComment(undefined, newTags)
+                    }
+                }
+            }
+        }
+
         function collectTsPlusFileSymbols(file: SourceFile, statements: NodeArray<Statement>, collectTypesIfNotExported = false) {
             for (const statement of statements) {
                 if (isModuleDeclaration(statement) && statement.body && isModuleBlock(statement.body)) {
@@ -1408,7 +1543,7 @@ namespace ts {
                     if (statement.tsPlusNoInheritTags && statement.tsPlusNoInheritTags.length > 0) {
                         file.tsPlusContext.noInherit.push(statement);
                     }
-                    if (isClassDeclaration(statement) && statement.tsPlusCompanionTags && statement.tsPlusCompanionTags.length > 0) {
+                    if (statement.tsPlusCompanionTags && statement.tsPlusCompanionTags.length > 0) {
                         file.tsPlusContext.companion.push(statement);
                     }
                     if (isClassDeclaration(statement) && statement.name && statement.tsPlusStaticTags && statement.tsPlusStaticTags.length > 0) {
@@ -7214,7 +7349,8 @@ namespace ts {
             // Decorators are not allowed on a variable statement, so we keep track of them to report them in the grammar checker.
             node.illegalDecorators = decorators;
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
-            if (finished.jsDoc && finished.declarationList.declarations.length === 1) {
+            if (finished.declarationList.declarations.length === 1) {
+                addTsPlusTagsFromExternalTypes(finished.declarationList.declarations[0], finished);
                 addTsPlusValueTags(finished.declarationList.declarations[0], finished.jsDoc);
             }
             return finished;
@@ -7245,7 +7381,6 @@ namespace ts {
             return undefined;
         }
         function addTsPlusValueTags(declaration: FunctionDeclaration | VariableDeclaration, jsDoc: JSDoc[] | undefined): void {
-            if (!jsDoc) return;
             const deriveTags: string[] = [];
             const fluentTags: TsPlusPrioritizedExtensionTag[] = [];
             const staticTags: TsPlusExtensionTag[] = [];
@@ -7258,7 +7393,10 @@ namespace ts {
             const indexTags: string[] = [];
             const pipeableIndexTags: string[] = [];
             let isImplicit = false;
-            for (const doc of jsDoc) {
+
+            addTsPlusTagsFromExternalTypes(declaration)
+
+            for (const doc of jsDoc ?? []) {
                 if (doc.tags) {
                     for (const tag of doc.tags) {
                         if (tag.tagName.escapedText === "tsplus" && typeof tag.comment === "string") {
@@ -7363,6 +7501,7 @@ namespace ts {
                     }
                 }
             }
+
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusFluentTags = undefinedIfZeroLength(fluentTags);
             (declaration as Mutable<FunctionDeclaration | VariableDeclaration>).tsPlusStaticTags = undefinedIfZeroLength(staticTags);
@@ -7800,6 +7939,7 @@ namespace ts {
                 : factory.createClassExpression(combineDecoratorsAndModifiers(decorators, modifiers), name, typeParameters, heritageClauses, members);
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
             if (isClassDeclaration(finished)) {
+                addTsPlusTagsFromExternalTypes(finished);
                 if (finished.jsDoc) {
                     const typeTags: string[] = [];
                     const companionTags: string[] = [];
@@ -7934,8 +8074,10 @@ namespace ts {
             const node = factory.createInterfaceDeclaration(modifiers, name, typeParameters, heritageClauses, members);
             (node as Mutable<InterfaceDeclaration>).illegalDecorators = decorators;
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            addTsPlusTagsFromExternalTypes(finished);
             if (finished.jsDoc) {
                 const typeTags: string[] = [];
+                const companionTags: string[] = [];
                 const deriveTags: string[] = [];
                 const noInheritTags: string[] = [];
                 for (const doc of finished.jsDoc) {
@@ -7950,6 +8092,14 @@ namespace ts {
                                             break;
                                         }
                                         typeTags.push(target);
+                                        break;
+                                    }
+                                    case "companion": {
+                                        if (!target) {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
+                                            break;
+                                        }
+                                        companionTags.push(target);
                                         break;
                                     }
                                     case "derive": {
@@ -7974,6 +8124,7 @@ namespace ts {
                     }
                 }
                 (finished as Mutable<InterfaceDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+                (finished as Mutable<InterfaceDeclaration>).tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
                 (finished as Mutable<InterfaceDeclaration>).tsPlusDeriveTags = undefinedIfZeroLength(deriveTags);
                 (finished as Mutable<InterfaceDeclaration>).tsPlusNoInheritTags = undefinedIfZeroLength(noInheritTags);
             }
@@ -7990,8 +8141,10 @@ namespace ts {
             const node = factory.createTypeAliasDeclaration(modifiers, name, typeParameters, type);
             (node as Mutable<TypeAliasDeclaration>).illegalDecorators = decorators;
             const finished = withJSDoc(finishNode(node, pos), hasJSDoc);
+            addTsPlusTagsFromExternalTypes(finished);
             if (finished.jsDoc) {
                 const typeTags: string[] = [];
+                const companionTags: string[] = [];
                 const noInheritTags: string[] = [];
                 for (const doc of finished.jsDoc) {
                     if (doc.tags) {
@@ -8005,6 +8158,14 @@ namespace ts {
                                             break;
                                         }
                                         typeTags.push(target);
+                                        break;
+                                    }
+                                    case "companion": {
+                                        if (!target) {
+                                            parseErrorAt(tag.pos, tag.end - 1, Diagnostics.Annotation_of_a_companion_extension_must_have_the_form_tsplus_companion_typename);
+                                            break;
+                                        }
+                                        companionTags.push(target);
                                         break;
                                     }
                                     case "no-inherit": {
@@ -8021,6 +8182,7 @@ namespace ts {
                     }
                 }
                 (finished as Mutable<TypeAliasDeclaration>).tsPlusTypeTags = undefinedIfZeroLength(typeTags);
+                (finished as Mutable<TypeAliasDeclaration>).tsPlusCompanionTags = undefinedIfZeroLength(companionTags);
                 (finished as Mutable<TypeAliasDeclaration>).tsPlusNoInheritTags = undefinedIfZeroLength(noInheritTags);
             }
             return finished;
@@ -9556,7 +9718,7 @@ namespace ts {
     }
 
     namespace IncrementalParser {
-        export function updateSourceFile(sourceFile: SourceFile, newText: string, textChangeRange: TextChangeRange, aggressiveChecks: boolean): SourceFile {
+        export function updateSourceFile(sourceFile: SourceFile, newText: string, textChangeRange: TextChangeRange, aggressiveChecks: boolean, compilerOptions?: CompilerOptions): SourceFile {
             aggressiveChecks = aggressiveChecks || Debug.shouldAssert(AssertionLevel.Aggressive);
 
             checkChangeRange(sourceFile, newText, textChangeRange, aggressiveChecks);
@@ -9632,7 +9794,7 @@ namespace ts {
             // inconsistent tree.  Setting the parents on the new tree should be very fast.  We
             // will immediately bail out of walking any subtrees when we can see that their parents
             // are already correct.
-            const result = Parser.parseSourceFile(sourceFile.fileName, newText, sourceFile.languageVersion, syntaxCursor, /*setParentNodes*/ true, sourceFile.scriptKind, sourceFile.setExternalModuleIndicator);
+            const result = Parser.parseSourceFile(sourceFile.fileName, newText, sourceFile.languageVersion, syntaxCursor, /*setParentNodes*/ true, sourceFile.scriptKind, sourceFile.setExternalModuleIndicator, compilerOptions);
             result.commentDirectives = getNewCommentDirectives(
                 sourceFile.commentDirectives,
                 result.commentDirectives,

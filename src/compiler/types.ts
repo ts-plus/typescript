@@ -3334,6 +3334,7 @@ namespace ts {
         readonly tsPlusTypeTags?: string[];
         readonly tsPlusDeriveTags?: string[];
         readonly tsPlusNoInheritTags?: string[];
+        readonly tsPlusCompanionTags?: string[];
         // TSPLUS END
     }
 
@@ -3356,6 +3357,7 @@ namespace ts {
 
         // TSPLUS BEGIN
         readonly tsPlusTypeTags?: string[];
+        readonly tsPlusCompanionTags?: string[];
         readonly tsPlusNoInheritTags?: string[];
         // TSPLUS END
     }
@@ -3823,6 +3825,7 @@ namespace ts {
         PipeableIdentifier = "TsPlusPipeableSymbol",
         PipeableDeclaration = "TsPlusPipeableDeclarationSymbol"
     }
+
 
     export interface TsPlusPipeableDeclarationSymbol extends TransientSymbol {
         tsPlusTag: TsPlusSymbolTag.PipeableDeclaration
@@ -4427,7 +4430,7 @@ namespace ts {
         tsPlusGlobalImports?: ImportDeclaration[];
         tsPlusContext: {
             type: (InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration)[];
-            companion: ClassDeclaration[];
+            companion: (InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration)[];
             fluent: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             pipeable: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             operator: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
@@ -5233,7 +5236,7 @@ namespace ts {
         getIndexAccessExpressionCache(): ESMap<Node, { signature: Signature, declaration: FunctionDeclaration | VariableDeclarationWithIdentifier, definition: SourceFile, exportName: string }>
         isTsPlusMacroCall<K extends string>(node: Node, macro: K): node is TsPlusMacroCallExpression<K>
         isTsPlusMacroGetter(node: Node, macro: string): boolean
-        isClassCompanionReference(node: Expression): boolean
+        isCompanionReference(node: Expression): boolean
         collectTsPlusFluentTags(statement: Declaration): readonly TsPlusPrioritizedExtensionTag[]
         hasExportedPlusTags(statement: Declaration): boolean;
         getFluentExtensionForPipeableSymbol(symbol: TsPlusPipeableIdentifierSymbol): TsPlusFluentExtension | undefined
@@ -7170,8 +7173,9 @@ namespace ts {
 
         [option: string]: CompilerOptionsValue | TsConfigSourceFile | undefined;
 
-        tsPlusConfig?: string
-        tsPlusEnabled?: boolean
+        tsPlusConfig?: string;
+        tsPlusTypes?: string[];
+        tsPlusEnabled?: boolean;
         transformers?: TransformerImport[];
     }
 
