@@ -7004,6 +7004,14 @@ namespace ts {
         position?: "before" | "after" | "afterDeclaration"
     }
 
+    export interface TsPlusFeatures {
+        operators?: boolean
+        extensions?: boolean
+        tracing?: boolean
+        unification?: boolean
+        index?: boolean
+    }
+
     export interface ProjectReference {
         /** A normalized path on disk */
         path: string;
@@ -7038,7 +7046,7 @@ namespace ts {
         FixedChunkSize,
     }
 
-    export type CompilerOptionsValue = string | number | boolean | (string | number)[] | string[] | MapLike<string[]> | PluginImport[] | ProjectReference[] | TransformerImport[] | null | undefined;
+    export type CompilerOptionsValue = string | number | boolean | (string | number)[] | string[] | MapLike<string[]> | PluginImport[] | ProjectReference[] | TransformerImport[] | TsPlusFeatures | null | undefined;
 
     export interface CompilerOptions {
         /*@internal*/ all?: boolean;
@@ -7170,8 +7178,9 @@ namespace ts {
 
         [option: string]: CompilerOptionsValue | TsConfigSourceFile | undefined;
 
-        tsPlusConfig?: string
-        tsPlusEnabled?: boolean
+        tsPlusConfig?: string;
+        tsPlusEnabled?: boolean;
+        tsPlusFeatures?: TsPlusFeatures;
         transformers?: TransformerImport[];
     }
 

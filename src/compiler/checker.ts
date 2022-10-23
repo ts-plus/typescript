@@ -47887,71 +47887,79 @@ namespace ts {
             for (const declaration of file.tsPlusContext.companion) {
                 cacheTsPlusCompanion(declaration);
             }
-            for (const declaration of file.tsPlusContext.fluent) {
-                if (isFunctionDeclaration(declaration)) {
-                    cacheTsPlusFluentFunction(file, declaration);
+            if (compilerOptions.tsPlusFeatures?.extensions !== false) {
+                for (const declaration of file.tsPlusContext.fluent) {
+                    if (isFunctionDeclaration(declaration)) {
+                        cacheTsPlusFluentFunction(file, declaration);
+                    }
+                    else {
+                        cacheTsPlusFluentVariable(file, declaration);
+                    }
                 }
-                else {
-                    cacheTsPlusFluentVariable(file, declaration);
+                for (const declaration of file.tsPlusContext.pipeable) {
+                    if (isFunctionDeclaration(declaration)) {
+                        cacheTsPlusPipeableFunction(file, declaration);
+                    }
+                    else {
+                        cacheTsPlusPipeableVariable(file, declaration);
+                    }
                 }
-            }
-            for (const declaration of file.tsPlusContext.pipeable) {
-                if (isFunctionDeclaration(declaration)) {
-                    cacheTsPlusPipeableFunction(file, declaration);
+                for (const declaration of file.tsPlusContext.static) {
+                    if (isFunctionDeclaration(declaration)) {
+                        cacheTsPlusStaticFunction(file, declaration);
+                    }
+                    else {
+                        cacheTsPlusStaticVariable(file, declaration);
+                    }
                 }
-                else {
-                    cacheTsPlusPipeableVariable(file, declaration);
+                for (const declaration of file.tsPlusContext.getter) {
+                    if (isFunctionDeclaration(declaration)) {
+                        cacheTsPlusGetterFunction(file, declaration);
+                    }
+                    else {
+                        cacheTsPlusGetterVariable(file, declaration);
+                    }
                 }
-            }
-            for (const declaration of file.tsPlusContext.operator) {
-                if (isFunctionDeclaration(declaration)) {
-                    cacheTsPlusOperatorFunction(file, declaration);
+                if (compilerOptions.tsPlusFeatures?.index !== false) {
+                    for (const declaration of file.tsPlusContext.index) {
+                        if (isFunctionDeclaration(declaration)) {
+                            cacheTsPlusIndexFunction(declaration);
+                        }
+                        else {
+                            cacheTsPlusIndexVariable(declaration);                        
+                        }
+                    }
+                    for (const declaration of file.tsPlusContext.pipeableIndex) {
+                        if (isFunctionDeclaration(declaration)) {
+                            cacheTsPlusPipeableIndexFunction(declaration);
+                        }
+                        else {
+                            cacheTsPlusPipeableIndexVariable(declaration);                        
+                        }
+                    }
                 }
-                else {
-                    cacheTsPlusOperatorVariable(file, declaration);
+                if (compilerOptions.tsPlusFeatures?.operators !== false) {
+                    for (const declaration of file.tsPlusContext.operator) {
+                        if (isFunctionDeclaration(declaration)) {
+                            cacheTsPlusOperatorFunction(file, declaration);
+                        }
+                        else {
+                            cacheTsPlusOperatorVariable(file, declaration);
+                        }
+                    }
+                    for (const declaration of file.tsPlusContext.pipeableOperator) {
+                        if (isFunctionDeclaration(declaration)) {
+                            cacheTsPlusPipeableOperatorFunction(file, declaration);
+                        }
+                        else {
+                            cacheTsPlusPipeableOperatorVariable(file, declaration);
+                        }
+                    }
                 }
-            }
-            for (const declaration of file.tsPlusContext.pipeableOperator) {
-                if (isFunctionDeclaration(declaration)) {
-                    cacheTsPlusPipeableOperatorFunction(file, declaration);
-                }
-                else {
-                    cacheTsPlusPipeableOperatorVariable(file, declaration);
-                }
-            }
-            for (const declaration of file.tsPlusContext.static) {
-                if (isFunctionDeclaration(declaration)) {
-                    cacheTsPlusStaticFunction(file, declaration);
-                }
-                else {
-                    cacheTsPlusStaticVariable(file, declaration);
-                }
-            }
-            for (const declaration of file.tsPlusContext.getter) {
-                if (isFunctionDeclaration(declaration)) {
-                    cacheTsPlusGetterFunction(file, declaration);
-                }
-                else {
-                    cacheTsPlusGetterVariable(file, declaration);
-                }
-            }
-            for (const declaration of file.tsPlusContext.unify) {
-                cacheTsPlusUnifyFunction(declaration);
-            }
-            for (const declaration of file.tsPlusContext.index) {
-                if (isFunctionDeclaration(declaration)) {
-                    cacheTsPlusIndexFunction(declaration);
-                }
-                else {
-                    cacheTsPlusIndexVariable(declaration);                        
-                }
-            }
-            for (const declaration of file.tsPlusContext.pipeableIndex) {
-                if (isFunctionDeclaration(declaration)) {
-                    cacheTsPlusPipeableIndexFunction(declaration);
-                }
-                else {
-                    cacheTsPlusPipeableIndexVariable(declaration);                        
+                if (compilerOptions.tsPlusFeatures?.unification !== false) {
+                    for (const declaration of file.tsPlusContext.unify) {
+                        cacheTsPlusUnifyFunction(declaration);
+                    }
                 }
             }
         }
