@@ -116,9 +116,6 @@ namespace ts {
             }
             function visitFunctionDeclaration(_source: SourceFile, node: FunctionDeclaration, _visitor: Visitor, _context: TransformationContext): VisitResult<Node> {
                 if (checker.hasExportedPlusTags(node)) {
-                    if (getSourceFileOfNode(node).fileName.includes("jsdoc-bug")) {
-                        debugger
-                    }
                     const emitNode = getOrCreateEmitNode(node);
                     if (!emitNode.tsPlusLocationComment) {
                         const existingJsDoc = node.jsDoc?.slice(-1)[0] ?? factory.createJSDocComment()
