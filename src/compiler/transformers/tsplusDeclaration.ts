@@ -116,32 +116,43 @@ namespace ts {
             }
             function visitFunctionDeclaration(_source: SourceFile, node: FunctionDeclaration, _visitor: Visitor, _context: TransformationContext): VisitResult<Node> {
                 if (checker.hasExportedPlusTags(node)) {
+                    if (getSourceFileOfNode(node).fileName.includes("jsdoc-bug")) {
+                        debugger
+                    }
                     const emitNode = getOrCreateEmitNode(node);
                     if (!emitNode.tsPlusLocationComment) {
-                        const existingJsDoc = node.jsDoc?.[0] ?? factory.createJSDocComment()
+                        const existingJsDoc = node.jsDoc?.slice(-1)[0] ?? factory.createJSDocComment()
                         const existingTags = existingJsDoc.tags ?? factory.createNodeArray()
-                        const newJsDoc = factory.createJSDocComment(
-                            existingJsDoc.comment,
-                            existingTags.concat([
-                                factory.createJSDocUnknownTag(
-                                    factory.createIdentifier("tsplus"),
-                                    `location "${getImportLocation(fileMap, getSourceFileOfNode(node).fileName)}"`
-                                )
-                            ])
-                        )
-                        const newCommentText = createPrinter()
-                            .printNode(EmitHint.Unspecified, newJsDoc, getSourceFileOfNode(node))
+                        const newJsDoc = [
+                            ...node.jsDoc?.slice(0, -1) ?? [],
+                            factory.createJSDocComment(
+                                existingJsDoc.comment,
+                                existingTags.concat([
+                                    factory.createJSDocUnknownTag(
+                                        factory.createIdentifier("tsplus"),
+                                        `location "${getImportLocation(fileMap, getSourceFileOfNode(node).fileName)}"`
+                                    )
+                                ])
+                            )
+                        ]
+                        const printer = createPrinter()
+                        const newCommentText = newJsDoc.map((jsDoc) =>
+                            printer.printNode(EmitHint.Unspecified, jsDoc, null!)
                             .trim()
                             .replace(/^\/\*|\*\/$/g, "")
+                        )
                         removeAllComments(node);
                         node.original && removeAllComments(node.original);
-                        setSyntheticLeadingComments(node, [{
-                            pos: -1,
-                            end: -1,
-                            text: newCommentText,
-                            kind: SyntaxKind.MultiLineCommentTrivia,
-                            hasTrailingNewLine: true
-                        }]);
+                        setSyntheticLeadingComments(
+                            node,
+                            newCommentText.map(text => ({
+                                pos: -1,
+                                end: -1,
+                                text,
+                                kind: SyntaxKind.MultiLineCommentTrivia,
+                                hasTrailingNewLine: true
+                            }))
+                        );
                         emitNode.tsPlusLocationComment = true;
                     }
                 }
@@ -157,35 +168,42 @@ namespace ts {
                             const signatureFluentTags = checker.collectTsPlusFluentTags(signatureDeclaration)
                             if (signatureFluentTags.length > 0) {
                                 const { target, name } = signatureFluentTags[0]
-                                const existingJsDoc = node.jsDoc?.[0] ?? factory.createJSDocComment()
+                                const existingJsDoc = node.jsDoc?.slice(-1)[0] ?? factory.createJSDocComment()
                                 const existingTags = existingJsDoc.tags ?? factory.createNodeArray()
-                                const newJsDoc = factory.createJSDocComment(
-                                    existingJsDoc.comment,
-                                    existingTags.concat([
-                                        factory.createJSDocUnknownTag(
-                                            factory.createIdentifier("tsplus"),
-                                            `pipeable ${target} ${name}`
-                                        ),
-                                        factory.createJSDocUnknownTag(
-                                            factory.createIdentifier("tsplus"),
-                                            `location "${getImportLocation(fileMap, getSourceFileOfNode(node).fileName)}"`
-                                        )
-                                    ])
-                                );
-                                const newCommentText = createPrinter()
-                                    .printNode(EmitHint.Unspecified, newJsDoc, getSourceFileOfNode(node))
+                                const newJsDoc = [
+                                    ...node.jsDoc?.slice(0, -1) ?? [],
+                                    factory.createJSDocComment(
+                                        existingJsDoc.comment,
+                                        existingTags.concat([
+                                            factory.createJSDocUnknownTag(
+                                                factory.createIdentifier("tsplus"),
+                                                `pipeable ${target} ${name}`
+                                            ),
+                                            factory.createJSDocUnknownTag(
+                                                factory.createIdentifier("tsplus"),
+                                                `location "${getImportLocation(fileMap, getSourceFileOfNode(node).fileName)}"`
+                                            )
+                                        ])
+                                    )
+                                ]
+                                const printer = createPrinter()
+                                const newCommentText = newJsDoc.map((jsDoc) =>
+                                    printer.printNode(EmitHint.Unspecified, jsDoc, null!)
                                     .trim()
                                     .replace(/^\/\*|\*\/$/g, "")
+                                )
                                 removeAllComments(node);
                                 node.original && removeAllComments(node.original);
-                                setSyntheticLeadingComments(node, [{
-                                    pos: -1,
-                                    end: -1,
-                                    text: newCommentText,
-                                    kind: SyntaxKind.MultiLineCommentTrivia,
-                                    hasTrailingNewLine: true
-                                }]);
-                                getOrCreateEmitNode(node).tsPlusPipeableComment = true;
+                                setSyntheticLeadingComments(
+                                    node,
+                                    newCommentText.map(text => ({
+                                        pos: -1,
+                                        end: -1,
+                                        text,
+                                        kind: SyntaxKind.MultiLineCommentTrivia,
+                                        hasTrailingNewLine: true
+                                    }))
+                                );
                                 getOrCreateEmitNode(node).tsPlusLocationComment = true;
                             }
                         }
@@ -194,31 +212,39 @@ namespace ts {
                         if (checker.hasExportedPlusTags(declaration)) {
                             const emitNode = getOrCreateEmitNode(node);
                             if (!emitNode.tsPlusLocationComment) {
-                                const existingJsDoc = node.jsDoc?.[0] ?? factory.createJSDocComment()
+                                const existingJsDoc = node.jsDoc?.slice(-1)[0] ?? factory.createJSDocComment()
                                 const existingTags = existingJsDoc.tags ?? factory.createNodeArray()
-                                const newJsDoc = factory.createJSDocComment(
-                                    existingJsDoc.comment,
-                                    existingTags.concat([
-                                        factory.createJSDocUnknownTag(
-                                            factory.createIdentifier("tsplus"),
-                                            `location "${getImportLocation(fileMap, getSourceFileOfNode(node).fileName)}"`
-                                        )
-                                    ])
-                                )
-                                const newCommentText = createPrinter()
-                                    .printNode(EmitHint.Unspecified, newJsDoc, getSourceFileOfNode(node))
+                                const newJsDoc = [
+                                    ...node.jsDoc?.slice(0, -1) ?? [],
+                                    factory.createJSDocComment(
+                                        existingJsDoc.comment,
+                                        existingTags.concat([
+                                                factory.createJSDocUnknownTag(
+                                                    factory.createIdentifier("tsplus"),
+                                                    `location "${getImportLocation(fileMap, getSourceFileOfNode(node).fileName)}"`
+                                                )
+                                        ])
+                                    )
+                                ]
+                                const printer = createPrinter()
+                                const newCommentText = newJsDoc.map((jsDoc) =>
+                                    printer.printNode(EmitHint.Unspecified, jsDoc, null!)
                                     .trim()
                                     .replace(/^\/\*|\*\/$/g, "")
+                                )
                                 removeAllComments(node);
                                 node.original && removeAllComments(node.original);
-                                setSyntheticLeadingComments(node, [{
-                                    pos: -1,
-                                    end: -1,
-                                    text: newCommentText,
-                                    kind: SyntaxKind.MultiLineCommentTrivia,
-                                    hasTrailingNewLine: true
-                                }]);
-                                emitNode.tsPlusLocationComment = true;
+                                setSyntheticLeadingComments(
+                                    node,
+                                    newCommentText.map(text => ({
+                                        pos: -1,
+                                        end: -1,
+                                        text,
+                                        kind: SyntaxKind.MultiLineCommentTrivia,
+                                        hasTrailingNewLine: true
+                                    }))
+                                );
+                                getOrCreateEmitNode(node).tsPlusLocationComment = true;
                             }
                         }
                         return node;
