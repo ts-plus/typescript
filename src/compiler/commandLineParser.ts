@@ -225,6 +225,12 @@ namespace ts {
             defaultValueDescription: true,
         },
         {
+            name: "tsPlusFeatures",
+            type: "object",
+            affectsModuleResolution: true,
+            isTSConfigOnly: true,
+        },
+        {
             name: "watch",
             shortName: "w",
             type: "boolean",
