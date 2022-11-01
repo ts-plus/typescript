@@ -5817,6 +5817,7 @@ namespace ts {
             type: Type,
             tags: Set<string>
         }
+        isPossibleCompanionReference?: boolean
         // TSPLUS END
     }
 

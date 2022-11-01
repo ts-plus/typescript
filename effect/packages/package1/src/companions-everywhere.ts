@@ -13,8 +13,3 @@ export const get: A = {}
  * @tsplus static companions-everywhere/AOps __call
  */
 export const callA = (): A => ({})
-
-class X {}
-
-new X()
-X

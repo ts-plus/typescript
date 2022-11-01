@@ -2790,16 +2790,19 @@ namespace ts {
                             if (symbol) {
                                 if (companionSymbolCache.has(symbol)) {
                                     result = symbol;
+                                    getSymbolLinks(symbol).isPossibleCompanionReference = true;
                                     break loop;
                                 }
                                 if (symbol.exportSymbol && companionSymbolCache.has(symbol.exportSymbol)) {
                                     result = symbol.exportSymbol;
+                                    getSymbolLinks(symbol.exportSymbol).isPossibleCompanionReference = true;
                                     break loop;
                                 }
                                 if (symbol.declarations && symbol.declarations[0] && isImportSpecifier(symbol.declarations[0])) {
                                     const originalSymbol = getTargetOfImportSpecifier(symbol.declarations[0], false);
                                     if (originalSymbol && companionSymbolCache.has(originalSymbol)) {
                                         result = originalSymbol;
+                                        getSymbolLinks(originalSymbol).isPossibleCompanionReference = true;
                                         symbol.isReferenced = SymbolFlags.Value;
                                         break loop;
                                     }
@@ -5837,8 +5840,21 @@ namespace ts {
             if (!type) {
                 return false
             }
-            return !!(getObjectFlags(type) & ObjectFlags.Anonymous && type.symbol && type.symbol.flags & SymbolFlags.Class)
-                || (!!symbol?.declarations?.[0] && (isInterfaceDeclaration(symbol.declarations[0]) || isTypeAliasDeclaration(symbol.declarations[0])))
+            
+            // Class companion object
+            if (getObjectFlags(type) & ObjectFlags.Anonymous && type.symbol && type.symbol.flags & SymbolFlags.Class) {
+                return true
+            }
+
+            // Synthetic Interface or TypeAlias companion object
+            if (symbol && symbol.declarations && symbol.declarations.length > 0) {
+                const declaration = symbol.declarations[0]
+                if (isInterfaceDeclaration(declaration) || isTypeAliasDeclaration(declaration)) {
+                    return !!getSymbolLinks(symbol).isPossibleCompanionReference;
+                }
+            }
+
+            return false
         }
         // TSPLUS EXTENSION END
 
