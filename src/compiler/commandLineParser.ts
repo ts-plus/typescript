@@ -211,6 +211,14 @@ namespace ts {
             type: "string",
         },
         {
+            name: "tsPlusGlobalFiles",
+            type: "list",
+            element: {
+                name: "tsPlusGlobalFiles",
+                type: "string"
+            }
+        },
+        {
             name: "tsPlusTypes",
             type: "list",
             element: {

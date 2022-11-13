@@ -1181,6 +1181,14 @@ namespace ts {
                                     processProjectReferenceFile(fileName, { kind: FileIncludeKind.SourceFromProjectReference, index });
                                 }
                             }
+                            // TSPLUS EXTENSION START
+                            const tsConfigLocation = parsedRef.sourceFile.fileName.split("/").slice(0, -1).join("/")
+                            if (parsedRef.commandLine.options.tsPlusGlobalFiles) {
+                                for (const path of parsedRef.commandLine.options.tsPlusGlobalFiles) {
+                                    processProjectReferenceFile(combinePaths(tsConfigLocation, path), { kind: FileIncludeKind.SourceFromProjectReference, index, isTsPlusGlobalFile: true })
+                                }
+                            }
+                            // TSPLUS EXTENSION END
                         }
                         else {
                             if (out) {
@@ -2959,6 +2967,11 @@ namespace ts {
                     const file = isString(source) ?
                         findSourceFile(source, isDefaultLib, ignoreNoDefaultLib, reason, packageId) :
                         undefined;
+                    // TSPLUS EXTENSION START
+                    if (file && reason.kind === FileIncludeKind.SourceFromProjectReference && reason.isTsPlusGlobalFile) {
+                        file.isTsPlusProjectReferenceGlobalFile = true;
+                    }
+                    // TSPLUS EXTENSION END
                     if (file) addFileToFilesByName(file, path, /*redirectedPath*/ undefined);
                     return file;
                 }
@@ -3005,6 +3018,12 @@ namespace ts {
                         processImportedModules(file);
                     }
                 }
+
+                // TSPLUS EXTENSION START
+                if (file && reason.kind === FileIncludeKind.SourceFromProjectReference && reason.isTsPlusGlobalFile) {
+                    file.isTsPlusProjectReferenceGlobalFile = true;
+                }
+                // TSPLUS EXTENSION END
 
                 return file || undefined;
             }
@@ -3102,6 +3121,11 @@ namespace ts {
                     processingOtherFiles!.push(file);
                 }
             }
+            // TSPLUS EXTENSION START
+            if (file && reason.kind === FileIncludeKind.SourceFromProjectReference && reason.isTsPlusGlobalFile) {
+                file.isTsPlusProjectReferenceGlobalFile = true;
+            }
+            // TSPLUS EXTENSION END
             return file;
         }
 

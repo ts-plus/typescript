@@ -7,19 +7,11 @@
     "tsPlusConfig": "../../tsplus.config.json",
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "tsPlusTypes": [
-      "./fp-ts__core.json"
-    ],
-    "composite": true,
-    "incremental": true,
-    "tsPlusGlobalFiles": [
-      "./src/prelude.ts"
-    ]
   },
   "include": ["src/**/*.ts"],
   "references": [
     {
-      "path": "../package1"
+      "path": "../package2"
     }
   ]
 }
