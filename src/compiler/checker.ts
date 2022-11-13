@@ -3056,7 +3056,7 @@ namespace ts {
             // TSPLUS EXTENSION START
             if (!result && originalLocation && checkTsPlusGlobals) {
                 const globalImport = tsPlusGlobalImportCache.get(name as string);
-                if (globalImport) {
+                if (globalImport && (!globalImport.isFromProjectReference || host.isSourceOfProjectReferenceRedirect(getSourceFileOfNode(originalLocation).fileName))) {
                     const targetSymbol = getTargetOfImportSpecifier(globalImport.importSpecifier, false);
                     if (targetSymbol &&
                         ((targetSymbol.flags & meaning) ||
@@ -47331,10 +47331,10 @@ namespace ts {
                 tags.push(tag)
             }
         }
-        function tryCacheTsPlusGlobalSymbol(declaration: ImportDeclaration): void {
+        function tryCacheTsPlusGlobalSymbol(file: SourceFile, declaration: ImportDeclaration): void {
             if (declaration.isTsPlusGlobal) {
                 (declaration.importClause!.namedBindings as NamedImports).elements.forEach((importSpecifier) => {
-                    tsPlusGlobalImportCache.set(importSpecifier.name.escapedText as string, { declaration, importSpecifier, moduleSpecifier: declaration.moduleSpecifier as StringLiteral });
+                    tsPlusGlobalImportCache.set(importSpecifier.name.escapedText as string, { declaration, importSpecifier, moduleSpecifier: declaration.moduleSpecifier as StringLiteral, isFromProjectReference: !!file.isTsPlusProjectReferenceGlobalFile });
                 })
             }
         }
@@ -48339,7 +48339,7 @@ namespace ts {
 
                 for (const statement of file.imports) {
                     if (isImportDeclaration(statement.parent)) {
-                        tryCacheTsPlusGlobalSymbol(statement.parent);
+                        tryCacheTsPlusGlobalSymbol(file, statement.parent);
                     }
                 }
             }

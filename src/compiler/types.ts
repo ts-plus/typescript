@@ -3989,6 +3989,7 @@ namespace ts {
         declaration: ImportDeclaration;
         importSpecifier: ImportSpecifier;
         moduleSpecifier: StringLiteral;
+        isFromProjectReference: boolean;
     }
 
     export interface TsPlusType extends Type {
@@ -4442,6 +4443,7 @@ namespace ts {
             pipeableIndex: (VariableDeclarationWithIdentifier | FunctionDeclaration)[];
             noInherit: (InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration)[];
         }
+        isTsPlusProjectReferenceGlobalFile?: boolean
         // TSPLUS EXTENSION END
     }
 
@@ -4664,6 +4666,9 @@ namespace ts {
     export interface ProjectReferenceFile {
         kind: ProjectReferenceFileKind;
         index: number;
+        // TSPLUS EXTENSION START
+        isTsPlusGlobalFile?: boolean;
+        // TSPLUS EXTENSION END
     }
 
     /*@internal*/
@@ -7177,6 +7182,7 @@ namespace ts {
         tsPlusConfig?: string;
         tsPlusTypes?: string[];
         tsPlusEnabled?: boolean;
+        tsPlusGlobalFiles?: string[];
         transformers?: TransformerImport[];
     }
 
