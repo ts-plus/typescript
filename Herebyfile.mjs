@@ -213,6 +213,7 @@ function createBundler(entrypoint, outfile, taskOptions = {}) {
             external: [
                 ...(taskOptions.external ?? []),
                 "source-map-support",
+                "ts-node",
             ],
             logLevel: "warning",
             // legalComments: "none", // If we add copyright headers to the source files, uncomment.
