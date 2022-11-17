@@ -6,16 +6,17 @@ import {
     compareStringsCaseSensitive, CompilerOptions, Debug, Declaration, EmitFlags, EmitHelperFactory, EmitHost,
     EmitResolver, EntityName, EqualityOperator, EqualityOperatorOrHigher, ExclamationToken, ExponentiationOperator,
     ExportDeclaration, Expression, ExpressionStatement, externalHelpersModuleNameText, first, firstOrUndefined,
-    ForInitializer, GeneratedIdentifier, GeneratedIdentifierFlags, GeneratedNamePart, GeneratedPrivateIdentifier,
+    ForInitializer, FunctionDeclaration, GeneratedIdentifier, GeneratedIdentifierFlags, GeneratedNamePart, GeneratedPrivateIdentifier,
     GetAccessorDeclaration,
     getAllAccessorDeclarations, getEmitFlags, getEmitHelpers, getEmitModuleKind, getESModuleInterop,
     getExternalModuleName, getExternalModuleNameFromPath, getJSDocType, getJSDocTypeTag, getModifiers,
     getNamespaceDeclarationNode, getOrCreateEmitNode, getOriginalNode, getParseTreeNode,
     getSourceTextOfNodeFromSourceFile, HasIllegalDecorators, HasIllegalModifiers, HasIllegalType,
     HasIllegalTypeParameters, Identifier, idText, ImportCall, ImportDeclaration, ImportEqualsDeclaration,
+    isArrowFunction,
     isAssignmentExpression, isAssignmentOperator, isBlock, isComputedPropertyName, isDeclarationBindingElement,
     isDefaultImport, isEffectiveExternalModule, isExclamationToken, isExportNamespaceAsDefaultDeclaration,
-    isFileLevelUniqueName, isGeneratedIdentifier, isGeneratedPrivateIdentifier, isIdentifier, isInJSFile,
+    isFileLevelUniqueName, isFunctionDeclaration, isFunctionExpression, isGeneratedIdentifier, isGeneratedPrivateIdentifier, isIdentifier, isInJSFile,
     isLiteralExpression, isMemberName, isMinusToken, isObjectLiteralElementLike, isParenthesizedExpression, isPlusToken,
     isPostfixUnaryExpression, isPrefixUnaryExpression, isPrivateIdentifier, isPrologueDirective, isPropertyAssignment,
     isPropertyName, isQualifiedName, isQuestionToken, isReadonlyKeyword, isShorthandPropertyAssignment, isSourceFile,
@@ -25,11 +26,11 @@ import {
     MethodDeclaration, MinusToken, ModifiersArray, ModuleKind, ModuleName, MultiplicativeOperator,
     MultiplicativeOperatorOrHigher, Mutable, NamedImportBindings, Node, NodeArray, NodeFactory, NullLiteral,
     NumericLiteral, ObjectLiteralElementLike, ObjectLiteralExpression, or, OuterExpression, OuterExpressionKinds,
-    outFile, parseNodeFactory, PlusToken, PostfixUnaryExpression, PrefixUnaryExpression, PrivateIdentifier,
+    outFile, ParameterDeclaration, parseNodeFactory, PlusToken, PostfixUnaryExpression, PrefixUnaryExpression, PrivateIdentifier,
     PropertyAssignment, PropertyDeclaration, PropertyName, pushIfUnique, QuestionToken, ReadonlyKeyword,
     RelationalOperator, RelationalOperatorOrHigher, SetAccessorDeclaration, setOriginalNode, setParent, setStartsOnNewLine, setTextRange,
     ShiftOperator, ShiftOperatorOrHigher, ShorthandPropertyAssignment, some, SourceFile, Statement, StringLiteral,
-    SyntaxKind, TextRange, ThisTypeNode, Token, TypeNode, TypeParameterDeclaration,
+    SyntaxKind, TextRange, ThisTypeNode, Token, TypeNode, TypeParameterDeclaration, VariableDeclaration,
 } from "../_namespaces/ts";
 
 // Compound nodes
@@ -1500,4 +1501,13 @@ export function createAccessorPropertySetRedirector(factory: NodeFactory, node: 
             )
         ])
     );
+}
+
+export function getParametersOfFunctionOrVariableDeclaration(node: FunctionDeclaration | VariableDeclaration): readonly ParameterDeclaration[] | undefined {
+    if (isFunctionDeclaration(node)) {
+        return node.parameters;
+    }
+    if (node.initializer && (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer))) {
+        return node.initializer.parameters
+    }
 }

@@ -2,7 +2,7 @@ import * as ts from "./_namespaces/ts";
 import {
     CompilerOptionsValue, EndOfLineState, FileExtensionInfo, HighlightSpanKind, MapLike, OutliningSpanKind, OutputFile,
     PluginImport, ProjectReference, RenameLocation, ScriptElementKind, ScriptKind, TextChange, TextInsertion,
-    TodoComment, TodoCommentDescriptor, TypeAcquisition,
+    TodoComment, TodoCommentDescriptor, TransformerImport, TypeAcquisition,
 } from "./_namespaces/ts";
 
 /**
@@ -3579,6 +3579,7 @@ export interface CompilerOptions {
     /** Paths used to used to compute primary types search locations */
     typeRoots?: string[];
     [option: string]: CompilerOptionsValue | undefined;
+    transformers?: TransformerImport[];
 }
 
 export const enum JsxEmit {
