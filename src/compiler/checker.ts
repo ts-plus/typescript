@@ -4140,6 +4140,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     );
                     if (!withoutGlobals) {
                         getNodeLinks(originalLocation).isTsPlusGlobalIdentifier = true;
+                        if (companionSymbolCache.has(targetSymbol)) {
+                            getSymbolLinks(targetSymbol).isPossibleCompanionReference = true;
+                        }
                         result = targetSymbol;
                     }
                 }
