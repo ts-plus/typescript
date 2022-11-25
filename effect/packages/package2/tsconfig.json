@@ -8,7 +8,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "tsPlusTypes": [
-      "./fp-ts__core.json"
+      "./fp-ts__core.json",
+      "./fp-ts__core_2.json"
     ]
   },
   "include": ["src/**/*.ts"]

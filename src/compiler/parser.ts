@@ -1823,73 +1823,68 @@ namespace Parser {
 
     function parseTsPlusExternalTypes(fileName: string, options: CompilerOptions) {
         if (options.configFilePath) {
-            let resolvedPath: string | undefined = undefined;
+            let resolvedPaths: string[] = [];
             if (options.tsPlusTypes) {
                 for (const path of options.tsPlusTypes) {
                     if (pathIsRelative(path)) {
-                        resolvedPath = resolvePath(options.configFilePath.split("/").slice(0, -1).join('/'), path);
+                        resolvedPaths.push(resolvePath(options.configFilePath.split("/").slice(0, -1).join('/'), path));
                     }
                     else {
                         const { resolvedModule } = resolveModuleName(path, options.configFilePath, options, sys);
                         if (resolvedModule) {
-                            resolvedPath = resolvedModule.resolvedFileName;
+                            resolvedPaths.push(resolvedModule.resolvedFileName);
                             break
                         }
                     }
                 }
             }
 
-            if (!resolvedPath) {
-                let packageName = removeExtension(fileName.split("node_modules").slice(-1)[0].substring(1), ".d.ts");
-                if (!packageName) {
-                    return;
-                }
-                if (packageName.startsWith("@")) {
-                    packageName = packageName.split(directorySeparator).slice(0, 2).join(directorySeparator);
+            const packagePath: string = removeExtension(fileName.split("node_modules").slice(-1)[0].substring(1), ".d.ts");
+            if (packagePath) {
+                let packageName: string
+                if (packagePath.startsWith("@")) {
+                    packageName = packagePath.split(directorySeparator).slice(0, 2).join(directorySeparator);
                 } else {
-                    packageName = fileName.split(directorySeparator).slice(0, 1)[0];
+                    packageName = packagePath.split(directorySeparator).slice(0, 1)[0];
                 }
+
                 const resolvedPackageJson = resolvePackageNameToPackageJson(packageName, options.configFilePath, options, sys, undefined)
                 if (resolvedPackageJson) {
                     const packageJsonText = sys.readFile(resolvePath(resolvedPackageJson.packageDirectory, 'package.json'));
                     if (packageJsonText) {
                         const packageJson = JSON.parse(packageJsonText);
                         if (packageJson["tsPlusTypes"]) {
-                            resolvedPath = resolvePath(resolvedPackageJson.packageDirectory, packageJson["tsPlusTypes"]);
+                            resolvedPaths.push(resolvePath(resolvedPackageJson.packageDirectory, packageJson["tsPlusTypes"]))
                         }
                     }
                 }
-            }
 
-            if (!resolvedPath) {
-                let packageName = removeExtension(fileName.split("node_modules").slice(-1)[0].substring(1), ".d.ts");
-                if (!packageName) {
-                    return;
-                }
-                if (packageName.startsWith("@")) {
-                    packageName = mangleScopedPackageName(packageName.split(directorySeparator).slice(0, 2).join(directorySeparator));
+                if (packagePath.startsWith("@")) {
+                    packageName = mangleScopedPackageName(packagePath.split(directorySeparator).slice(0, 2).join(directorySeparator));
                 } else {
-                    packageName = fileName.split(directorySeparator).slice(0, 1)[0];
+                    packageName = packagePath.split(directorySeparator).slice(0, 1)[0];
                 }
                 const { resolvedModule } = resolveModuleName(`@tsplus-types/${packageName}`, options.configFilePath, { ...options, resolveJsonModule: true }, sys);
                 if (resolvedModule) {
-                    resolvedPath = resolvedModule.resolvedFileName;
+                    resolvedPaths.push(resolvedModule.resolvedFileName);
                 }
             }
 
-            if (!resolvedPath) {
+            if (resolvedPaths.length === 0) {
                 return;
             }
 
-            const text = sys.readFile(resolvedPath);
-            if (text) {
-                const json = JSON.parse(text);
-                for (const moduleName in json) {
-                    const { resolvedModule } = resolveModuleName(moduleName, resolvedPath, options, sys);
-                    if (resolvedModule && resolvedModule.resolvedFileName === fileName) {
-                        currentTsPlusTypes = json[moduleName];
-                        currentTsPlusFile = moduleName;
-                        return;
+            for (const resolvedPath of resolvedPaths) {
+                const text = sys.readFile(resolvedPath);
+                if (text) {
+                    const json = JSON.parse(text);
+                    for (const moduleName in json) {
+                        const { resolvedModule } = resolveModuleName(moduleName, resolvedPath, options, sys);
+                        if (resolvedModule && resolvedModule.resolvedFileName === fileName) {
+                            currentTsPlusTypes = json[moduleName];
+                            currentTsPlusFile = moduleName;
+                            return;
+                        }
                     }
                 }
             }
