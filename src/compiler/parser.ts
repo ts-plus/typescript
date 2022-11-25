@@ -1853,8 +1853,10 @@ namespace Parser {
                     const packageJsonText = sys.readFile(resolvePath(resolvedPackageJson.packageDirectory, 'package.json'));
                     if (packageJsonText) {
                         const packageJson = JSON.parse(packageJsonText);
-                        if (packageJson["tsPlusTypes"]) {
-                            resolvedPaths.push(resolvePath(resolvedPackageJson.packageDirectory, packageJson["tsPlusTypes"]))
+                        if (packageJson.tsPlusTypes) {
+                            for (const path of toArray(packageJson.tsPlusTypes)) {
+                                resolvedPaths.push(resolvePath(resolvedPackageJson.packageDirectory, path))
+                            }
                         }
                     }
                 }
