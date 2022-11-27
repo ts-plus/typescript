@@ -48237,7 +48237,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         if (every(signatures, (sig) => !!sig.declaration && !!sig.declaration.type && isFunctionTypeNode(sig.declaration.type) && sig.declaration.type.parameters.length === 1)) {
             const tsPlusSignatures = flatMap(signatures, (sig) => {
                 const returnType = getReturnTypeOfSignature(sig);
-                const returnTypeNode = sig.declaration!.type! as FunctionTypeNode;
                 const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);
                 if (signatures.find(isPipeableSelfARestParameter)) {
                     error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
@@ -48254,9 +48253,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         pipeable.modifiers,
                         pipeable.asteriskToken,
                         pipeable.name,
-                        [...(returnTypeNode.typeParameters ?? []), ...(pipeable.typeParameters ?? [])],
-                        [...returnTypeNode.parameters, ...pipeable.parameters],
-                        returnTypeNode.type,
+                        [...(rsig.declaration?.typeParameters as NodeArray<TypeParameterDeclaration> ?? []), ...(sig.declaration?.typeParameters as NodeArray<TypeParameterDeclaration> ?? [])],
+                        [...(rsig.declaration?.parameters as NodeArray<ParameterDeclaration> ?? []), ...(sig.declaration?.parameters as NodeArray<ParameterDeclaration> ?? [])],
+                        rsig.declaration?.type as TypeNode,
                         undefined
                     );
                     newDecl.jsDoc = pipeable.jsDoc;
@@ -48379,7 +48378,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 isFunctionTypeNode(sig.declaration.type) &&
                 sig.declaration.type.parameters.length === 1)
             ) {
-            const pipeableWithType = pipeable as VariableDeclarationWithFunctionType
             if (signatures.find(isPipeableSelfARestParameter)) {
                 error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
                 return;
@@ -48394,10 +48392,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
                     newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
                     newSig.minArgumentCount = newSig.minArgumentCount + 1;
-                    const newDecl = factory.updateFunctionTypeNode(
-                        pipeableWithType.type,
-                        factory.createNodeArray([...(returnFn.typeParameters ?? []), ...(pipeableWithType.type.typeParameters ?? [])]),
-                        factory.createNodeArray([...returnFn.parameters, ...pipeableWithType.type.parameters]),
+                    const newDecl = factory.createFunctionTypeNode(
+                        factory.createNodeArray([...(returnFn.typeParameters ?? []), ...(sig.declaration?.typeParameters as NodeArray<TypeParameterDeclaration> ?? [])]),
+                        factory.createNodeArray([...returnFn.parameters, ...(sig.declaration?.parameters as NodeArray<ParameterDeclaration> ?? [])]),
                         returnFn.type
                     );
                     newDecl.jsDoc = pipeable.jsDoc;
@@ -48877,8 +48874,11 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
     }
     function cacheTsPlusPipeableVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier) {
-        if((declaration.initializer && isFunctionLikeDeclaration(declaration.initializer)) ||
-            (declaration.type && isFunctionTypeNode(declaration.type))) {
+        if(
+            (declaration.initializer && isFunctionLikeDeclaration(declaration.initializer)) ||
+            (declaration.type && isFunctionTypeNode(declaration.type)) ||
+            ((declaration.type) && isTypeLiteralNode(declaration.type) && every(declaration.type.members, isCallSignatureDeclaration))
+        ) {
             for (const { target, name, priority } of collectTsPlusPipeableTags(declaration)) {
                 getTsPlusSourceFileCache(target).add(getSourceFileOfNode(declaration));
                 if (!unresolvedPipeableCache.has(target)) {

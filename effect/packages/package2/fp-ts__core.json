@@ -47,5 +47,28 @@
         }
       ]
     }
+  ],
+  "@fp-ts/core/Option": [
+    {
+      "definitionName": "Option",
+      "definitionKind": "type",
+      "extensions": [
+        {
+          "kind": "type",
+          "typeName": "fp-ts/Option"
+        }
+      ]
+    },
+    {
+      "definitionName": "filter",
+      "definitionKind": "const",
+      "extensions": [
+        {
+          "kind": "pipeable",
+          "typeName": "fp-ts/Option",
+          "name": "filter"
+        }
+      ]
+    }
   ]
 }
