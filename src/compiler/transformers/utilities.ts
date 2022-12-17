@@ -114,13 +114,23 @@ export interface ExternalModuleInfo {
     generatedExportSpecifiers?: Map<Identifier, ExportSpecifier[]>;
 }
 
-export function getImportLocation(fileMap: [string, RegExp][], source: string) {
+const importLocationCache: Record<string, string | undefined> = {}
+export function tryGetImportLocation(fileMap: [string, RegExp][], source: string) {
+    if (source in importLocationCache) { return importLocationCache[source] }
     for (const [path, reg] of fileMap) {
         if (source.match(reg)) {
-            return source.replace(reg, path)
+            const r = source.replace(reg, path)
+            importLocationCache[source] = r
+            return r;
         }
     }
-    throw new Error(`cannot get import path for file: ${source} (Make sure to add it in your tsplus.config.json)`)
+    importLocationCache[source] = undefined
+    return undefined
+}
+export function getImportLocation(fileMap: [string, RegExp][], source: string) {
+    const found = tryGetImportLocation(fileMap, source)
+    if (!found) { throw new Error(`cannot get import path for file: ${source} (Make sure to add it in your tsplus.config.json)`); }
+    return found
 }
 
 export function getTraceLocation(traceMap: [string, RegExp][], source: string) {
