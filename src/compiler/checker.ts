@@ -4192,6 +4192,13 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 }
             }
         }
+        if (!result && originalLocation) {
+            const globalSymbol = getGlobalSymbol(name, SymbolFlags.Type, undefined);
+            if (globalSymbol && companionSymbolCache.has(globalSymbol)) {
+                result = globalSymbol;
+                getSymbolLinks(globalSymbol).isPossibleCompanionReference = true;
+            }
+        }
         // TSPLUS EXTENSION END
 
         // We just climbed up parents looking for the name, meaning that we started in a descendant node of `lastLocation`.
@@ -5575,7 +5582,12 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         if (!nodeIsSynthesized(name) && isEntityName(name) && (symbol.flags & SymbolFlags.Alias || name.parent.kind === SyntaxKind.ExportAssignment)) {
             markSymbolOfAliasDeclarationIfTypeOnly(getAliasDeclarationFromName(name), symbol, /*finalTarget*/ undefined, /*overwriteEmpty*/ true);
         }
-        return (symbol.flags & meaning) || dontResolveAlias ? symbol : resolveAlias(symbol);
+        return (symbol.flags & meaning) || dontResolveAlias ||
+            // TSPLUS EXTENSION BEGIN
+            (getGlobalSymbol(symbol.escapedName, SymbolFlags.Type, undefined) && getSymbolLinks(symbol).isPossibleCompanionReference)
+            // TSPLUS EXTENSION END
+                ? symbol
+                : resolveAlias(symbol);
     }
 
     /**

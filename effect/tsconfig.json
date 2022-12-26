@@ -7,6 +7,9 @@
         "strict": true,
         "declaration": true,
         "skipLibCheck": true,
-        "lib": ["ES2021"]
+        "lib": ["ES2021"],
+        "paths": {
+            "@tsplus-test/package1/*": ["./packages/package1/*"]
+        }
     },
 }
