@@ -1832,7 +1832,8 @@ namespace Parser {
                         resolvedPaths.push(resolvePath(options.configFilePath.split("/").slice(0, -1).join('/'), path));
                     }
                     else {
-                        const { resolvedModule } = resolveModuleName(path, options.configFilePath, options, sys);
+                        let resolvedModule = resolveModuleName(path, options.configFilePath, options, sys).resolvedModule;
+                        resolvedModule ??= resolveModuleName(path, fileName, options, sys).resolvedModule;
                         if (resolvedModule) {
                             resolvedPaths.push(resolvedModule.resolvedFileName);
                             break
@@ -1883,7 +1884,8 @@ namespace Parser {
                 if (text) {
                     const json = JSON.parse(text);
                     for (const moduleName in json) {
-                        const { resolvedModule } = resolveModuleName(moduleName, resolvedPath, options, sys);
+                        let resolvedModule = resolveModuleName(moduleName, resolvedPath, options, sys).resolvedModule;
+                        resolvedModule ??= resolveModuleName(moduleName, fileName, options, sys).resolvedModule;
                         if (resolvedModule && resolvedModule.resolvedFileName === fileName) {
                             currentTsPlusTypes = json[moduleName];
                             currentTsPlusFile = moduleName;
