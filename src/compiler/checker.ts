@@ -2001,8 +2001,10 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         getExtensionsForDeclaration: (node) => {
             return collectTsPlusStaticTags(node)
                 .concat(collectTsPlusFluentTags(node))
+                .concat(collectTsPlusPipeableTags(node))
                 .concat(collectTsPlusGetterTags(node))
                 .concat(collectTsPlusOperatorTags(node))
+                .concat(collectTsPlusPipeableOperatorTags(node))
         },
         getTsPlusFiles: () => tsPlusFilesFinal,
         getTsPlusGlobalImports: () => tsPlusGlobalImportCache,
@@ -4188,6 +4190,13 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 }
             }
         }
+        if (!result && originalLocation) {
+            const globalSymbol = getGlobalSymbol(name, SymbolFlags.Type, undefined);
+            if (globalSymbol && companionSymbolCache.has(globalSymbol)) {
+                result = globalSymbol;
+                getSymbolLinks(globalSymbol).isPossibleCompanionReference = true;
+            }
+        }
         // TSPLUS EXTENSION END
 
         // We just climbed up parents looking for the name, meaning that we started in a descendant node of `lastLocation`.
@@ -5571,7 +5580,12 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         if (!nodeIsSynthesized(name) && isEntityName(name) && (symbol.flags & SymbolFlags.Alias || name.parent.kind === SyntaxKind.ExportAssignment)) {
             markSymbolOfAliasDeclarationIfTypeOnly(getAliasDeclarationFromName(name), symbol, /*finalTarget*/ undefined, /*overwriteEmpty*/ true);
         }
-        return (symbol.flags & meaning) || dontResolveAlias ? symbol : resolveAlias(symbol);
+        return (symbol.flags & meaning) || dontResolveAlias ||
+            // TSPLUS EXTENSION BEGIN
+            getSymbolLinks(symbol).isPossibleCompanionReference
+            // TSPLUS EXTENSION END
+                ? symbol
+                : resolveAlias(symbol);
     }
 
     /**
@@ -31931,6 +31945,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     nodeLinks.tsPlusResolvedType = companionExt.type
                     return companionExt.type;
                 }
+                return;
             }
             const fluentExtType = getFluentExtension(leftType, right.escapedText.toString());
             if (fluentExtType && isCallExpression(node.parent) && node.parent.expression === node) {
@@ -48370,11 +48385,16 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                             returnStatement.expression.type,
                             undefined
                         );
+
                         newDecl.jsDoc = pipeable.jsDoc;
                         newDecl.jsDocCache = pipeable.jsDocCache;
                         newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
+                        setParent(newDecl, pipeable.parent);
+                        setOriginalNode(newDecl, pipeable)
+
                         newSig.declaration = newDecl;
                         newSig.tsPlusDeclaration = pipeable;
+
                         if (thisify) {
                             const thisified = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
                             if (!thisified) {
@@ -48414,11 +48434,16 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         rsig.declaration?.type as TypeNode,
                         undefined
                     );
+
                     newDecl.jsDoc = pipeable.jsDoc;
                     newDecl.jsDocCache = pipeable.jsDocCache;
                     newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
+                    setParent(newDecl, pipeable.parent);
+                    setOriginalNode(newDecl, pipeable);
+
                     newSig.declaration = newDecl;
                     newSig.tsPlusDeclaration = pipeable;
+
                     if (thisify) {
                         const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
                         if (!thisifiedSignature) {
@@ -48507,11 +48532,16 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                                 factory.createBlock([])
                             );
                         }
+
                         newDecl.jsDoc = pipeable.jsDoc;
                         newDecl.jsDocCache = pipeable.jsDocCache;
                         newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
+                        setParent(newDecl, pipeable.parent);
+                        setOriginalNode(newDecl, pipeable);
+
                         newSig.declaration = newDecl;
                         newSig.tsPlusDeclaration = pipeable;
+
                         if (thisify) {
                             const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
                             if (!thisifiedSignature) {
@@ -48553,11 +48583,16 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         factory.createNodeArray([...returnFn.parameters, ...(sig.declaration?.parameters as NodeArray<ParameterDeclaration> ?? [])]),
                         returnFn.type
                     );
-                    newDecl.jsDoc = pipeable.jsDoc;
-                    newDecl.jsDocCache = pipeable.jsDocCache;
+
+                    newDecl.jsDoc = pipeable.parent.parent.jsDoc;
+                    newDecl.jsDocCache = pipeable.parent.parent.jsDocCache;
                     newDecl.symbol = createTsPlusPipeableDeclarationSymbol(name, pipeable);
+                    setParent(newDecl, pipeable.parent);
+                    setOriginalNode(newDecl, pipeable);
+
                     newSig.declaration = newDecl;
                     newSig.tsPlusDeclaration = pipeable;
+
                     if (thisify) {
                         const thisifiedSignature = thisifyTsPlusSignature(pipeable, newSig, exportName, file, reportDiagnostic);
                         if (!thisifiedSignature) {

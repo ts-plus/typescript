@@ -3201,7 +3201,7 @@ function parseConfig(
     basePath: string,
     configFileName: string | undefined,
     resolutionStack: string[],
-    errors: Push<Diagnostic>,
+    errors: Diagnostic[],
     extendedConfigCache?: Map<string, ExtendedConfigCacheEntry>
 ): ParsedTsconfig {
     const config = parseConfigOriginal(

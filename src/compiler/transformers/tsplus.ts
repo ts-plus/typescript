@@ -8,7 +8,7 @@ import {
     isIdentifier, isNamedDeclaration, isNamespaceImport, isNumericLiteral, isParenthesizedExpression, isPartOfTypeNode, isPartOfTypeQuery,
     isPropertyAccessExpression, isReturnStatement, isSpreadElement, isStringLiteral, isSuperCall, isTsPlusSignature, isVariableDeclaration,
     isVariableStatement, JSDocTag, map, NamedDeclaration, Node, NodeArray, NodeFactory, NodeFlags, ParameterDeclaration, PropertyAccessExpression,
-    reduceLeft, SourceFile, Statement, symbolName, SyntaxKind, TransformationContext, TsPlusPipeableDeclarationSymbol, TsPlusSignature, TypeChecker,
+    reduceLeft, setOriginalNode, SourceFile, Statement, symbolName, SyntaxKind, TransformationContext, TsPlusPipeableDeclarationSymbol, TsPlusSignature, TypeChecker,
     VariableStatement, visitEachChild, visitNode, visitNodes, Visitor, VisitResult, __String
 } from "../_namespaces/ts";
 
@@ -380,7 +380,7 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
         function visitPropertyAccessExpression(source: SourceFile, traceInScope: Identifier | undefined, node: PropertyAccessExpression, visitor: Visitor, context: TransformationContext): VisitResult<Node> {
             const nodeLinks = checker.getNodeLinks(node);
             if (nodeLinks.tsPlusStaticExtension) {
-                return getPathOfExtension(context, importer, nodeLinks.tsPlusStaticExtension, source, sourceFileUniqueNames)
+                return getPathOfExtension(context, importer, nodeLinks.tsPlusStaticExtension, source, sourceFileUniqueNames, node);
             }
             if (nodeLinks.tsPlusGetterExtension) {
                 if (checker.isTsPlusMacroGetter(node, "identity")) {
@@ -398,10 +398,13 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
                         }
                     }
                 }
-                return factory.createCallExpression(
-                    getPathOfExtension(context, importer, nodeLinks.tsPlusGetterExtension, source, sourceFileUniqueNames),
-                    void 0,
-                    args
+                return setOriginalNode(
+                    factory.createCallExpression(
+                        getPathOfExtension(context, importer, nodeLinks.tsPlusGetterExtension, source, sourceFileUniqueNames, node),
+                        void 0,
+                        args
+                    ),
+                    node,
                 );
             }
             return visitEachChild(node, visitor, context);
@@ -461,7 +464,8 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
                         exportName
                     },
                     source,
-                    sourceFileUniqueNames
+                    sourceFileUniqueNames,
+                    call.expression,
                 ),
                 undefined,
                 args
@@ -839,7 +843,7 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
                 }
                 return factory.updateCallExpression(
                     visited,
-                    getPathOfExtension(context, importer, nodeLinks.tsPlusCallExtension, source, sourceFileUniqueNames),
+                    getPathOfExtension(context, importer, nodeLinks.tsPlusCallExtension, source, sourceFileUniqueNames, visited.expression),
                     visited.typeArguments,
                     visited.arguments
                 );
@@ -889,7 +893,14 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
                     return factory.updateCallExpression(
                         visited,
                         factory.createCallExpression(
-                            getPathOfExtension(context, importer, { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName }, source, sourceFileUniqueNames),
+                            getPathOfExtension(
+                                context,
+                                importer,
+                                { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName },
+                                source,
+                                sourceFileUniqueNames,
+                                visited.expression,
+                            ),
                             undefined,
                             visited.arguments
                         ),
@@ -910,10 +921,17 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
                         )
                     }
                     return factory.updateCallExpression(
-                        visited as CallExpression,
-                        getPathOfExtension(context, importer, { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName }, source, sourceFileUniqueNames),
-                        (visited as CallExpression).typeArguments,
-                        [expression, ...(visited as CallExpression).arguments]
+                        visited,
+                        getPathOfExtension(
+                            context,
+                            importer,
+                            { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName },
+                            source,
+                            sourceFileUniqueNames,
+                            visited.expression,
+                        ),
+                        visited.typeArguments,
+                        [expression, ...visited.arguments]
                     );
                 }
             }
@@ -959,7 +977,14 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
                     return factory.updateCallExpression(
                         visited,
                         factory.createCallExpression(
-                            getPathOfExtension(context, importer, { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName }, source, sourceFileUniqueNames),
+                            getPathOfExtension(
+                                context,
+                                importer,
+                                { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName },
+                                source,
+                                sourceFileUniqueNames,
+                                visited.expression,
+                            ),
                             undefined,
                             visited.arguments
                         ),
@@ -981,7 +1006,14 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
                     }
                     return factory.updateCallExpression(
                         visited as CallExpression,
-                        getPathOfExtension(context, importer, { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName }, source, sourceFileUniqueNames),
+                        getPathOfExtension(
+                            context,
+                            importer,
+                            { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName },
+                            source,
+                            sourceFileUniqueNames,
+                            visited.expression,
+                        ),
                         (visited as CallExpression).typeArguments,
                         [expression, ...(visited as CallExpression).arguments]
                     );
@@ -1220,7 +1252,7 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
         return node;
     }
 
-    function getPathOfExtension(context: TransformationContext, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile, sourceFileUniqueNames: SourceFileUniqueNames) {
+    function getPathOfExtension(context: TransformationContext, importer: TsPlusImporter, extension: { definition: SourceFile; exportName: string; }, source: SourceFile, sourceFileUniqueNames: SourceFileUniqueNames, original?: Node) {
         const factory = context.factory;
         if (source.fileName === extension.definition.fileName) {
             return sourceFileUniqueNames.get(extension.exportName).name;
@@ -1244,12 +1276,16 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
 
         const id = importer.get(path);
 
-        const node = factory.createPropertyAccessExpression(
-            id,
-            factory.createIdentifier(extension.exportName)
-        );
+        const identifier = factory.createIdentifier(extension.exportName);
+        if (original && isPropertyAccessExpression(original)) {
+            setOriginalNode(identifier, original.name);
+        }
+
+        const node = factory.createPropertyAccessExpression(id, identifier);
 
         (node as ExpressionWithReferencedImport<PropertyAccessExpression>).tsPlusReferencedImport = path;
+        setOriginalNode(node, original);
+
         return node;
     }
 }
