@@ -892,17 +892,20 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
                     }
                     return factory.updateCallExpression(
                         visited,
-                        factory.createCallExpression(
-                            getPathOfExtension(
-                                context,
-                                importer,
-                                { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName },
-                                source,
-                                sourceFileUniqueNames,
-                                visited.expression,
+                        setOriginalNode(
+                            factory.createCallExpression(
+                                getPathOfExtension(
+                                    context,
+                                    importer,
+                                    { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName },
+                                    source,
+                                    sourceFileUniqueNames,
+                                    visited.expression,
+                                ),
+                                undefined,
+                                visited.arguments
                             ),
-                            undefined,
-                            visited.arguments
+                            visited
                         ),
                         undefined,
                         [expression]
@@ -976,17 +979,20 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
                     }
                     return factory.updateCallExpression(
                         visited,
-                        factory.createCallExpression(
-                            getPathOfExtension(
-                                context,
-                                importer,
-                                { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName },
-                                source,
-                                sourceFileUniqueNames,
-                                visited.expression,
+                        setOriginalNode(
+                            factory.createCallExpression(
+                                getPathOfExtension(
+                                    context,
+                                    importer,
+                                    { definition: fluentExtension.tsPlusFile, exportName: fluentExtension.tsPlusExportName },
+                                    source,
+                                    sourceFileUniqueNames,
+                                    visited.expression,
+                                ),
+                                undefined,
+                                visited.arguments
                             ),
-                            undefined,
-                            visited.arguments
+                            visited,
                         ),
                         undefined,
                         [expression]
