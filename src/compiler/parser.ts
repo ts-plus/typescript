@@ -1825,64 +1825,94 @@ namespace Parser {
     }
 
     function getTsPlusExternalTypesPaths(fileName: string, options: CompilerOptions) {
-        if (options.configFilePath) {
-            if (tsPlusResolvedPathsCache.has(options.configFilePath)) {
-                return tsPlusResolvedPathsCache.get(options.configFilePath)!;
-            }
+        if (!options.configFilePath) {
+            return [];
+        }
 
-            let resolvedPaths: string[] = [];
-            if (options.tsPlusTypes) {
-                for (const path of options.tsPlusTypes) {
-                    if (pathIsRelative(path)) {
-                        resolvedPaths.push(resolvePath(options.configFilePath.split("/").slice(0, -1).join('/'), path));
-                    }
-                    else {
-                        const resolvedModule = resolveModuleName(path, options.configFilePath, options, sys).resolvedModule ?? resolveModuleName(path, fileName, options, sys).resolvedModule;
-                        if (resolvedModule) {
-                            resolvedPaths.push(resolvedModule.resolvedFileName);
-                            break
-                        }
-                    }
-                }
-            }
+        let tsconfigPaths: string[] = [];
 
-            const packagePath: string = removeExtension(fileName.split("node_modules").slice(-1)[0].substring(1), ".d.ts");
-            if (packagePath) {
-                let packageName: string
-                if (packagePath.startsWith("@")) {
-                    packageName = packagePath.split(directorySeparator).slice(0, 2).join(directorySeparator);
+        if (tsPlusResolvedPathsCache.has(options.configFilePath)) {
+            tsconfigPaths = tsPlusResolvedPathsCache.get(
+                options.configFilePath
+            )!;
+        } else if (options.tsPlusTypes) {
+            for (const path of options.tsPlusTypes) {
+                if (pathIsRelative(path)) {
+                    tsconfigPaths.push(resolvePath(options.configFilePath.split("/").slice(0, -1).join("/"), path));
                 } else {
-                    packageName = packagePath.split(directorySeparator).slice(0, 1)[0];
+                    const resolvedModule = resolveModuleName(path, options.configFilePath, options, sys).resolvedModule ?? resolveModuleName(path, fileName, options, sys).resolvedModule;
+                    if (resolvedModule) {
+                        tsconfigPaths.push(resolvedModule.resolvedFileName);
+                        break;
+                    }
                 }
+            }
+            tsPlusResolvedPathsCache.set(options.configFilePath, tsconfigPaths);
+        }
 
-                const resolvedPackageJson = resolvePackageNameToPackageJson(packageName, options.configFilePath, options, sys, undefined)
+        let packagePaths: string[] = [];
+        const packagePath: string = removeExtension(
+            fileName.split("node_modules").slice(-1)[0].substring(1),
+            ".d.ts"
+        );
+        if (packagePath) {
+            let packageName: string;
+            if (packagePath.startsWith("@")) {
+                packageName = packagePath
+                    .split(directorySeparator)
+                    .slice(0, 2)
+                    .join(directorySeparator);
+            } else {
+                packageName = packagePath
+                    .split(directorySeparator)
+                    .slice(0, 1)[0];
+            }
+
+            const packageCacheKey = packageName;
+
+            if (tsPlusResolvedPathsCache.has(packageCacheKey)) {
+                packagePaths = tsPlusResolvedPathsCache.get(packageCacheKey)!;
+            } else {
+                const resolvedPackageJson = resolvePackageNameToPackageJson(packageName, options.configFilePath, options, sys, undefined);
                 if (resolvedPackageJson) {
-                    const packageJsonText = sys.readFile(resolvePath(resolvedPackageJson.packageDirectory, 'package.json'));
+                    const packageJsonText = sys.readFile(resolvePath(resolvedPackageJson.packageDirectory, "package.json"));
                     if (packageJsonText) {
                         const packageJson = JSON.parse(packageJsonText);
                         if (packageJson.tsPlusTypes) {
                             for (const path of toArray(packageJson.tsPlusTypes)) {
-                                resolvedPaths.push(resolvePath(resolvedPackageJson.packageDirectory, path))
+                                packagePaths.push(resolvePath(resolvedPackageJson.packageDirectory, path));
                             }
                         }
                     }
                 }
 
                 if (packagePath.startsWith("@")) {
-                    packageName = mangleScopedPackageName(packagePath.split(directorySeparator).slice(0, 2).join(directorySeparator));
+                    packageName = mangleScopedPackageName(
+                        packagePath
+                            .split(directorySeparator)
+                            .slice(0, 2)
+                            .join(directorySeparator)
+                    );
                 } else {
-                    packageName = packagePath.split(directorySeparator).slice(0, 1)[0];
+                    packageName = packagePath
+                        .split(directorySeparator)
+                        .slice(0, 1)[0];
                 }
-                const { resolvedModule } = resolveModuleName(`@tsplus-types/${packageName}`, options.configFilePath, { ...options, resolveJsonModule: true }, sys);
+                const { resolvedModule } = resolveModuleName(
+                    `@tsplus-types/${packageName}`,
+                    options.configFilePath,
+                    { ...options, resolveJsonModule: true },
+                    sys
+                );
                 if (resolvedModule) {
-                    resolvedPaths.push(resolvedModule.resolvedFileName);
+                    packagePaths.push(resolvedModule.resolvedFileName);
                 }
-            }
 
-            tsPlusResolvedPathsCache.set(options.configFilePath, resolvedPaths);
-            return resolvedPaths;
+                tsPlusResolvedPathsCache.set(packageCacheKey, packagePaths);
+            }
         }
-        return [];
+
+        return tsconfigPaths.concat(packagePaths);
     }
 
     function parseTsPlusExternalTypes(fileName: string, options: CompilerOptions) {
