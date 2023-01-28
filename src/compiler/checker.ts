@@ -49219,6 +49219,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return getSignaturesOfType(getReturnTypeOfSignature(signature), SignatureKind.Call).find(isSelfARestParameter) != null;
     }
     function getTsPlusFluentSignatureForPipeableFunction(file: SourceFile, exportName: string, name: string, pipeable: FunctionDeclaration, thisify = false): [Type, TsPlusSignature[]] | undefined {
+        if (exportName === 'filterOrElse') {
+            debugger
+        }
         function reportDiagnostic(diagnostic: DiagnosticMessage) {
             error(pipeable, diagnostic);
         }
@@ -49282,7 +49285,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             if (!sig.declaration || !sig.declaration.type) {
                 return false
             }
-            if (isFunctionTypeNode(sig.declaration.type) && sig.declaration.parameters.length === 1) {
+            if (isFunctionTypeNode(sig.declaration.type) && sig.declaration.type.parameters.length === 1) {
                 return true
             }
             if (isCallSignatureDeclaration(sig.declaration) && sig.declaration.parameters.length === 1) {
@@ -49435,18 +49438,24 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 return [dataFirstType, tsPlusSignatures];
             }
         }
-        if (pipeable.type &&
-            every(signatures, (sig) =>
-                !!sig.declaration &&
-                !!sig.declaration.type &&
-                isFunctionTypeNode(sig.declaration.type) &&
-                sig.declaration.type.parameters.length === 1)
-            ) {
-            if (signatures.find(isPipeableSelfARestParameter)) {
-                error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
-                return;
+        const filteredSignatures = filter(signatures, (sig) => {
+            if (!sig.declaration || !sig.declaration.type) {
+                return false
             }
-            const tsPlusSignatures = flatMap(signatures, (sig) => {
+            if (isFunctionTypeNode(sig.declaration.type) && sig.declaration.type.parameters.length === 1) {
+                return true
+            }
+            if (isCallSignatureDeclaration(sig.declaration) && sig.declaration.parameters.length === 1) {
+                return true
+            }
+            return false
+        })
+        if (filteredSignatures.find(isPipeableSelfARestParameter)) {
+            error(pipeable, Diagnostics.The_first_parameter_of_a_pipeable_annotated_function_cannot_be_a_rest_parameter);
+            return;
+        }
+        if (filteredSignatures.length > 0) {
+            const tsPlusSignatures = flatMap(filteredSignatures, (sig) => {
                 const returnFn = sig.declaration!.type! as FunctionTypeNode
                 const returnType = getReturnTypeOfSignature(sig);
                 const returnSignatures = getSignaturesOfType(returnType, SignatureKind.Call);

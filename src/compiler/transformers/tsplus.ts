@@ -316,6 +316,8 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
                         exportName = declaration.symbol.escapedName as string;
                     } else if (isDeclaration(declaration.parent)) {
                         exportName = declaration.parent.symbol.escapedName as string;
+                    } else if (isDeclaration(declaration.parent.parent)) {
+                        exportName = declaration.parent.parent.symbol.escapedName as string;
                     } else {
                         throw new Error("Cannot find export name for operator extension");
                     }
