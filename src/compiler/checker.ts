@@ -34534,7 +34534,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             // TSPLUS EXTENTION START
             const originalParamType = thisType;
             let paramType = originalParamType;
-            if (isLazyParameterByType(originalParamType) && thisArgumentNode) {
+            if ((isLazyParameterByType(originalParamType) || isForceLazyParameterByType(originalParamType)) && thisArgumentNode) {
                 const contextFreeArgType = thisArgumentType;
                 if (isTypeIdenticalTo(contextFreeArgType, anyType) || isTypeIdenticalTo(contextFreeArgType, neverType)) {
                     return [createDiagnosticForNode(
@@ -34568,7 +34568,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 const originalParamType = getTypeAtPosition(signature, i);
                 const argType = checkExpressionWithContextualType(arg, unionIfLazy(originalParamType), /*inferenceContext*/ undefined, checkMode);
                 let paramType = originalParamType;
-                if (isLazyParameterByType(originalParamType)) {
+                if (isLazyParameterByType(originalParamType) || isForceLazyParameterByType(originalParamType)) {
                     if ((isTypeIdenticalTo(argType, anyType) || isTypeIdenticalTo(argType, neverType)) && !(checkMode & CheckMode.SkipGenericFunctions)) {
                         return [createDiagnosticForNode(
                             arg,
@@ -52122,7 +52122,11 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
     }
     function unionIfLazy(_paramType: Type) {
         const isLazy = isLazyParameterByType(_paramType);
-        const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]], UnionReduction.None) : _paramType;
+        const paramType = isLazy
+            ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]], UnionReduction.None)
+            : isForceLazyParameterByType(_paramType)
+                ? (_paramType as TypeReference).resolvedTypeArguments![0]
+                : _paramType;
         return paramType
     }
     function getFluentExtension(targetType: Type, name: string): Type | undefined {
@@ -52720,6 +52724,15 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         if (type.symbol && type.symbol.declarations && type.symbol.declarations.length > 0) {
             const tag = collectTsPlusTypeTags(type.symbol.declarations[0])[0];
             if (tag === "tsplus/LazyArgument") {
+                return true;
+            }
+        }
+        return false;
+    }
+    function isForceLazyParameterByType(type: Type): type is TypeReference {
+        if (type.symbol && type.symbol.declarations && type.symbol.declarations.length > 0) {
+            const tag = collectTsPlusTypeTags(type.symbol.declarations[0])[0];
+            if (tag === "tsplus/ForceLazyArgument") {
                 return true;
             }
         }
