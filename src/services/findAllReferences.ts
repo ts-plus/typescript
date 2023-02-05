@@ -243,6 +243,7 @@ import {
     getTokenAtPosition,
     isBinaryOperatorToken,
     TsPlusExtensionTag,
+    isTsPlusSymbol,
 } from "./_namespaces/ts";
 import {
     createImportTracker,
@@ -1024,26 +1025,26 @@ export namespace Core {
             return moduleReferences;
         }
 
-        // TSPLUS EXTENSION BEGIN
-
-        let tsPlusDeclarationReferences: SymbolAndEntries[] = []
-        if (symbol.valueDeclaration) {
-            for (const extension of checker.getExtensionsForDeclaration(symbol.valueDeclaration)) {
-                tsPlusDeclarationReferences = concatenate(
-                    tsPlusDeclarationReferences,
-                    getReferencedExtensionsForSymbol(symbol, extension, undefined, sourceFiles, sourceFilesSet, checker, cancellationToken, options)
-                );
-            }
-        }
-
-        // TSPLUS EXTENSION END
-
         const aliasedSymbol = getMergedAliasedSymbolOfNamespaceExportDeclaration(node, symbol, checker);
         const moduleReferencesOfExportTarget = aliasedSymbol &&
             getReferencedSymbolsForModuleIfDeclaredBySourceFile(aliasedSymbol, program, sourceFiles, cancellationToken, options, sourceFilesSet);
 
         const references = getReferencedSymbolsForSymbol(symbol, node, sourceFiles, sourceFilesSet, checker, cancellationToken, options);
-        return mergeReferences(program, moduleReferences, references, moduleReferencesOfExportTarget, tsPlusReferences, tsPlusDeclarationReferences);
+        // TSPLUS EXTENSION BEGIN
+        if (isTsPlusSymbol(symbol)) {
+            let tsPlusDeclarationReferences: SymbolAndEntries[] = []
+            if (symbol.valueDeclaration) {
+                for (const extension of checker.getExtensionsForDeclaration(symbol.valueDeclaration)) {
+                    tsPlusDeclarationReferences = concatenate(
+                        tsPlusDeclarationReferences,
+                        getReferencedExtensionsForSymbol(symbol, extension, undefined, sourceFiles, sourceFilesSet, checker, cancellationToken, options)
+                    );
+                }
+            }
+            return mergeReferences(program, moduleReferences, references, moduleReferencesOfExportTarget, tsPlusReferences, tsPlusDeclarationReferences);
+        }
+        // TSPLUS EXTENSION END
+        return mergeReferences(program, moduleReferences, references, moduleReferencesOfExportTarget);
     }
 
     export function getAdjustedNode(node: Node, options: Options) {
