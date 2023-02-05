@@ -13,3 +13,5 @@ const Ops: Ops = {}
 export const succeed = Effect.succeed
 
 const succeed2 = Ops.succeed
+
+Effect.succeed(1).flatMap((x) => Effect(1))

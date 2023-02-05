@@ -169,54 +169,57 @@ export function getDefinitionAtPosition(program: Program, sourceFile: SourceFile
     let symbol: Symbol | undefined;
     let failedAliasResolution: boolean | undefined;
 
-    if (isPropertyAccessExpression(parent)) {
-        const nodeType = typeChecker.getTypeAtLocation(node);
-        if(nodeType.symbol && isTsPlusSymbol(nodeType.symbol)) {
-            if (parent.parent && isCallExpression(parent.parent) && parent.parent.expression === parent) {
-                const declaration = getDeclarationForTsPlus(typeChecker, parent.parent, nodeType.symbol)
-                if (declaration) {
-                    symbol = declaration.symbol
-                }
-            }
-            if (!symbol && nodeType.symbol.tsPlusTag !== TsPlusSymbolTag.Fluent) {
-                symbol = nodeType.symbol.tsPlusDeclaration.symbol;
-            }
-        }
-        else if (isTsPlusTypeWithDeclaration(nodeType)) {
-            symbol = nodeType.tsPlusSymbol.tsPlusDeclaration.symbol;
-        }
-        else {
-            const type = typeChecker.getTypeAtLocation(parent.expression);
-            const extensions = typeChecker.getExtensions(parent.expression);
-
-            if(extensions) {
-                const name = parent.name.escapedText.toString();
-                const staticValueSymbol = typeChecker.getStaticExtension(type, name);
-                if(staticValueSymbol) {
-                    // If execution gets here, it means we have a static variable extension,
-                    // which needs to be treated a little differently
-                    const declaration = staticValueSymbol.patched.valueDeclaration;
-                    if(declaration && declaration.original) {
-                        symbol = (declaration.original as Declaration).symbol;
+    const nodeSymbol = typeChecker.getSymbolAtLocation(node)
+    if (!nodeSymbol) {
+        if (isPropertyAccessExpression(parent)) {
+            const nodeType = typeChecker.getTypeAtLocation(node);
+            if(nodeType.symbol && isTsPlusSymbol(nodeType.symbol)) {
+                if (parent.parent && isCallExpression(parent.parent) && parent.parent.expression === parent) {
+                    const declaration = getDeclarationForTsPlus(typeChecker, parent.parent, nodeType.symbol)
+                    if (declaration) {
+                        symbol = declaration.symbol
                     }
-                } else {
-                    symbol = extensions.get(name);
+                }
+                if (!symbol && nodeType.symbol.tsPlusTag !== TsPlusSymbolTag.Fluent) {
+                    symbol = nodeType.symbol.tsPlusDeclaration.symbol;
                 }
             }
-        }
-
-        if (!symbol) {
-            symbol = typeChecker.getNodeLinks(node.parent).tsPlusSymbol
-        }
-    }
-    else if (isBinaryOperatorToken(node) && isBinaryExpression(parent)) {
-        const extension = typeChecker.getResolvedOperator(parent);
-        if (extension && extension.declaration) {
-            if (isTsPlusSymbol(extension.declaration.symbol) && extension.declaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableDeclaration) {
-                symbol = extension.declaration.symbol.tsPlusDeclaration.symbol
+            else if (isTsPlusTypeWithDeclaration(nodeType)) {
+                symbol = nodeType.tsPlusSymbol.tsPlusDeclaration.symbol;
             }
             else {
-                symbol = extension.declaration.symbol;
+                const type = typeChecker.getTypeAtLocation(parent.expression);
+                const extensions = typeChecker.getExtensions(parent.expression);
+
+                if(extensions) {
+                    const name = parent.name.escapedText.toString();
+                    const staticValueSymbol = typeChecker.getStaticExtension(type, name);
+                    if(staticValueSymbol) {
+                        // If execution gets here, it means we have a static variable extension,
+                        // which needs to be treated a little differently
+                        const declaration = staticValueSymbol.patched.valueDeclaration;
+                        if(declaration && declaration.original) {
+                            symbol = (declaration.original as Declaration).symbol;
+                        }
+                    } else {
+                        symbol = extensions.get(name);
+                    }
+                }
+            }
+
+            if (!symbol) {
+                symbol = typeChecker.getNodeLinks(node.parent).tsPlusSymbol
+            }
+        }
+        else if (isBinaryOperatorToken(node) && isBinaryExpression(parent)) {
+            const extension = typeChecker.getResolvedOperator(parent);
+            if (extension && extension.declaration) {
+                if (isTsPlusSymbol(extension.declaration.symbol) && extension.declaration.symbol.tsPlusTag === TsPlusSymbolTag.PipeableDeclaration) {
+                    symbol = extension.declaration.symbol.tsPlusDeclaration.symbol
+                }
+                else {
+                    symbol = extension.declaration.symbol;
+                }
             }
         }
     }
