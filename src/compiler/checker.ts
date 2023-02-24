@@ -32162,6 +32162,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
 
     // TSPLUS EXTENSION START
     function checkPropertyAccessForExtension(node: PropertyAccessExpression | QualifiedName, _left: Expression | QualifiedName, leftType: Type, right: Identifier | PrivateIdentifier, _checkMode: CheckMode | undefined) {
+        if (isOptionalChain(node)) {
+            return;
+        }
         const inType = getPropertiesOfType(leftType).findIndex((p) => p.escapedName === right.escapedText) !== -1;
         if (!inType) {
             const nodeLinks = getNodeLinks(node);
