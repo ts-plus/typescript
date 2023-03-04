@@ -2135,11 +2135,11 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
 
         return out;
     }
-    function collectRelevantSymbolsLoop(target: Type, lastNoInherit: Set<string>, lastSeen?: Set<Type>) {
+    function collectRelevantSymbolsLoop(originalTarget: Type, lastNoInherit: Set<string>, lastSeen?: Set<Type>) {
         const seen: Set<Type> = new Set(lastSeen);
         const noInherit: Set<string> = new Set(lastNoInherit);
         const relevant: Set<Symbol> = new Set();
-        let queue: Type[] = [target]
+        let queue: Type[] = [originalTarget]
         while (queue.length > 0) {
             const target = queue.shift()!
             if (target.symbol) {
@@ -2277,9 +2277,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return arrayFrom(symbols.values());
     }
     /**
-        * Recursively collects the symbols associated with the given type. Index 0 is the given type's symbol,
-        * followed by subtypes, subtypes of subtypes, etc.
-        */
+     * Recursively collects the symbols associated with the given type. Index 0 is the given type's symbol,
+     * followed by subtypes, subtypes of subtypes, etc.
+     */
     function collectRelevantSymbolsWorker(target: Type) {
         let returnArray = arrayFrom(collectRelevantSymbolsLoop(target, new Set()).values())
 
@@ -2312,14 +2312,35 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
         return returnArray
     }
+    function getAllTypeTags(targetType: Type): string[] {
+        return targetType.symbol?.declarations?.flatMap(collectTsPlusTypeTags) ?? []
+    }
+    function isInstanceType(type: Type): boolean {
+        if (!type.symbol) {
+            return true;
+        }
+        if (!(type.symbol.flags & SymbolFlags.Class)) {
+            return true;
+        }
+        const declaredType = getDeclaredTypeOfClassOrInterface(type.symbol);
+        if (!declaredType.symbol) {
+            return true;
+        }
+        return getTypeOfSymbol(declaredType.symbol) !== type;
+    }
     function getExtensions(selfNode: Expression) {
         const targetType: Type = getTypeOfNode(selfNode);
+        const isInstance = isInstanceType(targetType);
         const symbols = collectRelevantSymbols(targetType);
         const copy: Map<string, Symbol> = new Map();
         const copyFluent: Map<string, Set<TsPlusFluentExtension>> = new Map();
+        const typeTags = getAllTypeTags(targetType)
         symbols.forEach((target) => {
-            if (typeSymbolCache.has(target) && !isCompanionReference(selfNode)) {
+            if (typeSymbolCache.has(target)) {
                 typeSymbolCache.get(target)!.forEach((typeSymbol) => {
+                    if (!isInstance && typeTags.includes(typeSymbol)) {
+                        return
+                    }
                     const _static = staticCache.get(typeSymbol);
                     if (_static) {
                         _static.forEach((v, k) => {
@@ -2432,12 +2453,17 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return paramType
     }
     function getFluentExtension(targetType: Type, name: string): Type | undefined {
+        const isInstance = isInstanceType(targetType);
+        const typeTags = getAllTypeTags(targetType)
         const symbols = collectRelevantSymbols(targetType);
         const candidates: Set<TsPlusSignature> = new Set();
         for (const target of symbols) {
             if (typeSymbolCache.has(target)) {
                 const x = typeSymbolCache.get(target)!.flatMap(
                     (tag) => {
+                        if (!isInstance && typeTags.includes(tag)) {
+                            return []
+                        }
                         if (fluentCache.has(tag)) {
                             const cache = fluentCache.get(tag)
                             if (cache?.has(name)) {
@@ -2474,10 +2500,15 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
     }
     function getGetterExtension(targetType: Type, name: string) {
         const symbols = collectRelevantSymbols(targetType)
+        const isInstance = isInstanceType(targetType);
+        const typeTags = getAllTypeTags(targetType)
         for (const target of symbols) {
             if (typeSymbolCache.has(target)) {
                 const x = typeSymbolCache.get(target)!.flatMap(
                     (tag) => {
+                        if (!isInstance && typeTags.includes(tag)) {
+                            return []
+                        }
                         if (getterCache.has(tag)) {
                             const cache = getterCache.get(tag)
                             if (cache?.has(name)) {
@@ -32178,7 +32209,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     nodeLinks.tsPlusResolvedType = companionExt.type
                     return companionExt.type;
                 }
-                return;
             }
             const fluentExtType = getFluentExtension(leftType, right.escapedText.toString());
             if (fluentExtType && isCallExpression(node.parent) && node.parent.expression === node) {
@@ -49594,6 +49624,25 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         forEach(heritage, (clause) => {
             forEach(clause.types, (node) => {
                 const type = getTypeOfNode(node);
+                if (isCallExpression(node.expression)) {
+                    const resolvedSignature = getResolvedSignature(node.expression);
+                    const returnType = resolvedSignature.resolvedReturnType
+                    if (returnType) {
+                        if (returnType.symbol) {
+                            heritageExtensions.add(returnType.symbol);
+                        }
+                        if (returnType.flags & TypeFlags.Intersection) {
+                            forEach((returnType as IntersectionType).types, (type) => {
+                                if (type.symbol) {
+                                    heritageExtensions.add(type.symbol)
+                                }
+                                if (type.aliasSymbol) {
+                                    heritageExtensions.add(type.aliasSymbol)
+                                }
+                            })
+                        }
+                    }
+                }
                 if (type.symbol) {
                     heritageExtensions.add(type.symbol)
                 }
