@@ -27370,10 +27370,18 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         // Since our fluent properties are "fake", to resolve a dotted name, we have to look up
                         // the parent type in the cache
                         const symbol = type.symbol || type.aliasSymbol;
-                        if (symbol && typeSymbolCache.has(symbol)) {
+                        if (symbol && (typeSymbolCache.has(symbol) || companionSymbolCache.has(symbol))) {
                             const fluentExtenion = getFluentExtension(type, name.escapedText as string);
                             if (fluentExtenion) {
                                 return fluentExtenion;
+                            }
+                            const staticExtension = getStaticExtension(type, name.escapedText as string);
+                            if (staticExtension) {
+                                return staticExtension.type;
+                            }
+                            const staticCompanionExtension = getStaticCompanionExtension(type, name.escapedText as string);
+                            if (staticCompanionExtension) {
+                                return staticCompanionExtension.type;
                             }
                         }
                         // TSPLUS EXTENSION END
