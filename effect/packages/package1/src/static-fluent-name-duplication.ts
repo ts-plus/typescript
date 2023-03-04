@@ -20,4 +20,4 @@ export function staticMethod(_y: string): A {
 
 A.f("hello");
 
-new A().f(1);
+new A().f(1)
