@@ -50156,20 +50156,11 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         forEach(heritage, (clause) => {
             forEach(clause.types, (node) => {
                 if (isIdentifier(node.expression)) {
-                    const nodeLinks = getNodeLinks(node.expression);
-                    let resolvedSymbol = nodeLinks.resolvedSymbol;
-                    if (!resolvedSymbol) {
-                        resolvedSymbol = resolveName(
-                            node.expression,
-                            node.expression.escapedText,
-                            SymbolFlags.Value | SymbolFlags.Type,
-                            undefined,
-                            undefined,
-                            false
-                        )
-                    }
-                    if (!!resolvedSymbol && !!resolvedSymbol.valueDeclaration) {
-                        const declarationType = getTypeOfNode(resolvedSymbol.valueDeclaration);
+                    const nodeType = getTypeOfNode(node.expression);
+                    const typeSymbol = nodeType.symbol;
+                    const valueDeclaration = typeSymbol?.valueDeclaration;
+                    if (valueDeclaration) {
+                        const declarationType = getTypeOfNode(valueDeclaration);
                         if (declarationType.symbol) {
                             heritageExtensions.add(declarationType.symbol);
                         }
@@ -50202,11 +50193,10 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                             })
                         }
                     }
-                } else {
-                    const type = getTypeOfNode(node);
-                    if (type.symbol) {
-                        heritageExtensions.add(type.symbol)
-                    }
+                }
+                const type = getTypeOfNode(node);
+                if (type.symbol) {
+                    heritageExtensions.add(type.symbol)
                 }
             })
         })
