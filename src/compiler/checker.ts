@@ -50150,11 +50150,41 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         if (!inheritanceSymbolCache.has(typeSymbol)) {
             inheritanceSymbolCache.set(typeSymbol, new Set());
         }
+
+
         const heritageExtensions = inheritanceSymbolCache.get(typeSymbol)!;
         forEach(heritage, (clause) => {
             forEach(clause.types, (node) => {
-                const type = getTypeOfNode(node);
-                if (isCallExpression(node.expression)) {
+                if (isIdentifier(node.expression)) {
+                    const nodeLinks = getNodeLinks(node.expression);
+                    let resolvedSymbol = nodeLinks.resolvedSymbol;
+                    if (!resolvedSymbol) {
+                        resolvedSymbol = resolveName(
+                            node.expression,
+                            node.expression.escapedText,
+                            SymbolFlags.Value | SymbolFlags.Type,
+                            undefined,
+                            undefined,
+                            false
+                        )
+                    }
+                    if (!!resolvedSymbol && !!resolvedSymbol.valueDeclaration) {
+                        const declarationType = getTypeOfNode(resolvedSymbol.valueDeclaration);
+                        if (declarationType.symbol) {
+                            heritageExtensions.add(declarationType.symbol);
+                        }
+                        if (declarationType.flags & TypeFlags.Intersection) {
+                            forEach((declarationType as IntersectionType).types, (type) => {
+                                if (type.symbol) {
+                                    heritageExtensions.add(type.symbol);
+                                }
+                                if (type.aliasSymbol) {
+                                    heritageExtensions.add(type.aliasSymbol);
+                                }
+                            })
+                        }
+                    }
+                } else if (isCallExpression(node.expression)) {
                     const resolvedSignature = getResolvedSignature(node.expression);
                     const returnType = resolvedSignature.resolvedReturnType
                     if (returnType) {
@@ -50172,9 +50202,11 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                             })
                         }
                     }
-                }
-                if (type.symbol) {
-                    heritageExtensions.add(type.symbol)
+                } else {
+                    const type = getTypeOfNode(node);
+                    if (type.symbol) {
+                        heritageExtensions.add(type.symbol)
+                    }
                 }
             })
         })
