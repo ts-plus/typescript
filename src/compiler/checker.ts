@@ -50157,23 +50157,21 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             forEach(clause.types, (node) => {
                 if (isIdentifier(node.expression)) {
                     const nodeType = getTypeOfNode(node.expression);
-                    const typeSymbol = nodeType.symbol;
-                    const valueDeclaration = typeSymbol?.valueDeclaration;
-                    if (valueDeclaration) {
-                        const declarationType = getTypeOfNode(valueDeclaration);
-                        if (declarationType.symbol) {
-                            heritageExtensions.add(declarationType.symbol);
-                        }
-                        if (declarationType.flags & TypeFlags.Intersection) {
-                            forEach((declarationType as IntersectionType).types, (type) => {
-                                if (type.symbol) {
-                                    heritageExtensions.add(type.symbol);
-                                }
-                                if (type.aliasSymbol) {
-                                    heritageExtensions.add(type.aliasSymbol);
-                                }
-                            })
-                        }
+                    if (nodeType.flags & TypeFlags.Intersection) {
+                        forEach((nodeType as IntersectionType).types, (type) => {
+                            if (type.symbol) {
+                                heritageExtensions.add(type.symbol);
+                            }
+                            if (type.aliasSymbol) {
+                                heritageExtensions.add(type.aliasSymbol);
+                            }
+                        })
+                    }
+                    if (nodeType.symbol) {
+                        heritageExtensions.add(nodeType.symbol);
+                    }
+                    if (nodeType.aliasSymbol) {
+                        heritageExtensions.add(nodeType.aliasSymbol)
                     }
                 } else if (isCallExpression(node.expression)) {
                     const resolvedSignature = getResolvedSignature(node.expression);
