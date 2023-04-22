@@ -14549,6 +14549,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
      * literal-typed properties are reducible).
      */
     function isGenericReducibleType(type: Type): boolean {
+        if (type.symbol?.declarations?.[0] && getSourceFileOfNode(type.symbol.declarations[0])?.fileName.includes("package1/src/test")) {
+            debugger
+        }
         return !!(type.flags & TypeFlags.Union && (type as UnionType).objectFlags & ObjectFlags.ContainsIntersections && some((type as UnionType).types, isGenericReducibleType) ||
             type.flags & TypeFlags.Intersection && isReducibleIntersection(type as IntersectionType));
     }
@@ -18014,7 +18017,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         // eagerly using the constraint type of 'this' at the given location.
         if (isGenericIndexType(indexType) || (accessNode && accessNode.kind !== SyntaxKind.IndexedAccessType ?
             isGenericTupleType(objectType) && !indexTypeLessThan(indexType, objectType.target.fixedLength) :
-            isGenericObjectType(objectType) && !(isTupleType(objectType) && indexTypeLessThan(indexType, objectType.target.fixedLength)) || isGenericReducibleType(objectType))) {
+            isGenericObjectType(objectType) && !(isTupleType(objectType) && indexTypeLessThan(indexType, objectType.target.fixedLength)) /* || isGenericReducibleType(objectType) */)) {
             if (objectType.flags & TypeFlags.AnyOrUnknown) {
                 return objectType;
             }
