@@ -1485,6 +1485,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
 
     // TSPLUS EXTENSION START
     const typeHashCache = new Map<Type, number>();
+    const unresolvedTypeDeclarations = new Set<InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration>()
+    const unresolvedCompanionDeclarations = new Set<InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration>()
     const typeSymbolCache = new Map<Symbol, string[]>();
     const companionSymbolCache = new Map<Symbol, string[]>();
     const resolvedFluentCache = new Map<string, Map<string, TsPlusFluentExtension>>();
@@ -50156,62 +50158,12 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
     }
     function cacheTsPlusType(declaration: InterfaceDeclaration | TypeAliasDeclaration | ClassDeclaration): void {
-        const type = getTypeOfNode(declaration);
-        for (const typeTag of collectTsPlusTypeTags(declaration)) {
-            if (type === globalStringType) {
-                addToTypeSymbolCache(tsplusStringPrimitiveSymbol, typeTag, "after");
-            }
-            if (type === globalNumberType) {
-                addToTypeSymbolCache(tsplusNumberPrimitiveSymbol, typeTag, "after");
-            }
-            if (type === globalBooleanType) {
-                addToTypeSymbolCache(tsplusBooleanPrimitiveSymbol, typeTag, "after");
-            }
-            if (type === getGlobalBigIntType()) {
-                addToTypeSymbolCache(tsplusBigIntPrimitiveSymbol, typeTag, "after");
-            }
-            if (type === globalFunctionType) {
-                addToTypeSymbolCache(tsplusFunctionPrimitiveSymbol, typeTag, "after");
-            }
-            if (type === globalObjectType) {
-                addToTypeSymbolCache(tsplusObjectPrimitiveSymbol, typeTag, "after");
-            }
-            if (type === globalArrayType) {
-                addToTypeSymbolCache(tsplusArraySymbol, typeTag, "after");
-            }
-            if (type === globalReadonlyArrayType) {
-                addToTypeSymbolCache(tsplusReadonlyArraySymbol, typeTag, "after");
-            }
-            if (type.symbol) {
-                addToTypeSymbolCache(type.symbol, typeTag, "after");
-                if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.heritageClauses) {
-                    tryCacheTsPlusInheritance(type.symbol, declaration.heritageClauses);
-                }
-            }
-            if (type.aliasSymbol) {
-                addToTypeSymbolCache(type.aliasSymbol, typeTag, "after");
-            }
-            if (type.flags & TypeFlags.Union) {
-                tryCacheUnionInheritance((type as UnionType).types, type);
-            }
-            if (type.flags & TypeFlags.UnionOrIntersection) {
-                const types = (type as UnionOrIntersectionType).types;
-                for (const member of types) {
-                    if (member.symbol) {
-                        addToTypeSymbolCache(member.symbol, typeTag, "before");
-                    }
-                    if (member.aliasSymbol) {
-                        addToTypeSymbolCache(member.aliasSymbol, typeTag, "before");
-                    }
-                }
-            }
-        }
+        unresolvedTypeDeclarations.add(declaration);
     }
     function tryCacheTsPlusInheritance(typeSymbol: Symbol, heritage: readonly HeritageClause[]): void {
         if (!inheritanceSymbolCache.has(typeSymbol)) {
             inheritanceSymbolCache.set(typeSymbol, new Set());
         }
-
 
         const heritageExtensions = inheritanceSymbolCache.get(typeSymbol)!;
         forEach(heritage, (clause) => {
@@ -50285,20 +50237,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return tsPlusFiles.has(tag) ? tsPlusFiles.get(tag)! : (tsPlusFiles.set(tag, new Set()), tsPlusFiles.get(tag)!);
     }
     function cacheTsPlusCompanion(declaration: ClassDeclaration | InterfaceDeclaration | TypeAliasDeclaration): void {
-        const tags = collectTsPlusCompanionTags(declaration);
-        const type = getTypeOfNode(declaration)
-        if (type.symbol) {
-            for (const companionTag of tags) {
-                getTsPlusSourceFileCache(companionTag).add(getSourceFileOfNode(declaration));
-                addToCompanionSymbolCache(type.symbol, companionTag);
-            }
-        }
-        if (type.aliasSymbol) {
-            for (const companionTag of tags) {
-                getTsPlusSourceFileCache(companionTag).add(getSourceFileOfNode(declaration));
-                addToCompanionSymbolCache(type.aliasSymbol, companionTag);
-            }
-        }
+        unresolvedCompanionDeclarations.add(declaration)
     }
     function cacheTsPlusStaticVariable(file: SourceFile, declaration: VariableDeclarationWithIdentifier | ClassDeclarationWithIdentifier) {
         const staticTags = collectTsPlusStaticTags(declaration);
@@ -50977,6 +50916,79 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
         tsPlusDebug && console.timeEnd("initTsPlusTypeChecker collect")
         tsPlusDebug && console.time("initTsPlusTypeChecker joinining signatures")
+
+        unresolvedTypeDeclarations.forEach((declaration) => {
+            const type = getTypeOfNode(declaration);
+            for (const typeTag of collectTsPlusTypeTags(declaration)) {
+                if (type === globalStringType) {
+                    addToTypeSymbolCache(tsplusStringPrimitiveSymbol, typeTag, "after");
+                }
+                if (type === globalNumberType) {
+                    addToTypeSymbolCache(tsplusNumberPrimitiveSymbol, typeTag, "after");
+                }
+                if (type === globalBooleanType) {
+                    addToTypeSymbolCache(tsplusBooleanPrimitiveSymbol, typeTag, "after");
+                }
+                if (type === getGlobalBigIntType()) {
+                    addToTypeSymbolCache(tsplusBigIntPrimitiveSymbol, typeTag, "after");
+                }
+                if (type === globalFunctionType) {
+                    addToTypeSymbolCache(tsplusFunctionPrimitiveSymbol, typeTag, "after");
+                }
+                if (type === globalObjectType) {
+                    addToTypeSymbolCache(tsplusObjectPrimitiveSymbol, typeTag, "after");
+                }
+                if (type === globalArrayType) {
+                    addToTypeSymbolCache(tsplusArraySymbol, typeTag, "after");
+                }
+                if (type === globalReadonlyArrayType) {
+                    addToTypeSymbolCache(tsplusReadonlyArraySymbol, typeTag, "after");
+                }
+                if (type.symbol) {
+                    addToTypeSymbolCache(type.symbol, typeTag, "after");
+                    if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.heritageClauses) {
+                        tryCacheTsPlusInheritance(type.symbol, declaration.heritageClauses);
+                    }
+                }
+                if (type.aliasSymbol) {
+                    addToTypeSymbolCache(type.aliasSymbol, typeTag, "after");
+                }
+                if (type.flags & TypeFlags.Union) {
+                    tryCacheUnionInheritance((type as UnionType).types, type);
+                }
+                if (type.flags & TypeFlags.UnionOrIntersection) {
+                    const types = (type as UnionOrIntersectionType).types;
+                    for (const member of types) {
+                        if (member.symbol) {
+                            addToTypeSymbolCache(member.symbol, typeTag, "before");
+                        }
+                        if (member.aliasSymbol) {
+                            addToTypeSymbolCache(member.aliasSymbol, typeTag, "before");
+                        }
+                    }
+                }
+            }
+        })
+        unresolvedTypeDeclarations.clear()
+
+        unresolvedCompanionDeclarations.forEach((declaration) => {
+            const tags = collectTsPlusCompanionTags(declaration);
+            const type = getTypeOfNode(declaration)
+            if (type.symbol) {
+                for (const companionTag of tags) {
+                    getTsPlusSourceFileCache(companionTag).add(getSourceFileOfNode(declaration));
+                    addToCompanionSymbolCache(type.symbol, companionTag);
+                }
+            }
+            if (type.aliasSymbol) {
+                for (const companionTag of tags) {
+                    getTsPlusSourceFileCache(companionTag).add(getSourceFileOfNode(declaration));
+                    addToCompanionSymbolCache(type.aliasSymbol, companionTag);
+                }
+            }
+        })
+        unresolvedCompanionDeclarations.clear()
+
         unresolvedStaticCache.forEach((map, typeName) => {
             if (!staticCache.has(typeName)) {
                 staticCache.set(typeName, new Map());
