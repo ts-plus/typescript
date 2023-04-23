@@ -50917,6 +50917,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         tsPlusDebug && console.timeEnd("initTsPlusTypeChecker collect")
         tsPlusDebug && console.time("initTsPlusTypeChecker joinining signatures")
 
+        const unresolvedUnionInheritance = new Map<Type, Type[]>()
+        const unresolvedInheritance = new Map<Symbol, NodeArray<HeritageClause>>()
+
         unresolvedTypeDeclarations.forEach((declaration) => {
             const type = getTypeOfNode(declaration);
             for (const typeTag of collectTsPlusTypeTags(declaration)) {
@@ -50947,14 +50950,14 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 if (type.symbol) {
                     addToTypeSymbolCache(type.symbol, typeTag, "after");
                     if ((isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)) && declaration.heritageClauses) {
-                        tryCacheTsPlusInheritance(type.symbol, declaration.heritageClauses);
+                        unresolvedInheritance.set(type.symbol, declaration.heritageClauses);
                     }
                 }
                 if (type.aliasSymbol) {
                     addToTypeSymbolCache(type.aliasSymbol, typeTag, "after");
                 }
                 if (type.flags & TypeFlags.Union) {
-                    tryCacheUnionInheritance((type as UnionType).types, type);
+                    unresolvedUnionInheritance.set(type, (type as UnionType).types)
                 }
                 if (type.flags & TypeFlags.UnionOrIntersection) {
                     const types = (type as UnionOrIntersectionType).types;
@@ -50969,7 +50972,17 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 }
             }
         })
-        unresolvedTypeDeclarations.clear()
+        unresolvedTypeDeclarations.clear();
+
+        unresolvedUnionInheritance.forEach((types, type) => {
+            tryCacheUnionInheritance(types, type);
+        });
+        unresolvedUnionInheritance.clear();
+
+        unresolvedInheritance.forEach((heritageClauses, symbol) => {
+            tryCacheTsPlusInheritance(symbol, heritageClauses);
+        });
+        unresolvedInheritance.clear()
 
         unresolvedCompanionDeclarations.forEach((declaration) => {
             const tags = collectTsPlusCompanionTags(declaration);
