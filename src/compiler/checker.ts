@@ -50188,7 +50188,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     }
                 } else if (isCallExpression(node.expression)) {
                     const resolvedSignature = getResolvedSignature(node.expression);
-                    const returnType = resolvedSignature.resolvedReturnType
+                    const returnType = getReturnTypeOfSignature(resolvedSignature);
                     if (returnType) {
                         if (returnType.symbol) {
                             heritageExtensions.add(returnType.symbol);
@@ -50974,16 +50974,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         })
         unresolvedTypeDeclarations.clear();
 
-        unresolvedUnionInheritance.forEach((types, type) => {
-            tryCacheUnionInheritance(types, type);
-        });
-        unresolvedUnionInheritance.clear();
-
-        unresolvedInheritance.forEach((heritageClauses, symbol) => {
-            tryCacheTsPlusInheritance(symbol, heritageClauses);
-        });
-        unresolvedInheritance.clear()
-
         unresolvedCompanionDeclarations.forEach((declaration) => {
             const tags = collectTsPlusCompanionTags(declaration);
             const type = getTypeOfNode(declaration)
@@ -51206,6 +51196,17 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 extensions.sort(({ priority: x }, { priority: y }) => x > y ? 1 : x < y ? -1 : 0)
             })
         })
+
+        unresolvedUnionInheritance.forEach((types, type) => {
+            tryCacheUnionInheritance(types, type);
+        });
+        unresolvedUnionInheritance.clear();
+
+        unresolvedInheritance.forEach((heritageClauses, symbol) => {
+            tryCacheTsPlusInheritance(symbol, heritageClauses);
+        });
+        unresolvedInheritance.clear()
+
         tsPlusDebug && console.timeEnd("initTsPlusTypeChecker joinining signatures")
         tsPlusDebug && console.time("initTsPlusTypeChecker implicits")
         initTsPlusTypeCheckerImplicits();
