@@ -247,7 +247,7 @@ import {
     getTokenAtPosition,
     isBinaryOperatorToken,
     TsPlusExtensionTag,
-    isTsPlusSymbol,
+    // isTsPlusSymbol,
 } from "./_namespaces/ts";
 import {
     createImportTracker,
@@ -987,7 +987,7 @@ export namespace Core {
             for (const extension of tsPlusExtensions) {
                 tsPlusReferences = concatenate(
                     tsPlusReferences,
-                    getReferencedExtensionsForSymbol(tsPlusSymbol, extension, node, sourceFiles, sourceFilesSet, checker, cancellationToken, options)
+                    getReferencedExtensionsForSymbol(tsPlusSymbol, extension, node, sourceFiles, sourceFilesSet, checker, cancellationToken, options, true)
                 );
             }
         }
@@ -1035,20 +1035,18 @@ export namespace Core {
 
         const references = getReferencedSymbolsForSymbol(symbol, node, sourceFiles, sourceFilesSet, checker, cancellationToken, options);
         // TSPLUS EXTENSION BEGIN
-        if (isTsPlusSymbol(symbol)) {
-            let tsPlusDeclarationReferences: SymbolAndEntries[] = []
-            if (symbol.valueDeclaration) {
-                for (const extension of checker.getExtensionsForDeclaration(symbol.valueDeclaration)) {
-                    tsPlusDeclarationReferences = concatenate(
-                        tsPlusDeclarationReferences,
-                        getReferencedExtensionsForSymbol(symbol, extension, undefined, sourceFiles, sourceFilesSet, checker, cancellationToken, options)
-                    );
-                }
+        let tsPlusDeclarationReferences: SymbolAndEntries[] = []
+        if (symbol.valueDeclaration) {
+            for (const extension of checker.getExtensionsForDeclaration(symbol.valueDeclaration)) {
+                tsPlusDeclarationReferences = concatenate(
+                    tsPlusDeclarationReferences,
+                    getReferencedExtensionsForSymbol(symbol, extension, undefined, sourceFiles, sourceFilesSet, checker, cancellationToken, options, false)
+                );
             }
-            return mergeReferences(program, moduleReferences, references, moduleReferencesOfExportTarget, tsPlusReferences, tsPlusDeclarationReferences);
         }
+        return mergeReferences(program, moduleReferences, references, moduleReferencesOfExportTarget, tsPlusReferences, tsPlusDeclarationReferences);
         // TSPLUS EXTENSION END
-        return mergeReferences(program, moduleReferences, references, moduleReferencesOfExportTarget);
+        // return mergeReferences(program, moduleReferences, references, moduleReferencesOfExportTarget);
     }
 
     export function getAdjustedNode(node: Node, options: Options) {
@@ -1354,7 +1352,7 @@ export namespace Core {
         return references;
     }
 
-    function getReferencedExtensionsForSymbol(referenceSymbol: Symbol, extension: TsPlusExtensionTag, _node: Node | undefined, sourceFiles: readonly SourceFile[], _sourceFilesSet: ReadonlySet<string>, checker: TypeChecker, cancellationToken: CancellationToken, _options: Options): SymbolAndEntries[] {
+    function getReferencedExtensionsForSymbol(referenceSymbol: Symbol, extension: TsPlusExtensionTag, _node: Node | undefined, sourceFiles: readonly SourceFile[], _sourceFilesSet: ReadonlySet<string>, checker: TypeChecker, cancellationToken: CancellationToken, _options: Options, includeDeclaration: boolean): SymbolAndEntries[] {
         const references: SymbolAndEntries[] = []
         for (const sourceFile of sourceFiles) {
             cancellationToken.throwIfCancellationRequested()
@@ -1363,7 +1361,7 @@ export namespace Core {
                     cancellationToken.throwIfCancellationRequested()
                     const referenceLocation = getTouchingPropertyName(sourceFile, position);
                     if (!isValidReferencePosition(referenceLocation, extension.name)) continue;
-                    const extensions = checker.getTsPlusExtensionsAtLocation(referenceLocation);
+                    const extensions = checker.getTsPlusExtensionsAtLocation(referenceLocation, includeDeclaration);
                     for (const referencedExtension of extensions) {
                         if (referencedExtension === extension) {
                             references.push({
