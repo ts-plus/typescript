@@ -1621,7 +1621,7 @@ namespace Parser {
     var parseErrorBeforeNextFinishedNode = false;
     /* eslint-enable no-var */
     
-    const tsPlusExternalTypeCache = new Map<string, Record<string, TsPlusTypeDefinition[]>>()
+    const tsPlusExternalTypeCache = new Map<string, Record<string, TsPlusTypeDefinition[]> | undefined>()
     const tsPlusResolvedPathsCache = new Map<string, string[]>()
     const tsPlusResolvedModuleCache = new Map<string, any>()
     let currentTsPlusTypes: TsPlusTypeDefinition[] | null = null;
@@ -1975,18 +1975,18 @@ namespace Parser {
         }
         for (const resolvedPath of resolvedPaths) {
             let json = tsPlusExternalTypeCache.get(resolvedPath);
-            if (!json) {
+            if (!tsPlusExternalTypeCache.has(resolvedPath)) {
                 const text = sys.readFile(resolvedPath);
                 if (text) {
                     json = JSON.parse(text);
-                    if (json) { tsPlusExternalTypeCache.set(resolvedPath, json) }
                 }
+                tsPlusExternalTypeCache.set(resolvedPath, json)
             }
             if (!json) return;
             for (const moduleName in json) {
                 const key = `${options.configFilePath ?? fileName}+${moduleName}`;
                 let resolvedModule = tsPlusResolvedModuleCache.get(key);
-                if (!resolvedModule) {
+                if (!tsPlusResolvedModuleCache.has(key)) {
                     resolvedModule = resolveModuleName(moduleName, resolvedPath, options, sys).resolvedModule ?? resolveModuleName(moduleName, fileName, options, sys).resolvedModule;
                     tsPlusResolvedModuleCache.set(key, resolvedModule);
                 }
