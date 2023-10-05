@@ -1979,6 +1979,7 @@ namespace Parser {
                 const text = sys.readFile(resolvedPath);
                 if (text) {
                     json = JSON.parse(text);
+                    if (json) { tsPlusExternalTypeCache.set(resolvedPath, json) }
                 }
             }
             if (!json) return;
