@@ -8419,7 +8419,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     if (getEmitModuleResolutionKind(compilerOptions) === ModuleResolutionKind.Node16 || getEmitModuleResolutionKind(compilerOptions) === ModuleResolutionKind.NodeNext) {
                         // We might be able to write a portable import type using a mode override; try specifier generation again, but with a different mode set
                         const swappedMode = contextFile?.impliedNodeFormat === ModuleKind.ESNext ? ModuleKind.CommonJS : ModuleKind.ESNext;
-                        specifier = getSpecifierForModuleSymbol(chain[0], context, swappedMode);
+                        specifier = getSpecifierForModuleSymbolSpecial(chain[0], context, swappedMode);
 
                         if (specifier.includes("/node_modules/")) {
                             // Still unreachable :(
