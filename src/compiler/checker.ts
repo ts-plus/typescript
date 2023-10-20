@@ -1089,6 +1089,7 @@ import {
     FromRule,
     getFileMap,
     getImportLocation,
+    tryGetImportLocation,
     getJSDocCommentsAndTags,
     isReturnStatement,
     JSDocTag,
@@ -8219,6 +8220,16 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             return top;
         }
 
+        function getSpecifierForModuleSymbolSpecial(symbol: Symbol, context: NodeBuilderContext, overrideImportMode?: ResolutionMode) {
+            let specifier = getSpecifierForModuleSymbol(symbol, context, overrideImportMode)
+            // ts plus import workaround
+            if (specifier && specifier.indexOf("/node_modules/") > 0) {
+                const r = tryGetImportLocation(fileMap.map, specifier)
+                if (r) { specifier = r; }
+            }
+            return specifier
+        }
+
         function getSpecifierForModuleSymbol(symbol: Symbol, context: NodeBuilderContext, overrideImportMode?: ResolutionMode) {
             let file = getDeclarationOfKind<SourceFile>(symbol, SyntaxKind.SourceFile);
             if (!file) {
@@ -8304,7 +8315,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 if (getEmitModuleResolutionKind(compilerOptions) === ModuleResolutionKind.Node16 || getEmitModuleResolutionKind(compilerOptions) === ModuleResolutionKind.NodeNext) {
                     // An `import` type directed at an esm format file is only going to resolve in esm mode - set the esm mode assertion
                     if (targetFile?.impliedNodeFormat === ModuleKind.ESNext && targetFile.impliedNodeFormat !== contextFile?.impliedNodeFormat) {
-                        specifier = getSpecifierForModuleSymbol(chain[0], context, ModuleKind.ESNext);
+                        specifier = getSpecifierForModuleSymbolSpecial(chain[0], context, ModuleKind.ESNext);
                         attributes = factory.createImportAttributes(
                             factory.createNodeArray([
                                 factory.createImportAttribute(
@@ -8316,7 +8327,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     }
                 }
                 if (!specifier) {
-                    specifier = getSpecifierForModuleSymbol(chain[0], context);
+                    specifier = getSpecifierForModuleSymbolSpecial(chain[0], context);
                 }
                 if (!(context.flags & NodeBuilderFlags.AllowNodeModulesRelativePaths) && getEmitModuleResolutionKind(compilerOptions) !== ModuleResolutionKind.Classic && specifier.includes("/node_modules/")) {
                     const oldSpecifier = specifier;
@@ -34049,7 +34060,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             // TSPLUS EXTENTION START
             const originalParamType = thisType;
             let paramType = originalParamType;
-            if (isLazyParameterByType(originalParamType) && thisArgumentNode) {
+            if ((isLazyParameterByType(originalParamType) || isForceLazyParameterByType(originalParamType)) && thisArgumentNode) {
                 const contextFreeArgType = thisArgumentType;
                 if (isTypeIdenticalTo(contextFreeArgType, anyType) || isTypeIdenticalTo(contextFreeArgType, neverType)) {
                     return [createDiagnosticForNode(
@@ -34083,7 +34094,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 const originalParamType = getTypeAtPosition(signature, i);
                 const argType = checkExpressionWithContextualType(arg, unionIfLazy(originalParamType), /*inferenceContext*/ undefined, checkMode);
                 let paramType = originalParamType;
-                if (isLazyParameterByType(originalParamType)) {
+                if (isLazyParameterByType(originalParamType) || isForceLazyParameterByType(originalParamType)) {
                     if ((isTypeIdenticalTo(argType, anyType) || isTypeIdenticalTo(argType, neverType)) && !(checkMode & CheckMode.SkipGenericFunctions)) {
                         return [createDiagnosticForNode(
                             arg,
@@ -51551,7 +51562,11 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
     }
     function unionIfLazy(_paramType: Type) {
         const isLazy = isLazyParameterByType(_paramType);
-        const paramType = isLazy ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]], UnionReduction.None) : _paramType;
+        const paramType = isLazy
+            ? getUnionType([_paramType, (_paramType as TypeReference).resolvedTypeArguments![0]], UnionReduction.None)
+            : isForceLazyParameterByType(_paramType)
+                ? (_paramType as TypeReference).resolvedTypeArguments![0]
+                : _paramType;
         return paramType
     }
     function getFluentExtension(targetType: Type, name: string): Type | undefined {
@@ -52149,6 +52164,15 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         if (type.symbol && type.symbol.declarations && type.symbol.declarations.length > 0) {
             const tag = collectTsPlusTypeTags(type.symbol.declarations[0])[0];
             if (tag === "tsplus/LazyArgument") {
+                return true;
+            }
+        }
+        return false;
+    }
+    function isForceLazyParameterByType(type: Type): type is TypeReference {
+        if (type.symbol && type.symbol.declarations && type.symbol.declarations.length > 0) {
+            const tag = collectTsPlusTypeTags(type.symbol.declarations[0])[0];
+            if (tag === "tsplus/ForceLazyArgument") {
                 return true;
             }
         }

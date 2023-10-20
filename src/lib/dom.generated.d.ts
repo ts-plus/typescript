@@ -25929,6 +25929,9 @@ interface WindowOrWorkerGlobalScope {
     setTimeout(handler: TimerHandler, timeout?: number, ...arguments: any[]): number;
     /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/structuredClone) */
     structuredClone<T = any>(value: T, options?: StructuredSerializeOptions): T;
+    readonly Option: {
+        new(text?: string, value?: string, defaultSelected?: boolean, selected?: boolean): HTMLOptionElement;
+    };
 }
 
 interface WindowSessionStorage {
@@ -27154,9 +27157,6 @@ declare var Audio: {
 };
 declare var Image: {
     new(width?: number, height?: number): HTMLImageElement;
-};
-declare var Option: {
-    new(text?: string, value?: string, defaultSelected?: boolean, selected?: boolean): HTMLOptionElement;
 };
 /**
  * @deprecated This is a legacy alias of `navigator`.

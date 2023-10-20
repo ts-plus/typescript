@@ -972,7 +972,7 @@ function tryGetModuleNameAsNodeModule({ path, isRedirect }: ModulePath, { getCan
     }
 
     // If the module was found in @types, get the actual Node package name
-    const nodeModulesDirectoryName = moduleSpecifier.substring(parts.topLevelPackageNameIndex + 1);
+    const nodeModulesDirectoryName = moduleSpecifier.substring(parts.topLevelPackageNameIndex + 1).replace(/\.pnpm\/[^\/]+\/node_modules\//, "");
     const packageName = getPackageNameFromTypesPackageName(nodeModulesDirectoryName);
     // For classic resolution, only allow importing from node_modules/@types, not other node_modules
     return getEmitModuleResolutionKind(options) === ModuleResolutionKind.Classic && packageName === nodeModulesDirectoryName ? undefined : packageName;
