@@ -1,5 +1,5 @@
 {
-    "name": "typescript",
+    "name": "@effect-app/typescript",
     "author": "Microsoft Corp.",
     "homepage": "https://www.typescriptlang.org/",
     "version": "5.4.0",
