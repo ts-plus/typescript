@@ -852,12 +852,13 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
             }
             if (nodeLinks.isFluentCall && nodeLinks.resolvedSignature) {
                 let fluentExtension: TsPlusSignature | undefined;
+                let resolvedSignature: ts.Signature | undefined = nodeLinks.resolvedSignature
 
-                if (isTsPlusSignature(nodeLinks.resolvedSignature)) {
-                    fluentExtension = nodeLinks.resolvedSignature;
-                }
-                else if (nodeLinks.resolvedSignature.target && isTsPlusSignature(nodeLinks.resolvedSignature.target)) {
-                    fluentExtension = nodeLinks.resolvedSignature.target;
+                while (!fluentExtension && resolvedSignature) {
+                    if (isTsPlusSignature(resolvedSignature)) {
+                        fluentExtension = resolvedSignature;
+                    }
+                    resolvedSignature = resolvedSignature.target;
                 }
 
                 if (!fluentExtension) {

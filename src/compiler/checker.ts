@@ -55205,7 +55205,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     return flatMap(returnSignatures, (rsig) => {
                         let newSig = createTsPlusSignature(sig, exportName, file);
                         newSig.parameters = [...rsig.parameters, ...sig.parameters];
-                        newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                        if (rsig.typeParameters !== undefined || sig.typeParameters !== undefined) {
+                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                        }
                         newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
                         newSig.minArgumentCount = newSig.minArgumentCount + 1;
                         const newDecl = factory.updateFunctionDeclaration(
@@ -55265,7 +55267,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 return flatMap(returnSignatures, (rsig) => {
                     let newSig = createTsPlusSignature(sig, exportName, file);
                     newSig.parameters = [...rsig.parameters, ...sig.parameters];
-                    newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                    if (rsig.typeParameters !== undefined || sig.typeParameters !== undefined) {
+                        newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                    }
                     newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
                     newSig.minArgumentCount = newSig.minArgumentCount + 1;
                     const newDecl = factory.updateFunctionDeclaration(
@@ -55348,7 +55352,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     return flatMap(returnSignatures, (rsig) => {
                         let newSig = createTsPlusSignature(sig, exportName, file);
                         newSig.parameters = [...rsig.parameters, ...sig.parameters];
-                        newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                        if (rsig.typeParameters !== undefined || sig.typeParameters !== undefined) {
+                            newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                        }
                         newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
                         newSig.minArgumentCount = newSig.minArgumentCount + 1;
                         let newDecl: ArrowFunction | FunctionExpression | FunctionTypeNode;
@@ -55423,7 +55429,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 return flatMap(returnSignatures, (rsig) => {
                     let newSig = createTsPlusSignature(sig, exportName, file);
                     newSig.parameters = [...rsig.parameters, ...sig.parameters];
-                    newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                    if (rsig.typeParameters !== undefined || sig.typeParameters !== undefined) {
+                        newSig.typeParameters = [...(rsig.typeParameters ?? []), ...(sig.typeParameters ?? [])];
+                    }
                     newSig.resolvedReturnType = getReturnTypeOfSignature(rsig);
                     newSig.minArgumentCount = newSig.minArgumentCount + 1;
                     const newDecl = factory.createFunctionTypeNode(
