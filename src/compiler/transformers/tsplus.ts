@@ -943,12 +943,15 @@ export function transformTsPlus(checker: TypeChecker, options: CompilerOptions, 
             }
             if (isPropertyAccessExpression(node.expression) && checker.getNodeLinks(node.expression).isFluent && nodeLinks.resolvedSignature) {
                 let fluentExtension: TsPlusSignature | undefined;
-                if (isTsPlusSignature(nodeLinks.resolvedSignature)) {
-                    fluentExtension = nodeLinks.resolvedSignature;
+                let resolvedSignature: ts.Signature | undefined = nodeLinks.resolvedSignature
+
+                while (!fluentExtension && resolvedSignature) {
+                    if (isTsPlusSignature(resolvedSignature)) {
+                        fluentExtension = resolvedSignature;
+                    }
+                    resolvedSignature = resolvedSignature.target;
                 }
-                else if (nodeLinks.resolvedSignature.target && isTsPlusSignature(nodeLinks.resolvedSignature.target)) {
-                    fluentExtension = nodeLinks.resolvedSignature.target;
-                }
+
                 if (!fluentExtension) {
                     throw new Error("BUG: No fluent signature found for fluent extension");
                 }
